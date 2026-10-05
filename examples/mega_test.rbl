@@ -1,0 +1,245 @@
+func add(a int, b int) int (
+    return a + b
+)
+
+func multiply(a int, b int) int (
+    return a * b
+)
+
+func factorial(n int) int (
+    set result = 1
+
+    for (i in 1..=n) (
+        let result = result * i
+    )
+
+    return result
+)
+
+func test_ints() (
+    print("=== INT ===")
+
+    set a = 10
+    set b = 20
+
+    print(a)
+    print(b)
+    print(a + b)
+    print(b - a)
+    print(a * b)
+    print(b / a)
+
+    let a = 15
+    print(a)
+
+    print(add(2, 3))
+    print(multiply(6, 7))
+    print(factorial(5))
+)
+
+func test_float() (
+    print("=== FLOAT ===")
+
+    set x = 10f
+    set y = 2f
+
+    print(x)
+    print(y)
+    print(x + y)
+    print(x - y)
+    print(x * y)
+    print(x / y)
+
+    let x = 12f
+    print(x)
+)
+
+func test_bool() (
+    print("=== BOOL ===")
+
+    set a = true
+    set b = false
+
+    print(a)
+    print(b)
+
+    print(a and a)
+    print(a and b)
+    print(b or a)
+    print(b or b)
+
+    if (a) (
+        print("true branch")
+    ) elif (b) (
+        print("wrong branch")
+    ) else (
+        print("wrong else")
+    )
+)
+
+func test_comparisons() (
+    print("=== COMPARISONS ===")
+
+    set a = 10
+    set b = 20
+
+    print(a == b)
+    print(a != b)
+    print(a < b)
+    print(a > b)
+    print(a <= b)
+    print(a >= b)
+
+    if (a < b) (
+        print("a < b")
+    ) elif (a == b) (
+        print("a == b")
+    ) else (
+        print("a > b")
+    )
+)
+
+func test_strings() (
+    print("=== STRING ===")
+
+    set hello = "hello"
+    set world = "world"
+
+    print(hello)
+    print(world)
+
+    set message = hello + " " + world
+
+    print(message)
+
+    let message = "RBL works!"
+    print(message)
+
+    print(hello == world)
+    print(hello != world)
+)
+
+func test_ranges() (
+    print("=== RANGE EXCLUSIVE ===")
+
+    for (i in 0..5) (
+        print(i)
+    )
+
+    print("=== RANGE INCLUSIVE ===")
+
+    for (i in 0..=5) (
+        print(i)
+    )
+)
+
+func test_nested_loops() (
+    print("=== NESTED LOOPS ===")
+
+    set total = 0
+
+    for (i in 1..=5) (
+        for (j in 1..=5) (
+            let total = total + 1
+        )
+    )
+
+    print(total)
+)
+
+func test_loop_state() (
+    print("=== LOOP STATE ===")
+
+    for (i in 10..=15) (
+        print(i)
+    )
+
+    print("last loop value:")
+    print(i)
+)
+
+func test_functions() (
+    print("=== FUNCTIONS ===")
+
+    print(add(100, 200))
+    print(multiply(12, 12))
+    print(factorial(10))
+)
+
+func test_warnings() (
+    print("=== LOGGING ===")
+
+    warn.log("this is a warning")
+    error.log("this is an error")
+
+    print("logging finished")
+)
+
+func test_unicode() (
+    print("=== UNICODE IDENTIFIER ===")
+
+    set число = 42
+    set привет = "hello from unicode"
+
+    print(число)
+    print(привет)
+
+    let число = 43
+    print(число)
+)
+
+func test_branching() (
+    print("=== BRANCHING ===")
+
+    set x = 50
+
+    if (x < 10) (
+        print("less than 10")
+    ) elif (x < 25) (
+        print("10..24")
+    ) elif (x < 50) (
+        print("25..49")
+    ) elif (x == 50) (
+        print("exactly 50")
+    ) else (
+        print("greater than 50")
+    )
+)
+
+func test_evaluation_order() (
+    print("=== EVALUATION ORDER ===")
+
+    set x = 0
+
+    for (i in 0..=5) (
+        let x = x + i
+        print(x)
+    )
+
+    print("final:")
+    print(x)
+)
+
+func main() (
+    print("================================")
+    print("       RBL MEGA TEST")
+    print("================================")
+
+    test_ints()
+    test_float()
+    test_bool()
+    test_comparisons()
+    test_strings()
+    test_ranges()
+    test_nested_loops()
+    test_loop_state()
+    test_functions()
+    test_warnings()
+    test_unicode()
+    test_branching()
+    test_evaluation_order()
+
+    print("================================")
+    print("        ALL TESTS DONE")
+    print("================================")
+)

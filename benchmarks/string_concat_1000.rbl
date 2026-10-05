@@ -1,0 +1,7 @@
+func main() (
+    set s = ""
+    for (i in 0..=1000) (
+        let s = s + "x"
+    )
+    print(s)
+)

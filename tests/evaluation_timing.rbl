@@ -1,0 +1,8 @@
+func one() int (
+    print("ONE")
+    return 1
+)
+func takes_one(a int) int ( return a )
+func main() (
+    takes_one(one(), one())
+)

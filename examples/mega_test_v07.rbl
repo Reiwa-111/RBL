@@ -1,0 +1,42 @@
+func add(a int, b int) int (
+    return a + b
+)
+
+func factorial(n int) int (
+    set result = 1
+    for (i in 1..=n) (
+        let result = result * i
+    )
+    return result
+)
+
+func main() (
+    print("=== RBL 0.7 MEGA TEST ===")
+    print(add(20, 22))
+    print(factorial(8))
+
+    set x = 50
+    if (x < 10) (
+        print("less")
+    ) elif (x == 50) (
+        print("exactly 50")
+    ) else (
+        print("other")
+    )
+
+    for (i in 0..=3) (
+        print(i)
+    )
+
+    print(len("Привет"))
+    print(rbl.string.upper("hello RBL"))
+    print(rbl.string.contains("hello world", "world"))
+    print(rbl.math.sqrt(81))
+    print(rbl.math.pow(2, 8))
+    print(rbl.time.now_ms() > 0)
+    print(rbl.random.bool())
+
+    warn.log("stdlib warning")
+    error.log("stdlib error")
+    print("ALL TESTS DONE")
+)

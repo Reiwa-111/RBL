@@ -1,0 +1,3 @@
+func main() (
+    let x = print("RHS RUNS FIRST")
+)

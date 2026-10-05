@@ -1,0 +1,20 @@
+// Numeric literals (RBL 0.8): 0x/0b/0o prefixes, '_' separators, float exponents.
+// A leading zero without a prefix stays decimal, so 017 is seventeen and octal
+// literals are always written 0o17 (no C-style octal trap).
+func main() (
+    print(0xFF)
+    print(0xff)
+    print(0b1010)
+    print(0o755)
+    print(017)
+    print(1_000_000)
+    print(0xFF_FF)
+    print(1e3)
+    print(1.5e-3)
+    print(2E+2)
+    print(1.5f)
+    print(10f)
+    print(1e3f)
+    print(1_0.5_0)
+    print(1e1_0)
+)

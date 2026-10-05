@@ -1,0 +1,19 @@
+func ready() bool (
+    return true
+)
+
+func main() (
+    set x = 3
+
+    if (x > 2) (
+        print("greater")
+    ) elif (ready()) (
+        print("ready")
+    ) else (
+        print("other")
+    )
+
+    for (i in 0..=3) (
+        print(i)
+    )
+)

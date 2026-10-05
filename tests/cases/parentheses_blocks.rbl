@@ -1,0 +1,19 @@
+func is_ready() bool (
+    return true
+)
+
+func main() (
+    set ok = true
+
+    if (not ok) (
+        print("wrong")
+    ) elif (is_ready()) (
+        print("ready")
+    ) else (
+        print("wrong")
+    )
+
+    for (i in 0..=2) (
+        print(i)
+    )
+)

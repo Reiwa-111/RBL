@@ -1,0 +1,13 @@
+// Standard library showcase
+func main() (
+    print("len:", len("Привет"))
+    print("abs:", abs(-42))
+    print("sqrt:", sqrt(81))
+    print("min:", min(9, 4, 7))
+    print("max:", max(9, 4, 7))
+    print("int:", int("123"))
+    print("float:", float("3.25"))
+    print("str:", str(456))
+    write_file("/tmp/rbl_example.txt", "Hello from RBL")
+    print(read_file("/tmp/rbl_example.txt"))
+)

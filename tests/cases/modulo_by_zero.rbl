@@ -1,0 +1,6 @@
+// % by zero must report the same diagnostic as / by zero, on both code paths.
+func main() (
+    set a = 5
+    set b = 0
+    print(a % b)
+)

@@ -1,0 +1,6 @@
+func main() (
+    print(3.5)
+    print(10.0)
+    print(0.25)
+    print(3.5 + 0.5)
+)

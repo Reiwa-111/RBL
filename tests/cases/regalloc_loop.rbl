@@ -1,0 +1,17 @@
+func inc(n int) int (
+    return n + 1
+)
+
+func main() (
+    set sum = 0
+    for (i in 0..=1000) (
+        let sum = sum + i
+    )
+    print(sum)
+
+    set x = 0
+    for (i in 0..1000) (
+        let x = inc(x)
+    )
+    print(x)
+)

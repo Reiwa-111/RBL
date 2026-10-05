@@ -1,0 +1,9 @@
+// degrees() / radians() are compile-time rewrites to float(x) * const, so they
+// need no runtime function, accept int or float arguments, and stay exact for
+// the round trip radians(180) -> degrees(...).
+func main() (
+    print(degrees(radians(180.0)) > 179.999)
+    print(radians(180.0) > 3.14)
+    print(radians(0))
+    print(degrees(0.0))
+)

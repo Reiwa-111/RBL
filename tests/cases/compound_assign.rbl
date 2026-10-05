@@ -1,0 +1,25 @@
+// Compound assignment and increments (RBL 0.8). They are rebindings, so they are
+// written with 'let' and desugar to `let x = x <op> rhs` / `let x = x + 1`.
+// Increments are statements only: `let x++` and `let ++x` are the same thing and
+// cannot be used inside an expression.
+func main() (
+    set i = 10
+    let i += 5
+    let i -= 3
+    let i *= 2
+    let i /= 4
+    let i %= 4
+    let i++
+    let ++i
+    let i--
+    let --i
+    print(i)
+
+    set s = "a"
+    let s += "b"
+    print(s)
+
+    set f = 1.5
+    let f *= 2.0
+    print(f)
+)

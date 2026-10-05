@@ -1,0 +1,8 @@
+// Regression: a range expression outside a for header used to make generated code
+// reference a runtime-internal local label (".Lmsg_range_value"), which the linker
+// could never resolve, so the program failed to link at all. The message must now
+// come from the compiler's own string pool.
+func main() (
+    set x = 1..5
+    print(2)
+)

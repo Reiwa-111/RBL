@@ -1,0 +1,10 @@
+func main() (
+    set x = 0
+    for (i in 0..100000000) (
+        if (i < 50000000) (
+            let x = x + 1
+        ) else (
+            let x = x - 1
+        )
+    )
+)

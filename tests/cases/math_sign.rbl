@@ -1,0 +1,9 @@
+// sign(x) -> int: -1, 0 or 1. Works for int and float; NaN counts as 0.
+func main() (
+    print(sign(42))
+    print(sign(-42))
+    print(sign(0))
+    print(sign(2.5))
+    print(sign(-2.5))
+    print(rbl.math.sign(0.0))
+)

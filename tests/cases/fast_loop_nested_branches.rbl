@@ -1,0 +1,30 @@
+// Stress: optimized loop with nested branches, a second optimized loop and
+// several following ifs in one function. Every label class (if, loop, overflow)
+// must stay unique after the loop bodies consume ids in a copied context.
+func main() (
+    set total = 0
+    set acc = 0
+    for (i in 0..6) (
+        if (i > 1) (
+            if (i > 3) (
+                let total = total + i
+            ) else (
+                let acc = acc + i
+            )
+        )
+    )
+    if (total > 0) (
+        print(total)
+    )
+    if (acc > 0) (
+        print(acc)
+    )
+    for (j in 0..3) (
+        if (j > 0) (
+            let total = total + j
+        )
+    )
+    if (total > 0) (
+        print(total)
+    )
+)

@@ -1,0 +1,8 @@
+// Intentionally invalid while format specs are pending: they need runtime helpers
+// in both back ends (`rbl_sprintf` / `rbl_pad`). Covered by tests/differential.py
+// (frontend parity), not by run_tests.py, because diagnostics embed the host path.
+// When the specs land, this file must be replaced by a real fstrings_format.rbl.
+func main() (
+    set x = 3.14159
+    print(f"{x:.2f}")
+)

@@ -1,0 +1,16 @@
+// Memory (RBL 0.8, phase 2.3): the collector must keep a loop that allocates
+// lists and dictionaries bounded. Output is deterministic, so the real check is
+// that this program finishes under a hard memory limit (see docs/TESTING.md).
+func main() (
+    set total = 0
+    set i = 0
+    set xs = []
+    set d = {}
+    for (i < 50000) (
+        let xs = [i, i + 1]
+        let d = {"k": xs}
+        let total += len(d)
+        let i += 1
+    )
+    print(total)
+)

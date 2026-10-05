@@ -1,0 +1,32 @@
+// null (RBL 0.8, phase 2.1): a distinct value, not the same as a function that
+// returns nothing. It prints as `null`, compares by tag, and works as a
+// dictionary value.
+func returns_nothing() (
+)
+
+func maybe(flag bool) (
+    if (flag) ( return "value" )
+    return null
+)
+
+func main() (
+    set n = null
+    print(n)
+    print(n == null)
+    print(n != null)
+    print(n is null)
+    print(null == null)
+    print(maybe(true))
+    print(maybe(false))
+    print(returns_nothing())
+
+    set d = {"a": 1}
+    let d["b"] = null
+    print(d["b"])
+    print(len(d))
+    print(d["a"] is null)
+
+    set xs = [null, 1]
+    print(xs)
+    print(xs[0] is null)
+)

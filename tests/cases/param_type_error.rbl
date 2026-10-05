@@ -1,0 +1,6 @@
+func take(x int) (
+    print(x)
+)
+func main() (
+    take(true)
+)

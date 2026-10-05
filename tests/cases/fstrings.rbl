@@ -1,0 +1,15 @@
+// Interpolated strings (RBL 0.8): f"…" with {expression} parts.
+// Literal runs keep normal escape handling; {{ and }} produce literal braces.
+func main() (
+    set name = "Reiwa"
+    set n = 42
+    print(f"hello, {name}!")
+    print(f"{n} + 1 = {n + 1}")
+    print(f"len={len(name)}")
+    print(f"braces {{}} and {n}")
+    print(f"float {1.5} bool {true}")
+    print(f"tab\t{n}\nnext")
+    print(f"{name}{name}")
+    print(len(f""))
+    print(f"no parts here")
+)

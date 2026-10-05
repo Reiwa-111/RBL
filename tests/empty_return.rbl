@@ -1,0 +1,7 @@
+func noop() int (
+    return
+)
+func main() (
+    set x = noop()
+    print(x)
+)

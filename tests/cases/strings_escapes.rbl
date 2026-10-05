@@ -1,0 +1,11 @@
+// String escapes and multi-line strings (RBL 0.8).
+// Supported escapes: \n \t \r \\ \" \xNN \uXXXX \UXXXXXXXX (a NUL byte is rejected).
+func main() (
+    print("tab[\t]nl")
+    print("quote[\"]slash[\\]")
+    print("hex[\x41]u[\u2713]U[\U0001F600]")
+    print("""line one
+line two""")
+    print(len("Привет"))
+    print("a" + "b")
+)

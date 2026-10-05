@@ -1,0 +1,7 @@
+# '#' starts a line comment, exactly like '//'
+func main() (
+    print("before")   # trailing hash comment
+    # whole line comment
+    set x = 1  # another
+    print(x)
+)

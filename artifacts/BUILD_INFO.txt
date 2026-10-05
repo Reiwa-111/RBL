@@ -1,0 +1,12 @@
+RBL Studio release artifact
+Generated from examples/test.rbl
+Target: x86-64 Linux ELF / System V AMD64
+Pipeline: RBL -> direct ASM -> as -> ld -> ELF
+gcc in user-program pipeline: NO
+
+Files:
+-rwxr-xr-x 1 root oai_shared  20K Sep 28 17:19 artifacts/example_direct
+-rw-r--r-- 1 root oai_shared 4.7K Sep 28 17:19 artifacts/example_direct.o
+-rw-r--r-- 1 root oai_shared 8.3K Sep 28 17:19 artifacts/example_direct.s
+-rw-r--r-- 1 root oai_shared 9.0K Sep 28 17:18 bin/linux-x86_64/rbl_runtime.o
+-rwxr-xr-x 1 root oai_shared 847K Sep 28 17:18 bin/linux-x86_64/rblc-asm

@@ -1,0 +1,8 @@
+// rbl.math.pi and rbl.math.e are constants: a qualified name without '(' is a
+// value, not a call.
+func main() (
+    print(rbl.math.pi > 3.14)
+    print(rbl.math.pi < 3.15)
+    print(rbl.math.e > 2.71)
+    print(rbl.math.pi * 2.0 > 6.28)
+)

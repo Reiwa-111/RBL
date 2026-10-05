@@ -1,0 +1,3 @@
+func main() (
+    print(rbl.randome.int(1, 10))
+)

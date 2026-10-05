@@ -1,0 +1,43 @@
+// Lists (RBL 0.8, phase 2): literals, indexing, element assignment, len,
+// iteration and deep printing/equality.
+func main() (
+    set xs = [1, 2, 3]
+    print(xs)
+    print(len(xs))
+    print(xs[0])
+    print(xs[2])
+
+    let xs[1] = 20
+    print(xs)
+
+    set ys = []
+    let ys = [1, "two", 3.5, true]
+    let ys[0] = 99
+    print(ys)
+    print(len(ys))
+
+    set zs = [7, 8]
+    zs[1] = 70
+    print(zs)
+
+    set total = 0
+    for (v in xs) (
+        let total = total + v
+    )
+    print(total)
+
+    set nested = [[1, 2], [3]]
+    print(nested)
+    print(nested[0][1])
+    print(len(nested[1]))
+
+    print([1, 2] == [1, 2])
+    print([1, 2] == [1, 3])
+    print([1, 2] == "no")
+
+    set acc = [0, 0, 0, 0]
+    for (i in 0..4) (
+        let acc[i] = i * 10
+    )
+    print(acc)
+)

@@ -1,0 +1,4 @@
+func main() (
+    set name = input("Name: ")
+    print("Hello", name)
+)

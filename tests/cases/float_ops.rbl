@@ -1,0 +1,10 @@
+func main() (
+    set a = 10f
+    set b = 2f
+    print(a + b)
+    print(a - b)
+    print(a * b)
+    print(a / b)
+    print(-a)
+    print(a > b)
+)

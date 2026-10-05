@@ -1,0 +1,13 @@
+func main() (
+    print("RBL standard library demo")
+    print(len("hello"))
+    print(rbl.math.sqrt(81))
+    print(rbl.math.pow(2, 8))
+    print(rbl.string.upper("hello RBL"))
+    print(rbl.string.trim("   clean   "))
+    print(rbl.fs.cwd())
+    print(rbl.time.now_ms() > 0)
+    print(rbl.random.int(1, 10))
+    print(rbl.random.float())
+    print(rbl.random.bool())
+)

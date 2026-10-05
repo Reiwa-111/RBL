@@ -1,0 +1,12 @@
+func main() (
+    print(true == true)
+    print(true != false)
+    print("a" == "a")
+    print("a" != "b")
+    print(1 == 1f)
+    set ok = true
+    print(not ok)
+    print(!ok)
+    print(true and false)
+    print(false or true)
+)

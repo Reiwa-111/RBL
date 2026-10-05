@@ -1,0 +1,34 @@
+// тестовый файл — проверяем все подтверждённые конструкции разом
+func add(a int, b int) int {
+    return a + b
+}
+
+func main() {
+    set a = 10
+    print(a)
+    print("change number")
+    let a = 20
+    print(a)
+    print("if elif else")
+    if a > 15 {
+        print("big")
+    } elif a == 15 {
+        print("exactly 15")
+    } else {
+        print("small")
+    }
+
+    for i in 0..=10 {
+        print(i)
+    }
+
+    set ok = true
+    if not ok {
+        error.log("something went wrong")
+    } else {
+        warn.log("just a warning")
+    }
+
+    set result = add(2, 3)
+    print(result)
+}

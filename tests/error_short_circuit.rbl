@@ -1,0 +1,4 @@
+func main() (
+    set ok = false
+    print(ok and missing_variable)
+)

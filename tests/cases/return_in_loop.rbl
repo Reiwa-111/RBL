@@ -1,0 +1,12 @@
+func find(n int) int (
+    for (i in 0..=10) (
+        if (i == n) (
+            return i
+        )
+    )
+    return -1
+)
+func main() (
+    print(find(7))
+    print(find(11))
+)

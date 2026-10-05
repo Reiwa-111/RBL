@@ -1,0 +1,6 @@
+// Intentionally invalid: continue outside of a loop. Covered by
+// tests/differential.py (frontend parity), not by run_tests.py, because
+// diagnostics embed the host file path.
+func main() (
+    continue
+)

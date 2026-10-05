@@ -1,0 +1,6 @@
+func main() (
+    set a = "hello "
+    set b = "RBL"
+    print(a + b)
+    print(("a" + "b") == "ab")
+)

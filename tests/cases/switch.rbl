@@ -1,0 +1,29 @@
+// switch without fallthrough: case 1, case 2, 3, case 4..=9, default.
+// Desugared into if/elif/else comparisons.
+func main() (
+    set x = 2
+    switch (x) (
+        case 1 ( print("one") )
+        case 2, 3 ( print("two-or-three") )
+        case 4..=9 ( print("four-to-nine") )
+        default ( print("other") )
+    )
+
+    set y = 6
+    switch (y) (
+        case 1 ( print("one") )
+        case 4..=9 ( print("four-to-nine") )
+        default ( print("other") )
+    )
+
+    switch ("hi") (
+        case "no" ( print("wrong") )
+        case "hi" ( print("string case") )
+        default ( print("other") )
+    )
+
+    switch (100) (
+        case 1 ( print("one") )
+        default ( print("other") )
+    )
+)

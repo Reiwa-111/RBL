@@ -1,0 +1,10 @@
+// Regression: the optimized loop must report integer overflow on the final
+// increment exactly like the tagged loop does, instead of wrapping and looping
+// forever. Body is int-only so the fast loop path is selected.
+func main() (
+    set s = 0
+    for (i in 9223372036854775806..=9223372036854775807) (
+        let s = s + i
+    )
+    print(s)
+)

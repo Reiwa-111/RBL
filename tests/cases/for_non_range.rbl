@@ -1,0 +1,7 @@
+// Regression: the same code path is used when a for header is not a range at all.
+func main() (
+    set x = 5
+    for (i in x) (
+        print(i)
+    )
+)

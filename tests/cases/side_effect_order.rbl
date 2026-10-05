@@ -1,0 +1,7 @@
+func mark(a int) int (
+    print(a)
+    return a
+)
+func main() (
+    print(mark(1) + mark(2))
+)

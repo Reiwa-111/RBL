@@ -1,0 +1,16 @@
+func main() (
+    set x = 3
+    if (x < 2) (
+        print("bad")
+    ) elif (x == 3) (
+        print("elif")
+    ) else (
+        print("bad2")
+    )
+    for (i in 0..3) (
+        print(i)
+    )
+    for (j in 2..=4) (
+        print(j)
+    )
+)

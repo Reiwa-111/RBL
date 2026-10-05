@@ -1,0 +1,10 @@
+func inc(x int) int (
+    return x + 1
+)
+func main() (
+    set x = 0
+    for (i in 0..=20000) (
+        let x = inc(x)
+    )
+    print(x)
+)

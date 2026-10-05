@@ -1,0 +1,35 @@
+// Dictionaries (RBL 0.8, phase 2.4): literals, keys of int/float/string,
+// indexing, element assignment, `in`, len, printing and deep equality.
+func main() (
+    set d = {"a": 1, "b": 2}
+    print(d)
+    print(len(d))
+    print(d["a"])
+    print(d["b"])
+    print(d["missing"])
+
+    let d["c"] = 3
+    print(d["c"])
+    print(len(d))
+
+    set e = {}
+    print(len(e))
+    let e[1] = "one"
+    let e[2.5] = "half"
+    print(e)
+
+    print("a" in d)
+    print("zz" in d)
+    print(1 in e)
+    print(3 in e)
+    print("ell" in "hello")
+    print("xx" in "hello")
+    print(d["a"] in [1, 2, 3])
+
+    let d["a"] = 100
+    print(d["a"])
+    print(len(d))
+
+    print({"x": 1} == {"x": 1})
+    print({"x": 1} == {"x": 2})
+)

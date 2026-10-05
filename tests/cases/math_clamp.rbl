@@ -1,0 +1,8 @@
+// clamp(x, lo, hi) is rewritten to min(max(x, lo), hi) at parse time, so it adds
+// no runtime entry point and evaluates each argument exactly once.
+func main() (
+    print(clamp(5, 1, 10))
+    print(clamp(0, 1, 10))
+    print(clamp(99, 1, 10))
+    print(clamp(2.5, 1.0, 2.0))
+)

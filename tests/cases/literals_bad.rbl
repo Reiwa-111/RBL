@@ -1,0 +1,7 @@
+// Intentionally invalid: a '_' separator must sit between two digits of the
+// literal. This file is exercised by tests/differential.py (frontend parity
+// between the Linux and Windows builds of the compiler), not by run_tests.py,
+// because compiler diagnostics embed the host file path.
+func main() (
+    print(1__0)
+)

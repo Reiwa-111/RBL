@@ -1,0 +1,26 @@
+// break / continue (RBL 0.8): unlabelled, statement-level, inside for loops.
+// A loop whose body contains break/continue leaves the optimized integer path
+// automatically, so this also covers the tagged loop code path.
+func main() (
+    set sum = 0
+    for (i in 0..10) (
+        if (i == 3) ( continue )
+        if (i == 6) ( break )
+        let sum = sum + i
+    )
+    print(sum)
+
+    set n = 0
+    for (i in 0..5) (
+        if (i % 2 == 0) ( continue )
+        let n = n + 1
+    )
+    print(n)
+
+    for (i in 0..3) (
+        for (j in 0..3) (
+            if (j == 1) ( break )
+            print(i, j)
+        )
+    )
+)

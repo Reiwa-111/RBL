@@ -1,0 +1,13 @@
+// Phase-1 math additions: log10, log2, trunc — available both as globals and
+// through the rbl.math namespace. Arguments may be int or float (converted to
+// double), the result is always float.
+func main() (
+    print(log10(1000.0))
+    print(log2(8.0))
+    print(trunc(3.7))
+    print(trunc(-3.7))
+    print(rbl.math.log10(100.0))
+    print(rbl.math.log2(1024.0))
+    print(rbl.math.trunc(9.99))
+    print(log10(100))
+)

@@ -1,0 +1,7 @@
+// % is integer-only by language decision; float operands take the tagged path
+// and fail with a diagnostic instead of silently computing something C-like.
+func main() (
+    set a = 5.5
+    set b = 2
+    print(a % b)
+)

@@ -1,0 +1,10 @@
+func inc(n int) int (
+    return n + 1
+)
+
+func main() (
+    set x = 0
+    for (i in 0..10000000) (
+        let x = inc(x)
+    )
+)

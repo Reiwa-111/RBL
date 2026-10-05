@@ -1,0 +1,10 @@
+func main() (
+    if (true) (
+        set x = 7
+    )
+    print(x)
+    for (i in 3..=3) (
+        print(i)
+    )
+    print(i)
+)

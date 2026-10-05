@@ -1,0 +1,21 @@
+// % — integer remainder (RBL 0.8). Sign rule follows C/Rust (sign of the
+// dividend), which keeps `a == (a / b) * b + a % b` true for the truncating `/`.
+// The loop body stays on the optimized integer path, so both the unboxed and the
+// tagged code paths are exercised by the corpus (see modulo_float.rbl).
+func main() (
+    print(10 % 3)
+    print(-10 % 3)
+    print(10 % -3)
+    print(-10 % -3)
+    print(7 % 7)
+
+    set n = 17
+    set m = 5
+    print(n % m)
+
+    set sum = 0
+    for (i in 0..=10) (
+        let sum = sum + i % 3
+    )
+    print(sum)
+)

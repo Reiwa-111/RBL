@@ -1,0 +1,63 @@
+RBL Studio — Direct x86-64 ASM IDE + CLI
+Release: v0.7.0
+Backend: two targets from one code generator
+  - Linux x86-64 ELF : RBL -> ASM -> GNU as --64 -> GNU ld + libc/libm
+  - Windows x86-64 PE: RBL -> ASM -> GNU as --64 -> MinGW-w64 gcc + rbl_runtime_win.o
+No C source is generated for user RBL programs on either target. On Windows the C
+compiler only builds the runtime object and acts as the linker driver; the runtime
+itself is runtime/rbl_runtime_win.c compiled with __attribute__((sysv_abi)), and
+the generated code calls it through the same System V registers as on Linux.
+
+New in this tree:
+- Native Windows backend without WSL: compiler --target win, MSYS2 MinGW-w64
+  discovery in tools/rbltool.py, rbl doctor reporting the active backend,
+  wsl_mode setting (auto/native/wsl) and the RBL_TOOLCHAIN override.
+- Windows 7/8.1 supported through the msvcrt-based mingw64 environment; Windows
+  10/11 through ucrt64. See docs/WINDOWS.md.
+- Audit fixes: optimized-loop label-id reuse (assembler error on valid programs),
+  unbounded recursion in the fast-int analysis (compiler SIGSEGV), missing
+  induction-variable overflow check in the optimized loop (endless loop instead
+  of "integer overflow"), and generated code referencing the runtime-internal
+  label .Lmsg_range_value (any range outside a for header failed to link).
+- tests/differential.py compares both runtimes byte for byte over the whole corpus
+  (all 45 programs behave identically; the two programs whose output is
+  intentionally platform dependent are compared on the exit code).
+- Runtime parity fixes found by that runner: rbl_neg/rbl_not now use the same
+  (rdi, rsi) operand convention as the rest of the runtime; the Windows runtime
+  trims an input line at the first LF/CR like the Linux one; the native toolchain
+  driver prepends the toolchain bin directory to PATH (cc1.exe resolves its DLLs
+  through PATH); console output is UTF-8 and never dies on an unencodable
+  character under a legacy Windows code page.
+- 57-case core regression suite (was 25) plus dedicated stdlib/input smoke tests.
+- Memory (phase 2.3): a conservative mark-and-sweep collector for lists, tuples and
+  dictionaries in the shared C runtime. Roots are the machine stack (any word equal to a
+  live container pointer), so temporaries are safe and the code generator needs no
+  ownership analysis. Verified with a 1M-allocation loop under `ulimit -v 122880`.
+- Benchmarks: `benchmarks/compare_all.py` is now a five-way comparison (RBL, C -O2,
+  C++ -O2, CPython, hand-written x86-64 ASM) over the same three workloads.
+- Phase 2 (containers) started: lists with literals `[1, 2]`, indexing `a[i]`, element
+  assignment (`a[i] = v` and `let a[i] = v`), `len(a)`, `for (x in list)`, deep printing and
+  deep equality. The container runtime is written ONCE in C (`runtime/rbl_containers.c`) and
+  linked into both targets, so Linux ASM and Windows PE share one implementation.
+- 0.8 language work (Phase 1, in progress): integer remainder operator `%`; numeric literals
+  `0xFF` / `0b1010` / `0o755` / `1_000_000` / `1e42` / `1.5e-3` (with `017` staying decimal);
+  `#` line comments; string escapes `\n \t \r \\ \" \xNN \uXXXX \UXXXXXXXX` (NUL rejected);
+  multi-line `"""…"""` strings; interpolated `f"…"` strings with `{expression}` and `{{`/`}}`
+  (format specs `{x:.2f}` are the next step); `let x += 1` / `let x++` / `let ++x` and braces
+  are no longer accepted as block delimiters (reserved for dict literals).
+  Contract and phase plan: docs/SYNTAX_DECISIONS.md, docs/ROADMAP.md.
+- Benchmark suite reports build / run / net (net = run - start-up baseline).
+- Every program runs with a timeout, so a regression cannot hang the suite.
+- examples/mega_test.rbl converted to canonical parenthesized syntax.
+
+New in v0.7.0:
+- Canonical parenthesized block syntax: func main() (...), if (cond) (...), for (i in range) (...).
+- Legacy { ... } blocks remain accepted only for source compatibility; formatter/examples use parentheses.
+- Standard-library builtins: len, input, read_file, write_file, abs, sqrt, min, max, int, float, str, pow, floor, ceil, round, sin, cos, tan, log, exp, random_int, random_float, random_bool.
+- Added rbl.io, rbl.math, rbl.string, rbl.fs, rbl.time, rbl.random.
+- Built-in stdlib runtime is implemented directly in the hand-written x86-64 runtime.
+- Added decimal float literals such as 3.5.
+- CLI/project templates and formatter use parenthesized blocks by default.
+- IDE syntax/indentation support updated for canonical parenthesized blocks.
+- Existing typed fast paths and loop-local register allocation retained.
+- Windows IDE -> WSL bridge retained as a fallback path for hosts without MinGW-w64.

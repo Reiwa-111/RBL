@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+PY="$ROOT/.venv/bin/python3"
+[ -x "$PY" ] || PY="$(command -v python3)"
+exec "$PY" "$ROOT/rbl.py" "$@"

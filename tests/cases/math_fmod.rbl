@@ -1,0 +1,9 @@
+// fmod(a, b): float remainder with C semantics (the result takes the sign of the
+// dividend). Because '%' is integer-only, this is the only float remainder in RBL.
+func main() (
+    print(fmod(5.5, 2.0))
+    print(fmod(-5.5, 2.0))
+    print(fmod(5.5, -2.0))
+    print(fmod(7, 3))
+    print(fmod(1.5, 0.5))
+)

@@ -1,0 +1,7 @@
+func main() (
+    set sum = 0
+    for (i in 0..=100000) (
+        let sum = sum + i
+    )
+    print(sum)
+)

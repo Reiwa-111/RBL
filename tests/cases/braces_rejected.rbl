@@ -1,0 +1,6 @@
+// Intentionally invalid: braces are not a block delimiter in RBL 0.8 (they are
+// reserved for dictionary literals). Covered by tests/differential.py (frontend
+// parity), not by run_tests.py, because diagnostics embed the host file path.
+func main() {
+    print("legacy")
+}

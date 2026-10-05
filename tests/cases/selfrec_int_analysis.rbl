@@ -1,0 +1,19 @@
+// Regression: the fast-int analysis must terminate on (mutually) recursive
+// single-return int functions. Before the fix the compiler recursed until the
+// stack overflowed and died with SIGSEGV, even when the functions are never
+// called by the program.
+func self_rec(x int) int (
+    return self_rec(x)
+)
+
+func mutual_a(x int) int (
+    return mutual_b(x)
+)
+
+func mutual_b(x int) int (
+    return mutual_a(x)
+)
+
+func main() (
+    print("analysis ok")
+)

@@ -1,0 +1,6 @@
+// Intentionally invalid: RBL strings are NUL-terminated, so a NUL byte in a
+// literal is a compile error. Covered by tests/differential.py (frontend parity),
+// not by run_tests.py, because diagnostics embed the host file path.
+func main() (
+    print("cut\0here")
+)

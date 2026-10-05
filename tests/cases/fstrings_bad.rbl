@@ -1,0 +1,6 @@
+// Intentionally invalid: the '{' of an interpolation is never closed.
+// Covered by tests/differential.py (frontend parity), not by run_tests.py,
+// because diagnostics embed the host file path.
+func main() (
+    print(f"value = {1 + 2")
+)
