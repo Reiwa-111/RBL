@@ -1,9 +1,10 @@
 # RBL Studio
 
 RBL Studio is a native IDE and toolchain for **Reiwa Bat Language (RBL v0.7.0)**, keeping compatibility with the current Rust-language surface while adding a direct-ASM optimizer and a project CLI.
+
 It is designed around the existing Rust implementation, but the execution path is now a **direct x86-64 assembly backend**.
 
-The backend targets **two platforms from one code generator**: Linux x86-64 ELF (assembled with GNU `as` and linked with GNU `ld`) and native Windows x86-64 PE (assembled with GNU `as` and linked with MinGW-w64 `gcc`, no WSL required). See [docs/WINDOWS.md](docs/WINDOWS.md).
+The backend targets **two platforms from one code generator**: Linux x86-64 ELF (assembled with GNU `as` and linked with GNU `ld`) and native Windows x86-64 PE/COFF (assembled with GNU `as` and linked with MinGW-w64 `gcc`). WSL is supported as a fallback when the native Windows toolchain is unavailable or explicitly selected. See [docs/WINDOWS.md](docs/WINDOWS.md).
 
 The important distinction from the previous prototype is:
 
@@ -22,17 +23,18 @@ GNU as --64
    ↓
 .o
    ↓
-ld + libc
+link + runtime
    ↓
-ELF executable
+native executable
 ```
 
-There is **no generated C program and no GCC/Clang in the user-program build path**. A C compiler is present only as an optional bootstrap tool for rebuilding `rblc-asm` from its C source. The archive already contains a bundled `rblc-asm` executable for Linux x86-64, so normal use does not need GCC.
+There is **no generated C program and no GCC/Clang in the user-program build path on Linux**. On Windows, MinGW-w64 `gcc` is used as the native linker driver and to build the Windows runtime object; it does not receive generated C source from an RBL program.
 
+The repository includes bundled compiler/runtime binaries, so normal use does not require rebuilding `rblc-asm`.
 
 ### Windows: native backend first, WSL as fallback
 
-The Windows GUI is native Tkinter, and since this release the toolchain is native too: RBL Studio finds a MinGW-w64 GNU toolchain (`gcc.exe` + `as.exe`, usually from MSYS2) and assembles/links the generated PE image locally. WSL is used only when no native toolchain is present, or when it is selected explicitly.
+The Windows GUI is native Tkinter, and the toolchain is native-first too: RBL Studio finds a MinGW-w64 GNU toolchain (`gcc.exe` + `as.exe`, usually from MSYS2) and assembles/links the generated PE image locally. WSL is used only when no native toolchain is present, or when it is selected explicitly.
 
 ```powershell
 python rbl.py doctor                  # toolchain + active backend
@@ -54,7 +56,7 @@ python tools\windows_wsl_smoke.py
 - PyCharm-style bottom output area with `Run`, `Console`, and `Problems` tabs.
 - `F5` one-key build + run.
 - Built-in syntax checking and inline problem highlighting.
-- Built-in 25-case core regression suite plus dedicated stdlib/input smoke tests.
+- Built-in 57-case core regression suite plus dedicated stdlib/input smoke tests.
 - Built-in benchmark suite with build time, runtime, min/max and binary size.
 - Four themes: Dark, Light, Nord, Monokai.
 - Persistent settings for theme, font size, tab size, auto-check, auto-save, WSL mode and line numbers.
@@ -65,7 +67,7 @@ python tools\windows_wsl_smoke.py
 - Linux MIME/desktop integration installer/uninstaller.
 - Direct x86-64 ASM compiler and standalone assembly runtime.
 - Native Windows PE output through MinGW-w64, with WSL as an automatic fallback.
-- `tests/differential.py` compares both backends byte for byte over the whole corpus.
+- `tests/differential.py` for cross-backend regression comparison.
 - Typed scalar fast-path optimizer for statically provable `int`/`bool` code.
 - Loop-local register allocation using callee-saved x86-64 registers.
 - Fast integer loops with register-held induction variables and hot locals.
@@ -113,9 +115,9 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\installer\install_windows.ps1
 ```
 
-After that, `.rbl` files use the RBL Studio bat icon and open directly in the IDE.
+After that, `.rbl` files use the RBL Studio icon and open directly in the IDE.
 
-The Windows toolchain expects WSL for running the Linux x86-64 backend. The bundled `rblc-asm` and `rbl_runtime.o` are already present; only `as` and `ld` are needed in WSL for ordinary builds.
+For the Linux x86-64 backend on Windows, select the `wsl` backend or allow `auto` to fall back to WSL when the native toolchain is unavailable. The bundled `rblc-asm` and `rbl_runtime.o` are already present; only `as` and `ld` are needed in WSL for ordinary Linux builds.
 
 A minimal WSL check is:
 
@@ -193,18 +195,49 @@ The parser still accepts `{ ... }` as legacy syntax, but new code and the format
 
 ## Standard library
 
-RBL now ships these built-in functions:
+RBL ships these global built-ins:
 
 ```text
-len(string)
-input() / input(prompt)
-read_file(path) / write_file(path, content)
-abs(x) / sqrt(x)
-min(...) / max(...)
-int(x) / float(x) / str(x)
+print
+len
+input
+read_file
+write_file
+abs
+sqrt
+min
+max
+int
+float
+str
+pow
+floor
+ceil
+round
+sin
+cos
+tan
+log
+exp
+random_int
+random_float
+random_bool
+```
+
+Namespaces:
+
+```text
+rbl.io
+rbl.math
+rbl.string
+rbl.fs
+rbl.time
+rbl.random
 ```
 
 `len` counts UTF-8 code points. File functions operate on text. `min/max` require all arguments to be numeric and of one common type.
+
+See `docs/STDLIB.md` for the complete reference.
 
 ## Current language compatibility
 
@@ -256,7 +289,7 @@ The runtime is also hand-written x86-64 assembly in `runtime/rbl_runtime.s` and 
 
 ## Command-line toolchain
 
-For day-to-day project work, use the new `rbl` command. It is intentionally shaped like the workflows people know from Python tooling, C/C++ build tools and Cargo, but it still invokes RBL's direct-ASM backend:
+For day-to-day project work, use the `rbl` command. It is intentionally shaped like the workflows people know from Python tooling, C/C++ build tools and Cargo, but it still invokes RBL's direct-ASM backend:
 
 ```bash
 ./rbl new hello
@@ -324,19 +357,23 @@ Run the regression suite:
 python3 tests/run_tests.py
 ```
 
-The current suite contains **57 cases** covering arithmetic, precedence, floats, strings (escapes, multi-line text, interpolation), compound assignment and increments, `break`/`continue`, the unified `for (cond)` loop, the `a if (cond) else b` conditional expression, `switch`, lists (literals, indexing, element assignment, iteration, deep printing and equality), dictionaries (int/float/string keys, indexing, `in`, deep equality), tuples and structs (records with fields and receiver methods), `null` and `is`, the standard library (the complete 0.8 math set), equality, comparisons, functions, recursion, argument timing, dynamic parameter checks, control flow, ranges, integer remainder, numeric literal forms, comments, Unicode identifiers, Unit values, logging and expected error cases. Six of them are regressions for defects found during the code audit: label-id reuse after an optimized loop (`fast_loop_labels`, `fast_loop_nested_branches`), unbounded recursion in the fast-int analysis (`selfrec_int_analysis`), the missing induction-variable overflow check in the optimized loop (`loop_inc_overflow`), and the unresolvable runtime-internal label for ranges outside a `for` header (`range_outside_for`, `for_non_range`).
+The current suite contains **57 cases** covering arithmetic, precedence, floats, strings (escapes, multi-line text, interpolation), compound assignment and increments, `break`/`continue`, the unified `for (cond)` loop, the `a if (cond) else b` conditional expression, `switch`, lists (literals, indexing, element assignment, iteration, deep printing and equality), dictionaries (int/float/string keys, indexing, `in`, deep equality), tuples and structs (records with fields and receiver methods), `null` and `is`, the standard library, equality, comparisons, functions, recursion, argument timing, dynamic parameter checks, control flow, ranges, integer remainder, numeric literal forms, comments, Unicode identifiers, Unit values, logging and expected error cases.
+
+Several cases are dedicated regressions for defects found during the code audit, including optimized-loop label reuse, recursive fast-int analysis, induction-variable overflow and runtime-internal range labels.
 
 Every program is built and run with a timeout, so a program that regresses into an endless loop fails the suite instead of blocking it.
 
 ## Differential testing
 
-The two backends share the frontend and the code generator but not the runtime, so they are checked against each other byte for byte:
+The two backends share the frontend and the code generator but not the runtime, so they are checked against each other:
 
 ```bash
 python3 tests/differential.py --a wsl --b native
 ```
 
-This builds and runs `tests/cases`, `tests/stdlib_smoke.rbl`, `examples` and `benchmarks` through both toolchains and compares exit code, stdout and stderr. Every program receives a few real input lines, so `input()` exercises the line-reading path, not only the EOF path. Programs whose output is intentionally platform dependent (the random API, `rbl.fs.cwd()`) are compared on the exit code only and reported as such.
+This builds and runs `tests/cases`, `tests/stdlib_smoke.rbl`, `examples` and `benchmarks` through both toolchains and compares exit code, stdout and stderr. Every program receives a few real input lines, so `input()` exercises the line-reading path, not only the EOF path.
+
+Programs whose output is intentionally platform dependent (the random API, `rbl.fs.cwd()`) are compared on the exit code only and reported as such.
 
 ## Benchmarks
 
@@ -346,7 +383,9 @@ Run the benchmark suite:
 python3 benchmarks/run_benchmarks.py     # or: rbl bench
 ```
 
-It reports `build` (compile + assemble + link), `run` (whole process execution) and `net = run - baseline`, where the baseline is an empty program measured the same way. The `net` column exists because a small workload is dominated by process start-up: on Windows every run also pays for the WSL bridge or the PE loader, which is why absolute `run` figures are only comparable on one machine and one backend. Absolute numbers from the release machine live in `benchmarks/RESULTS.md`.
+It reports `build` (compile + assemble + link), `run` (whole process execution) and `net = run - baseline`, where the baseline is an empty program measured the same way.
+
+The `net` column exists because a small workload is dominated by process start-up: on Windows every run can also pay for the WSL bridge or the PE loader, which is why absolute `run` figures are only comparable on one machine and one backend. Absolute numbers from the release machine live in `benchmarks/RESULTS.md`.
 
 The Linux-only 3-way comparison (RBL vs CPython vs hand-written ASM, `benchmarks/compare_all.py`) needs a Linux host because the baseline programs are Linux syscall programs; run it inside WSL.
 
@@ -355,23 +394,26 @@ The Linux-only 3-way comparison (RBL vs CPython vs hand-written ASM, `benchmarks
 ```text
 RBLStudio/
 ├── compiler/
-│   ├── rblc_asm.c       lexer + parser + AST + direct ASM backend
-│   └── rblc-asm         bundled static Linux x86-64 compiler
+│   └── rblc_asm.c       lexer + parser + AST + direct ASM backend
 ├── runtime/
-│   └── rbl_runtime.s    hand-written assembly runtime
-├── bin/linux-x86_64/
-│   ├── rblc-asm
-│   └── rbl_runtime.o
+│   ├── rbl_runtime.s    hand-written Linux assembly runtime
+│   ├── rbl_containers.c
+│   └── rbl_runtime_win.c
+├── bin/
+│   ├── linux-x86_64/
+│   └── win-x86_64/
 ├── ide/
 │   └── rbl_studio.py    IDE
 ├── tools/
 │   └── rbltool.py       build/check/run/ASM driver
 ├── tests/               semantic regression suite
 ├── benchmarks/          speed benchmarks
+├── examples/            example RBL programs
 ├── reference/Rust_v0.1/ original implementation snapshot
 ├── installer/           Windows/Linux file association integration
 ├── docs/                design, audit, IDE and backend docs
-└── assets/              `.rbl` icon files
+├── assets/              application icons/assets
+└── artifacts/           checked-in build/reference artifacts
 ```
 
 ## Design documents
@@ -388,15 +430,15 @@ The requested design is written out explicitly in:
 
 ## Rebuilding the compiler itself
 
-Normal use does not require a C compiler because the archive ships a static `rblc-asm` binary.
+Normal use does not require a C compiler because the repository ships a static `rblc-asm` binary.
 
-For compiler development, `tools/rebuild_compiler.sh` rebuilds the bootstrap compiler and runtime. This uses a C compiler **only for the compiler implementation itself**; it never inserts C or GCC into the RBL program pipeline.
+For compiler development, `tools/rebuild_compiler.sh` rebuilds the bootstrap compiler and runtime. This uses a C compiler **only for the compiler implementation itself**; it never inserts C or GCC into the RBL user-program compilation pipeline on Linux.
 
 ## Current limitations
 
-1. Two targets exist: Linux x86-64 ELF and Windows x86-64 PE (native, Windows 7-11). Other targets and other architectures are not implemented.
+1. Two targets exist: Linux x86-64 ELF and Windows x86-64 PE/COFF. Other targets and other architectures are not implemented.
 2. Dynamic values and strings still use a compact runtime representation rather than a fully optimized static type system.
-3. There is no source-level debugger yet, and generated PE images carry no line tables.
+3. There is no source-level debugger yet, and generated PE images currently carry no line tables.
 4. The optimizer is conservative: dynamic values, strings and operations with uncertain types still use the tagged runtime ABI.
 5. Register allocation is currently local to loops rather than a whole-function graph-coloring allocator.
 6. Float printing uses C `%.17g` on both targets, which is not the shortest round-trip form used by the Rust reference (`0.1` prints as `0.10000000000000001`, NaN as `-nan`). Fixing that is an open item.
@@ -431,20 +473,19 @@ This tree contains the audit fixes, the native Windows target and the first step
 - added string escape sequences (`\n \t \r \\ \" \xNN \uXXXX \UXXXXXXXX`, NUL rejected) and multi-line `"""…"""` strings;
 - added interpolated strings `f"…"` with `{expression}` parts and `{{`/`}}` (desugared to `str()` + string concatenation, so they reuse the existing runtime; format specs such as `{x:.2f}` are the next step);
 - agreed syntax contract for the rest of 0.8 in [docs/SYNTAX_DECISIONS.md](docs/SYNTAX_DECISIONS.md) and the phase plan in [docs/ROADMAP.md](docs/ROADMAP.md);
-
 - fixed label-id reuse after an optimized loop, which made valid programs fail with `symbol '.L_if_next_N' is already defined` from GNU `as`;
 - fixed unbounded recursion in the fast-int analysis, which crashed the compiler with SIGSEGV on (mutually) recursive single-return `int` functions;
 - fixed the optimized loop's missing induction-variable overflow check, which turned a required `integer overflow` error into an endless loop;
-- fixed generated code referencing the runtime-internal label `.Lmsg_range_value`, which made every program with a range outside a `for` header fail to link (`ld: undefined reference`);
+- fixed generated code referencing the runtime-internal label `.Lmsg_range_value`, which made programs with a range outside a `for` header fail to link;
 - made label ids translation-unit-wide, so labels can never be reused inside a loop body or between a function and its fast variant;
-- added `tests/differential.py`, which compares both runtime implementations byte for byte;
+- added `tests/differential.py`, which compares both runtime implementations;
 - unified the runtime operand convention: `rbl_neg`/`rbl_not` now take `(tag in rdi, payload in rsi)` like every other entry point, so `-float` and `not bool` work on both backends;
 - the Windows runtime truncates an input line at the first LF/CR exactly like the Linux runtime;
 - the native toolchain driver prepends the toolchain `bin` directory to `PATH`, which `cc1.exe` needs to find its DLLs;
 - console output is encoding-safe on Windows (UTF-8 console + `errors="replace"`), so non-ASCII paths and program output no longer crash `rbl check` / `rbl run`;
 - added the native Windows PE backend (`--target win` in the compiler, `runtime/rbl_runtime_win.c`, MinGW-w64 discovery in `tools/rbltool.py`) and a start-up baseline in the benchmark suite;
 - fixed the Windows input smoke test, which used to launch a Linux ELF natively;
-- converted `examples/mega_test.rbl` to the canonical parenthesized syntax (it no longer compiled).
+- converted `examples/mega_test.rbl` to the canonical parenthesized syntax.
 
 ## Release v0.7.0 update
 
@@ -455,52 +496,44 @@ The release fixes the IDE launcher path, adds `tools/ide_doctor.py` and a startu
 The GUI launcher now initializes Tk from inside the event loop to avoid a WSLg/XWayland startup race. It also handles Ctrl+C cleanly.
 
 Normal:
+
 ```bash
 ./RBLStudio.sh
 ```
 
 Debug:
+
 ```bash
 ./RBLStudio.sh --debug
 ```
 
 Minimal GUI probe:
+
 ```bash
 python3 tools/gui_probe.py
 ```
 
 Safe mode (does not construct the full IDE):
+
 ```bash
 ./RBLStudio.sh --safe
 ```
 
 ### Windows -> WSL path bridge
-Windows F5 uses `Ubuntu-24.04` and normalizes host paths to `Q:/...` before calling `wslpath`; this avoids WSL command-line backslash stripping. The bundled `rblc-asm` is used as-is during normal F5. To explicitly rebuild the compiler/runtime, run `rbl bootstrap` or set `RBL_REBUILD_COMPILER=1`.
 
-## Standard library
+When WSL is selected, Windows F5 uses `Ubuntu-24.04` and normalizes host paths to `Q:/...` before calling `wslpath`; this avoids WSL command-line backslash stripping. The bundled `rblc-asm` is used as-is during normal F5.
 
-Global built-ins include:
-
-```text
-print len input read_file write_file
-abs sqrt min max int float str
-pow floor ceil round sin cos tan log exp
-random_int random_float random_bool
-```
-
-Namespaces:
+To explicitly rebuild the compiler/runtime, run:
 
 ```text
-rbl.io
-rbl.math
-rbl.string
-rbl.fs
-rbl.time
-rbl.random
-rbl.random
+rbl bootstrap
 ```
 
-See `docs/STDLIB.md` for the complete reference.
+or set:
+
+```text
+RBL_REBUILD_COMPILER=1
+```
 
 `int(x)`, `float(x)`, and `str(x)` convert supported scalar values.
 
