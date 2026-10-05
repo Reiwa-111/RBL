@@ -250,6 +250,10 @@ RBL_SYSV void rbl_check_type(const uint64_t *value, const char *expected,
     case TAG_FLOAT: actual = "float";  break;
     case TAG_STR:   actual = "string"; break;
     case TAG_BOOL:  actual = "bool";   break;
+    case TAG_LIST:  actual = "list";   break;
+    case TAG_DICT:  actual = "dict";   break;
+    case TAG_TUPLE: actual = "tuple";  break;
+    case TAG_NULL:  actual = "null";   break;
     default:        actual = "()";     break;
     }
 

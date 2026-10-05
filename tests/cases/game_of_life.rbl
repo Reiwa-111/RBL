@@ -1,0 +1,82 @@
+# Deterministic RBL smoke test for the Game of Life step function.
+
+func key(x int, y int, width int) int (
+    return y * width + x
+)
+
+func alive(grid dict, x int, y int, width int, height int) bool (
+    if (x < 0 or x >= width or y < 0 or y >= height) (
+        return false
+    )
+    return key(x, y, width) in grid
+)
+
+func neighbours(grid dict, x int, y int, width int, height int) int (
+    set count = 0
+    for (dy in -1..=1) (
+        for (dx in -1..=1) (
+            if (dx == 0 and dy == 0) (
+                continue
+            )
+            if (alive(grid, x + dx, y + dy, width, height)) (
+                let count += 1
+            )
+        )
+    )
+    return count
+)
+
+func step(grid dict, width int, height int) dict (
+    set next = {}
+    set k = 0
+    set n = 0
+    set is_alive = false
+    for (y in 0..height) (
+        for (x in 0..width) (
+            let k = key(x, y, width)
+            let n = neighbours(grid, x, y, width, height)
+            let is_alive = k in grid
+            if (is_alive and (n == 2 or n == 3)) (
+                let next[k] = true
+            ) elif (not is_alive and n == 3) (
+                let next[k] = true
+            )
+        )
+    )
+    return next
+)
+
+func main() (
+    set width = 5
+    set height = 5
+
+    # Horizontal blinker at y=2:  .###.
+    set start = {
+        11: true,
+        12: true,
+        13: true
+    }
+
+    set expected_after_1 = {
+        7: true,
+        12: true,
+        17: true
+    }
+
+    set after_1 = step(start, width, height)
+    set after_2 = step(after_1, width, height)
+
+    if (after_1 == expected_after_1) (
+        print("PASS: generation 1")
+    ) else (
+        print("FAIL: generation 1")
+        print(after_1)
+    )
+
+    if (after_2 == start) (
+        print("PASS: generation 2 returns to start")
+    ) else (
+        print("FAIL: generation 2")
+        print(after_2)
+    )
+)

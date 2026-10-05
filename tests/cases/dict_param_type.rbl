@@ -1,0 +1,14 @@
+func size(d dict) int (
+    return len(d)
+)
+
+func main() (
+    set grid = {
+        11: true,
+        12: true,
+        13: true
+    }
+
+    print(size(grid))
+    print(12 in grid)
+)

@@ -62,7 +62,9 @@ CASES=[
 ("tests/cases/switch.rbl",0,"two-or-three\nfour-to-nine\nstring case\nother\n",""),
 ("tests/cases/lists.rbl",0,"[1, 2, 3]\n3\n1\n3\n[1, 20, 3]\n[99, two, 3.5, true]\n4\n[7, 70]\n24\n[[1, 2], [3]]\n2\n1\ntrue\nfalse\nfalse\n[0, 10, 20, 30]\n",""),
 ("tests/cases/dicts.rbl",0,"{b: 2, a: 1}\n2\n1\n2\n\n3\n3\n0\n{2.5: half, 1: one}\ntrue\nfalse\ntrue\nfalse\ntrue\nfalse\ntrue\n100\n3\ntrue\nfalse\n",""),
+("tests/cases/dict_param_type.rbl",0,"3\ntrue\n",""),
 ("tests/cases/tuples_structs.rbl",0,"(1, 2, 3)\n3\n1\n3\n(1, (2, 3))\n3\ntrue\nfalse\n0\n1\n2\n3\n{x: 3, y: 4}\n3\n4\n30\n2\ntrue\ntrue\nfalse\n35\n10\n{x: 35, y: 10}\n",""),
+("tests/cases/game_of_life.rbl",0,"PASS: generation 1\nPASS: generation 2 returns to start\n",""),
 ("tests/cases/gc_pressure.rbl",0,"50000\n",""),
 ("tests/cases/null_value.rbl",0,"null\ntrue\nfalse\ntrue\ntrue\nvalue\nnull\n\nnull\n2\nfalse\n[null, 1]\ntrue\n",""),
 ]

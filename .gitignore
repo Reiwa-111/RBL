@@ -22,3 +22,7 @@ __pycache__/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Local backup/optimization snapshots
+*.before_*
+*.opt*

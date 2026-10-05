@@ -133,10 +133,26 @@ def find_native_toolchain():
     return None
 
 
+def _hidden_subprocess_kwargs():
+    """Prevent transient console windows when RBL Studio runs child tools on Windows."""
+    if os.name != "nt":
+        return {}
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = subprocess.SW_HIDE
+    return {
+        "startupinfo": si,
+        "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    }
+
+
+_WSL_AVAILABLE_CACHE = {}
+
 def native_toolchain_version(tc):
     try:
         p = subprocess.run([str(tc["gcc"]), "--version"], text=True, capture_output=True,
-                           encoding="utf-8", errors="replace", timeout=30)
+                           encoding="utf-8", errors="replace", timeout=30,
+                           **_hidden_subprocess_kwargs())
         return (p.stdout or "").splitlines()[0].strip()
     except Exception as exc:                                   # pragma: no cover
         return f"unavailable ({exc})"
@@ -156,11 +172,17 @@ def wsl_available(settings=None) -> bool:
     if not (is_windows() and have("wsl.exe")):
         return False
     distro = wsl_distro(settings)
+    key = distro
+    if key in _WSL_AVAILABLE_CACHE:
+        return _WSL_AVAILABLE_CACHE[key]
     try:
-        p = subprocess.run(["wsl.exe", "--distribution", distro, "--exec", "true"], text=True, capture_output=True, encoding="utf-8", errors="replace")
-        return p.returncode == 0
+        p = subprocess.run(["wsl.exe", "--distribution", distro, "--exec", "true"], text=True, capture_output=True, encoding="utf-8", errors="replace",
+                           **_hidden_subprocess_kwargs())
+        ok = p.returncode == 0
     except OSError:
-        return False
+        ok = False
+    _WSL_AVAILABLE_CACHE[key] = ok
+    return ok
 
 
 # wslpath() spawns wsl.exe each time it is called (~0.3-0.5 s per call), and the
@@ -184,7 +206,8 @@ def wsl_path(path: Path, settings=None) -> str:
         return _WSL_PATH_CACHE[cache_key]
     proc = subprocess.run(
         ["wsl.exe", "-d", distro, "--", "wslpath", "-a", "--", host_path],
-        text=True, capture_output=True, encoding="utf-8", errors="replace"
+        text=True, capture_output=True, encoding="utf-8", errors="replace",
+        **_hidden_subprocess_kwargs()
     )
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "unknown wslpath error").strip()
@@ -251,7 +274,8 @@ def run_native(cmd, cwd=ROOT, capture=True, input_text=None, env=None):
     try:
         p = subprocess.run(cmd, cwd=str(cwd), text=True, capture_output=capture,
                            input=input_text, env=env,
-                           encoding="utf-8", errors="replace", timeout=PROGRAM_TIMEOUT)
+                           encoding="utf-8", errors="replace", timeout=PROGRAM_TIMEOUT,
+                           **_hidden_subprocess_kwargs())
     except subprocess.TimeoutExpired:
         return TIMEOUT_RC, "", f"RBL: command timed out after {PROGRAM_TIMEOUT:.0f}s: {cmd}"
     if capture:
@@ -270,6 +294,7 @@ def run_wsl(cmd, settings=None, capture=True, input_text=None):
             text=True, capture_output=capture, input=input_text,
             encoding="utf-8", errors="replace",
             timeout=PROGRAM_TIMEOUT,
+            **_hidden_subprocess_kwargs(),
         )
     except subprocess.TimeoutExpired:
         return TIMEOUT_RC, "", f"RBL: command timed out after {PROGRAM_TIMEOUT:.0f}s: {cmd}"
@@ -405,20 +430,44 @@ def check(source: Path, settings):
     return run_native([str(COMPILER_BIN), str(source), "--check"])
 
 
+def _build_cache_valid(exe: Path, source: Path, dependencies: list[Path]) -> bool:
+    if os.environ.get("RBL_NO_BUILD_CACHE") == "1":
+        return False
+    try:
+        exe_mtime = exe.stat().st_mtime_ns
+        if exe_mtime < source.stat().st_mtime_ns:
+            return False
+        return all(exe_mtime >= dep.stat().st_mtime_ns for dep in dependencies if dep.exists())
+    except OSError:
+        return False
+
+
 def _build_wsl(source: Path, settings):
     out_dir = BUILD_DIR / source.stem
     ensure_dir(out_dir)
     asm = out_dir / (source.stem + ".s")
     obj = out_dir / (source.stem + ".o")
     exe = out_dir / source.stem
-    cs = shlex.quote(wsl_path(COMPILER_BIN, settings)); ss=shlex.quote(wsl_path(source, settings)); asmp=shlex.quote(wsl_path(asm, settings)); objp=shlex.quote(wsl_path(obj, settings)); rt=shlex.quote(wsl_path(RUNTIME_OBJ, settings)); ct=shlex.quote(wsl_path(CONTAINERS_OBJ, settings)); exep=shlex.quote(wsl_path(exe, settings))
-    cmds = [f"{cs} {ss} -S {asmp}", f"as --64 {asmp} -o {objp}", f"ld {objp} {rt} {ct} -o {exep} -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lm"]
-    allout=[]
-    for c in cmds:
-        code,o,e=run_wsl(c, settings); allout.append(o+e)
-        if code:return code,"".join(allout),"build failed"
-    return 0,"".join(allout),str(exe)
-
+    deps = [COMPILER_BIN, RUNTIME_OBJ, CONTAINERS_OBJ]
+    if _build_cache_valid(exe, source, deps):
+        return 0, "build cache: up to date\n", str(exe)
+    cs = shlex.quote(wsl_path(COMPILER_BIN, settings))
+    ss = shlex.quote(wsl_path(source, settings))
+    asmp = shlex.quote(wsl_path(asm, settings))
+    objp = shlex.quote(wsl_path(obj, settings))
+    rt = shlex.quote(wsl_path(RUNTIME_OBJ, settings))
+    ct = shlex.quote(wsl_path(CONTAINERS_OBJ, settings))
+    exep = shlex.quote(wsl_path(exe, settings))
+    command = (
+        f"{cs} {ss} -S {asmp} && "
+        f"as --64 {asmp} -o {objp} && "
+        f"ld {objp} {rt} {ct} -o {exep} "
+        f"-dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lm"
+    )
+    code, out, err = run_wsl(command, settings)
+    if code:
+        return code, out + err, "build failed"
+    return 0, out + err, str(exe)
 
 def _build_native_linux(source: Path, settings):
     out_dir = BUILD_DIR / source.stem
@@ -426,6 +475,8 @@ def _build_native_linux(source: Path, settings):
     asm = out_dir / (source.stem + ".s")
     obj = out_dir / (source.stem + ".o")
     exe = out_dir / source.stem
+    if _build_cache_valid(exe, source, [COMPILER_BIN, RUNTIME_OBJ, CONTAINERS_OBJ]):
+        return 0, "build cache: up to date\n", str(exe)
     c1=run_native([str(COMPILER_BIN),str(source),"-S",str(asm)])
     if c1[0]:return c1
     c2=run_native(["as","--64",str(asm),"-o",str(obj)])
@@ -443,6 +494,8 @@ def _build_native_windows(source: Path, settings):
     asm = out_dir / (source.stem + ".s")
     obj = out_dir / (source.stem + ".o")
     exe = out_dir / (source.stem + ".exe")
+    if _build_cache_valid(exe, source, [WIN_COMPILER_BIN, WIN_RUNTIME_OBJ, WIN_CONTAINERS_OBJ]):
+        return 0, "build cache: up to date\n", str(exe)
     steps = [
         ([str(WIN_COMPILER_BIN), str(source), "-S", str(asm), "--target", "win"], "compile"),
         ([str(tc["as"]), "--64", str(asm), "-o", str(obj)], "assemble"),

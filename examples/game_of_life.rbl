@@ -1,0 +1,121 @@
+# Conway's Game of Life stress test for RBL.
+# Exercises typed dict parameters, nested loops, strings, random numbers,
+# interpolation, modulo, containers and file I/O.
+
+func key(x int, y int, width int) int (
+    return y * width + x
+)
+
+func alive(grid dict, x int, y int, width int, height int) bool (
+    if (x < 0 or x >= width or y < 0 or y >= height) (
+        return false
+    )
+
+    set k = 0
+    let k = key(x, y, width)
+    return k in grid
+)
+
+func neighbours(grid dict, x int, y int, width int, height int) int (
+    set count = 0
+
+    for (dy in -1..=1) (
+        for (dx in -1..=1) (
+            if (dx == 0 and dy == 0) (
+                continue
+            )
+            if (alive(grid, x + dx, y + dy, width, height)) (
+                let count += 1
+            )
+        )
+    )
+
+    return count
+)
+
+func render(grid dict, width int, height int) string (
+    set out = ""
+
+    for (y in 0..height) (
+        for (x in 0..width) (
+            if (alive(grid, x, y, width, height)) (
+                let out = out + "##"
+            ) else (
+                let out = out + "  "
+            )
+        )
+        let out = out + "\n"
+    )
+
+    return out
+)
+
+func step(grid dict, width int, height int) dict (
+    set next = {}
+    set k = 0
+    set n = 0
+    set is_alive = false
+
+    for (y in 0..height) (
+        for (x in 0..width) (
+            let k = key(x, y, width)
+            let n = neighbours(grid, x, y, width, height)
+            let is_alive = k in grid
+
+            if (is_alive and (n == 2 or n == 3)) (
+                let next[k] = true
+            ) elif (not is_alive and n == 3) (
+                let next[k] = true
+            )
+        )
+    )
+
+    return next
+)
+
+func seed_random(width int, height int, percent int) dict (
+    set grid = {}
+
+    for (y in 0..height) (
+        for (x in 0..width) (
+            if (random_int(0, 99) < percent) (
+                let grid[key(x, y, width)] = true
+            )
+        )
+    )
+
+    return grid
+)
+
+func main() (
+    set width = 48
+    set height = 24
+    set generations = 50
+    set density = 24
+    set grid = seed_random(width, height, density)
+    set report = "RBL Game of Life\n"
+    let report = report + "================\n"
+    let report = report + f"grid: {width}x{height}\n"
+    let report = report + f"generations: {generations}\n"
+    let report = report + f"initial cells: {len(grid)}\n\n"
+    set frame = ""
+
+    for (gen in 0..=generations) (
+        if (gen % 5 == 0) (
+            let frame = f"Generation {gen} | live={len(grid)}\n"
+            print(frame)
+            print(render(grid, width, height))
+            let report = report + frame
+            let report = report + render(grid, width, height)
+            let report = report + "\n"
+        )
+
+        if (gen < generations) (
+            let grid = step(grid, width, height)
+        )
+    )
+
+    write_file("life_report.txt", report)
+    print(f"Done. Final live cells: {len(grid)}")
+    print("Saved: life_report.txt")
+)

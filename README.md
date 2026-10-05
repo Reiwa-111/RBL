@@ -2,7 +2,7 @@
 
 **Reiwa Bat Language (RBL)** is a compiled programming language with a native IDE, project CLI, direct x86-64 assembly backend and its own runtime.
 
-Current release: **RBL v0.7.0**
+Current release: **RBL v0.7.1**
 
 RBL is designed as a compact native language/toolchain with a straightforward compilation pipeline:
 
@@ -1750,7 +1750,7 @@ The native Windows backend does not require WSL for normal Windows builds.
 
 # Current implementation status
 
-RBL v0.7.0 currently provides a working:
+RBL v0.7.x currently provides a working:
 
 ```text
 language

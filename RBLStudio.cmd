@@ -1,7 +1,8 @@
 @echo off
 setlocal
 set ROOT=%~dp0
-set PY=%ROOT%.venv\Scripts\python.exe
+set PY=%ROOT%.venv\Scripts\pythonw.exe
+if not exist "%PY%" set PY=pythonw.exe
 if not exist "%PY%" set PY=python.exe
 "%PY%" -c "import tkinter" >nul 2>"%ROOT%ide_startup.log"
 if errorlevel 1 (

@@ -1,5 +1,5 @@
 RBL Studio — Direct x86-64 ASM IDE + CLI
-Release: v0.7.0
+Release: v0.7.1
 Backend: two targets from one code generator
   - Linux x86-64 ELF : RBL -> ASM -> GNU as --64 -> GNU ld + libc/libm
   - Windows x86-64 PE: RBL -> ASM -> GNU as --64 -> MinGW-w64 gcc + rbl_runtime_win.o
@@ -10,6 +10,7 @@ the generated code calls it through the same System V registers as on Linux.
 
 New in this tree:
 - Native Windows backend without WSL: compiler --target win, MSYS2 MinGW-w64
+- Fixed Windows runtime parameter type reporting for list/dict/tuple/null values; stale runtime_win.o is rebuilt automatically from the newer runtime source.
   discovery in tools/rbltool.py, rbl doctor reporting the active backend,
   wsl_mode setting (auto/native/wsl) and the RBL_TOOLCHAIN override.
 - Windows 7/8.1 supported through the msvcrt-based mingw64 environment; Windows
@@ -20,7 +21,7 @@ New in this tree:
   of "integer overflow"), and generated code referencing the runtime-internal
   label .Lmsg_range_value (any range outside a for header failed to link).
 - tests/differential.py compares both runtimes byte for byte over the whole corpus
-  (all 45 programs behave identically; the two programs whose output is
+  (all 47 programs behave identically; the two programs whose output is
   intentionally platform dependent are compared on the exit code).
 - Runtime parity fixes found by that runner: rbl_neg/rbl_not now use the same
   (rdi, rsi) operand convention as the rest of the runtime; the Windows runtime
@@ -28,7 +29,7 @@ New in this tree:
   driver prepends the toolchain bin directory to PATH (cc1.exe resolves its DLLs
   through PATH); console output is UTF-8 and never dies on an unencodable
   character under a legacy Windows code page.
-- 57-case core regression suite (was 25) plus dedicated stdlib/input smoke tests.
+- 59-case core regression suite (was 25) plus dedicated stdlib/input smoke tests; added typed dictionary-parameter coverage and a deterministic Game of Life regression.
 - Memory (phase 2.3): a conservative mark-and-sweep collector for lists, tuples and
   dictionaries in the shared C runtime. Roots are the machine stack (any word equal to a
   live container pointer), so temporaries are safe and the code generator needs no
@@ -61,3 +62,16 @@ New in v0.7.0:
 - IDE syntax/indentation support updated for canonical parenthesized blocks.
 - Existing typed fast paths and loop-local register allocation retained.
 - Windows IDE -> WSL bridge retained as a fallback path for hosts without MinGW-w64.
+
+New in v0.7.1:
+- Fixed Windows runtime type checking for container and nullable runtime values; typed function parameters for dict/list/tuple/null now resolve to the correct runtime type instead of falling through to Unit.
+- Rebuilt the Windows runtime object with the corrected type-checking implementation.
+- Improved native Windows toolchain handling with MinGW-w64/ucrt64 as the primary backend and WSL as an optional fallback.
+- Added more reliable automatic compiler/runtime rebuild handling when the source implementation is newer than bundled build artifacts.
+- Improved Windows build/run reliability and reduced unnecessary console window creation during toolchain execution.
+- Improved compiler/toolchain caching to avoid unnecessary rebuilds during repeated tests and builds.
+- Added deterministic Game of Life regression coverage using dictionaries, nested loops, typed function parameters and container operations.
+- Expanded regression coverage for container type handling and Windows-specific runtime behavior.
+- Updated the Windows/WSL smoke-test and diagnostic tooling.
+- Updated release documentation and benchmark information for the current native Windows backend.
+- Existing direct x86-64 assembly backend, typed fast paths, loop optimization and loop-local register allocation retained.

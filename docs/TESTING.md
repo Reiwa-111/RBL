@@ -2,7 +2,7 @@
 
 The suite is designed around the semantics of the original Rust interpreter, not merely compiler success.
 
-Current direct ASM regression count: **57 cases**.
+Current direct ASM regression count: **59 cases**.
 
 Memory is verified separately from correctness, because a leaking collector still
 prints the right answer. The check is a hard address-space limit:

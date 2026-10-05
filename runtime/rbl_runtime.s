@@ -306,6 +306,14 @@ rbl_check_type:
     je .Lct_actual_str
     cmp rdi, TAG_BOOL
     je .Lct_actual_bool
+    cmp rdi, TAG_LIST
+    je .Lct_actual_list
+    cmp rdi, TAG_DICT
+    je .Lct_actual_dict
+    cmp rdi, TAG_TUPLE
+    je .Lct_actual_tuple
+    cmp rdi, TAG_NULL
+    je .Lct_actual_null
     lea r8, [rip+.Lstr_unit]
     jmp .Lct_compare
 .Lct_actual_int:
@@ -319,6 +327,18 @@ rbl_check_type:
     jmp .Lct_compare
 .Lct_actual_bool:
     lea r8, [rip+.Lstr_bool]
+    jmp .Lct_compare
+.Lct_actual_list:
+    lea r8, [rip+.Lstr_list]
+    jmp .Lct_compare
+.Lct_actual_dict:
+    lea r8, [rip+.Lstr_dict]
+    jmp .Lct_compare
+.Lct_actual_tuple:
+    lea r8, [rip+.Lstr_tuple]
+    jmp .Lct_compare
+.Lct_actual_null:
+    lea r8, [rip+.Lstr_null]
 .Lct_compare:
     mov rdi, [rbp-8]
     mov rsi, r8

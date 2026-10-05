@@ -1612,6 +1612,36 @@ static bool expr_fast_bool(ACG*g,Expr*e){
 
 static void emit_call_args(ACG*g,ExprVec*args){size_t n=args->len,bytes=((n*16+15)/16)*16;if(bytes)fprintf(g->out,"    sub rsp, %zu\n",bytes);for(size_t i=0;i<n;i++){emit_expr_asm(g,args->data[i]);fprintf(g->out,"    mov QWORD PTR [rsp+%zu], rax\n    mov QWORD PTR [rsp+%zu], rdx\n",i*16,i*16+8);}}
 
+static bool expr_fast_leaf_int(ACG*g,Expr*e){
+    if(!e || infer_expr_type(g->prog,e,g->vars)!=ST_INT) return false;
+    if(e->kind==EX_INT) return true;
+    if(e->kind==EX_IDENT){
+        int i=var_find(g->vars,e->as.ident);
+        return i>=0 && g->vars->data[i].type==ST_INT && g->vars->data[i].definitely_bound;
+    }
+    return false;
+}
+
+static void emit_fast_leaf_int(ACG*g,Expr*e,const char *dst){
+    FILE *o=g->out;
+    if(e->kind==EX_INT){
+        fprintf(o,"    mov %s,%lld\n",dst,(long long)e->as.i);
+        return;
+    }
+    int idx=var_find(g->vars,e->as.ident);
+    if(idx<0) fatal("internal: unknown integer identifier %s",e->as.ident);
+    int rk=reg_for_slot(g,idx);
+    if(rk>=0){
+        fprintf(o,"    mov %s,%s\n",dst,reg_name_for_index(rk));
+        return;
+    }
+    if(g->fast_slots){
+        fprintf(o,"    mov %s,QWORD PTR [rbp%d]\n",dst,cur_slot_off(g,idx));
+    } else {
+        fprintf(o,"    mov %s,QWORD PTR [rbp%d+16]\n",dst,cur_slot_off(g,idx));
+    }
+}
+
 static void emit_fast_call(ACG*g,int fi,ExprVec*args){
     size_t n=args->len, bytes=align16((int)(n*8));
     if(n)fprintf(g->out,"    sub rsp, %zu\n",bytes);
@@ -1651,6 +1681,26 @@ static void emit_int_expr(ACG*g,Expr*e){
     }
 }
 
+static bool emit_fast_leaf_compare(ACG*g,Expr*left,Expr*right){
+    if(!expr_fast_leaf_int(g,left) || !expr_fast_leaf_int(g,right)) return false;
+    FILE *o=g->out;
+    if(left->kind==EX_IDENT && right->kind==EX_INT && right->as.i>=INT32_MIN && right->as.i<=INT32_MAX){
+        emit_fast_leaf_int(g,left,"rcx");
+        fprintf(o,"    cmp rcx,%lld\n",(long long)right->as.i);
+        return true;
+    }
+    if(left->kind==EX_IDENT && right->kind==EX_IDENT){
+        emit_fast_leaf_int(g,left,"rcx");
+        emit_fast_leaf_int(g,right,"rax");
+        fputs("    cmp rcx,rax\n",o);
+        return true;
+    }
+    emit_fast_leaf_int(g,left,"rcx");
+    emit_fast_leaf_int(g,right,"rax");
+    fputs("    cmp rcx,rax\n",o);
+    return true;
+}
+
 static void emit_bool_expr(ACG*g,Expr*e){
     FILE*o=g->out;
     switch(e->kind){
@@ -1660,7 +1710,9 @@ static void emit_bool_expr(ACG*g,Expr*e){
         case EX_BINARY:{
             BinaryOp op=e->as.binary.op;
             if(op==B_AND||op==B_OR){emit_bool_expr(g,e->as.binary.left);fputs("    push rax\n",o);emit_bool_expr(g,e->as.binary.right);fputs("    pop rcx\n",o);if(op==B_AND)fputs("    and eax,ecx\n",o);else fputs("    or eax,ecx\n",o);return;}
-            emit_int_expr(g,e->as.binary.left);fputs("    push rax\n",o);emit_int_expr(g,e->as.binary.right);fputs("    pop rcx\n    cmp rcx,rax\n",o);
+            if(!emit_fast_leaf_compare(g,e->as.binary.left,e->as.binary.right)){
+                emit_int_expr(g,e->as.binary.left);fputs("    push rax\n",o);emit_int_expr(g,e->as.binary.right);fputs("    pop rcx\n    cmp rcx,rax\n",o);
+            }
             const char*cc="e";switch(op){case B_EQ:cc="e";break;case B_IS:cc="e";break;case B_NE:cc="ne";break;case B_LT:cc="l";break;case B_GT:cc="g";break;case B_LE:cc="le";break;case B_GE:cc="ge";break;default:fatal("internal: invalid bool op");}
             fprintf(o,"    set%s al\n    movzx eax,al\n",cc);return;
         }
@@ -1982,6 +2034,30 @@ static void emit_expr_asm(ACG*g,Expr*e){
 
 static void emit_store_slot(FILE*o,int idx){fprintf(o,"    mov [rbp%d+8],rax\n    mov [rbp%d+16],rdx\n    mov QWORD PTR [rbp%d],1\n",slot_off(idx),slot_off(idx),slot_off(idx));}
 static void emit_store_int_slot(ACG*g,int idx){int rk=reg_for_slot(g,idx);if(rk>=0){fprintf(g->out,"    mov %s,rax\n",reg_name_for_index(rk));return;}fprintf(g->out,"    mov QWORD PTR [rbp%d+16],rax\n    mov QWORD PTR [rbp%d+8],1\n    mov QWORD PTR [rbp%d],1\n",slot_off(idx),slot_off(idx),slot_off(idx));}
+static bool emit_fast_inplace_int_update(ACG*g,int idx,Expr*e){
+    if(idx<0 || reg_for_slot(g,idx)<0 || !e || e->kind!=EX_BINARY) return false;
+    BinaryOp op=e->as.binary.op;
+    if(op!=B_ADD && op!=B_SUB && op!=B_MUL) return false;
+    Expr *lhs=e->as.binary.left, *rhs=e->as.binary.right;
+    if(!lhs || lhs->kind!=EX_IDENT || strcmp(lhs->as.ident,g->vars->data[idx].name)!=0) return false;
+    if(!expr_fast_leaf_int(g,rhs)) return false;
+    const char *dst=reg_name_for_index(reg_for_slot(g,idx));
+    if(rhs->kind==EX_INT && rhs->as.i>=INT32_MIN && rhs->as.i<=INT32_MAX){
+        if(op==B_ADD) fprintf(g->out,"    add %s,%lld\n",dst,(long long)rhs->as.i);
+        else if(op==B_SUB) fprintf(g->out,"    sub %s,%lld\n",dst,(long long)rhs->as.i);
+        else fprintf(g->out,"    imul %s,%lld\n",dst,(long long)rhs->as.i);
+    }else{
+        emit_fast_leaf_int(g,rhs,"rax");
+        if(op==B_ADD) fprintf(g->out,"    add %s,rax\n",dst);
+        else if(op==B_SUB) fprintf(g->out,"    sub %s,rax\n",dst);
+        else fprintf(g->out,"    imul %s,rax\n",dst);
+    }
+    unsigned long n=aid(g);
+    fprintf(g->out,"    jo .L_int_overflow_%lu\n",n);
+    fprintf(g->out,"    jmp .L_int_done_%lu\n.L_int_overflow_%lu:\n    call rbl_int_overflow\n.L_int_done_%lu:\n",n,n,n);
+    return true;
+}
+
 static void emit_block_asm(ACG*g,StmtVec*v){for(size_t i=0;i<v->len;i++)emit_stmt_asm(g,v->data[i]);}
 
 static bool stmt_fast_int(ACG*g,Stmt*s){
@@ -2031,10 +2107,11 @@ static void emit_fast_for(ACG*g,Stmt*s){
     for(int rk=1;rk<2;rk++) if(loopg.reg_slots[rk]>=0)
         fprintf(o,"    mov %s,QWORD PTR [rbp%d+16]\n",reg_name_for_index(rk),slot_off(loopg.reg_slots[rk]));
 
+    fputs("    mov r13,QWORD PTR [rsp+8]\n",o);
     if(loop_reg_ok) fputs("    mov r14,QWORD PTR [rsp]\n",o);
     fprintf(o,".L_fast_for_%lu:\n",loop);
-    if(loop_reg_ok) fprintf(o,"    cmp r14,QWORD PTR [rsp+8]\n    jg .L_fast_for_end_%lu\n",end);
-    else fprintf(o,"    mov rax,QWORD PTR [rsp]\n    cmp rax,QWORD PTR [rsp+8]\n    jg .L_fast_for_end_%lu\n",end);
+    if(loop_reg_ok) fprintf(o,"    cmp r14,r13\n    jg .L_fast_for_end_%lu\n",end);
+    else fprintf(o,"    mov rax,QWORD PTR [rsp]\n    cmp rax,r13\n    jg .L_fast_for_end_%lu\n",end);
 
     if(loop_reg_ok){
         loopg.vars->data[idx].type=ST_INT; loopg.vars->data[idx].definitely_bound=true;
@@ -2077,8 +2154,8 @@ static void emit_fast_for(ACG*g,Stmt*s){
 static void emit_stmt_asm(ACG*g,Stmt*s){
     FILE*o=g->out;
     switch(s->kind){
-        case ST_SET:{int idx=var_get_or_add(g->vars,s->as.assign.name);fprintf(o,"    lea rdi,[rbp%d]\n    lea rsi,[rip+%s]\n    call rbl_require_unbound\n",slot_off(idx),pool_intern(g->pool,s->as.assign.name));if(g->vars->data[idx].type==ST_INT&&expr_fast_int(g,s->as.assign.value)){emit_int_expr(g,s->as.assign.value);emit_store_int_slot(g,idx);}else{emit_expr_asm(g,s->as.assign.value);emit_store_slot(o,idx);}return;}
-        case ST_LET:{int idx=var_get_or_add(g->vars,s->as.assign.name);if(g->vars->data[idx].type==ST_INT&&g->vars->data[idx].definitely_bound&&expr_fast_int(g,s->as.assign.value)){emit_int_expr(g,s->as.assign.value);emit_store_int_slot(g,idx);return;}emit_expr_asm(g,s->as.assign.value);fputs("    sub rsp,16\n    mov [rsp],rax\n    mov [rsp+8],rdx\n",o);fprintf(o,"    lea rdi,[rbp%d]\n    mov rsi,[rsp]\n    lea rdx,[rip+%s]\n    call rbl_require_rebind\n    mov rax,[rsp]\n    mov rdx,[rsp+8]\n    add rsp,16\n",slot_off(idx),pool_intern(g->pool,s->as.assign.name));emit_store_slot(o,idx);return;}
+        case ST_SET:{int idx=var_get_or_add(g->vars,s->as.assign.name);fprintf(o,"    lea rdi,[rbp%d]\n    lea rsi,[rip+%s]\n    call rbl_require_unbound\n",slot_off(idx),pool_intern(g->pool,s->as.assign.name));if(g->vars->data[idx].type==ST_INT&&expr_fast_int(g,s->as.assign.value)){if(!emit_fast_inplace_int_update(g,idx,s->as.assign.value)){emit_int_expr(g,s->as.assign.value);emit_store_int_slot(g,idx);}return;}else{emit_expr_asm(g,s->as.assign.value);emit_store_slot(o,idx);}return;}
+        case ST_LET:{int idx=var_get_or_add(g->vars,s->as.assign.name);if(g->vars->data[idx].type==ST_INT&&g->vars->data[idx].definitely_bound&&expr_fast_int(g,s->as.assign.value)){if(!emit_fast_inplace_int_update(g,idx,s->as.assign.value)){emit_int_expr(g,s->as.assign.value);emit_store_int_slot(g,idx);}return;}emit_expr_asm(g,s->as.assign.value);fputs("    sub rsp,16\n    mov [rsp],rax\n    mov [rsp+8],rdx\n",o);fprintf(o,"    lea rdi,[rbp%d]\n    mov rsi,[rsp]\n    lea rdx,[rip+%s]\n    call rbl_require_rebind\n    mov rax,[rsp]\n    mov rdx,[rsp+8]\n    add rsp,16\n",slot_off(idx),pool_intern(g->pool,s->as.assign.name));emit_store_slot(o,idx);return;}
         case ST_BREAK:if(!g->break_label)fatal_at(s->pos,"break outside of a for loop");fprintf(o,"    jmp .L_for_end_%lu\n",g->break_label);return;
         case ST_CONTINUE:if(!g->continue_label)fatal_at(s->pos,"continue outside of a for loop");fprintf(o,"    jmp .L_for_cont_%lu\n",g->continue_label);return;
         case ST_RETURN:if(s->as.ret)emit_expr_asm(g,s->as.ret);else fputs("    xor eax,eax\n    xor edx,edx\n",o);fprintf(o,"    jmp .L_return_%zu\n",g->fi);return;
