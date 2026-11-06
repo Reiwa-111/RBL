@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""High-resolution RBL vs CPython vs hand-written x86-64 ASM benchmark.
+"""High-resolution RBL vs C vs C++ vs CPython vs hand-written x86-64 ASM benchmark.
 
-Timed region is the whole process execution. All three workloads perform the same
+Timed region is the whole process execution. All five implementations run the same
 algorithm and self-check their result via exit status. RBL programs are compiled
 through the direct ASM backend; no C compiler is involved in user-program builds.
 """
@@ -35,6 +35,7 @@ PURE_SRCS = {name: PURE_DIR / f"{name}.s" for name in RBL_SRCS}
 # Native mirrors of the same three workloads, compiled with -O2.
 C_SRCS = {name: ROOT / "benchmarks" / "c" / f"{name}.c" for name in RBL_SRCS}
 CPP_SRCS = {name: ROOT / "benchmarks" / "cpp" / f"{name}.cpp" for name in RBL_SRCS}
+WORKLOAD_COUNTS = {"sum": 100_000_000, "calls": 10_000_000, "branches": 100_000_000}
 
 @dataclass
 class Stats:
@@ -145,7 +146,7 @@ def main() -> int:
         # The hand-written baseline programs issue Linux syscalls directly and are
         # linked with GNU ld and no C runtime, so they cannot become PE images, and
         # the whole comparison is only meaningful on one host anyway.
-        print("This 3-way benchmark needs a Linux host (or WSL): the hand-written ASM")
+        print("This five-way benchmark needs a Linux host (or WSL): the hand-written ASM")
         print("baseline programs are Linux syscall programs linked without libc.")
         print("Use one of:")
         print("  wsl -d Ubuntu-24.04 -- bash -lc 'cd <repo> && python3 benchmarks/compare_all.py'")
@@ -153,7 +154,7 @@ def main() -> int:
         return 2
 
     pin_current_process()
-    print("RBL Studio high-resolution 3-way benchmark")
+    print("RBL Studio high-resolution five-way benchmark")
     print(f"Python: {platform.python_version()} | OS: {platform.platform()}")
     print(f"Warmups: {args.warmups} | Timed runs: {args.reps}")
     print("Timer: Python perf_counter_ns around the complete process execution")
@@ -174,8 +175,11 @@ def main() -> int:
             "RBL": [str(rbl_bins[name])],
             "Python": [PYTHON, str(PY_SRCS[name])],
             "ASM": [str(pure_bins[name])],
-            "C": [str(c_bins[name])],
-            "C++": [str(cpp_bins[name])],
+            # Keep loop bounds as runtime inputs in the native mirrors. Without
+            # this, GCC/G++ can constant-fold the known result and delete the
+            # entire sum/call workload at -O2.
+            "C": [str(c_bins[name]), str(WORKLOAD_COUNTS[name])],
+            "C++": [str(cpp_bins[name]), str(WORKLOAD_COUNTS[name])],
         }
 
     ratios: list[tuple[str, float, float]] = []
@@ -207,7 +211,7 @@ def main() -> int:
             f"{speedup(r['RBL'], r['ASM']):8.3f}x {speedup(r['Python'], r['RBL']):7.2f}x"
         )
     print("\nNote: these are workload-specific runtime measurements, not universal language rankings.")
-    print("Process startup is included equally in all three measurements; compiler build time is reported separately.")
+    print("Process startup is included in all five measurements; compiler/build time is reported separately.")
     return 0
 
 if __name__ == "__main__":

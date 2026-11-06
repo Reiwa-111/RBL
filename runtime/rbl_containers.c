@@ -1,4 +1,4 @@
-/* Shared container runtime for RBL 0.8.
+/* Shared container runtime for RBL 0.7.2.
  *
  * Written once in C and linked into BOTH targets: the Linux ELF build links it
  * next to the hand-written asm runtime, the Windows PE build next to
@@ -9,8 +9,10 @@
  * Values are stored as (tag, payload) pairs, 16 bytes each, so a list can hold
  * anything the language has, including nested lists.
  *
- * Memory: block 2.3 of the roadmap adds reclamation. Until then lists are not
- * freed, which is a deliberate, documented limitation rather than an oversight.
+ * Memory: container allocations are registered with the conservative
+ * mark-and-sweep collector below. It reclaims list, tuple and dictionary
+ * objects; runtime string allocations are managed separately and may live
+ * until process exit.
  */
 #include <stdint.h>
 #include <stdlib.h>

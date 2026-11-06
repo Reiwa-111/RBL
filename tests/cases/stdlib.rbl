@@ -12,6 +12,6 @@ func main() (
     print(str(true))
     print(int("321"))
     print(float("3.25"))
-    write_file("/tmp/rbl_stdlib_test.txt", "RBL stdlib works")
-    print(read_file("/tmp/rbl_stdlib_test.txt"))
+    write_file("build/rbl_stdlib_test.txt", "RBL stdlib works")
+    print(read_file("build/rbl_stdlib_test.txt"))
 )

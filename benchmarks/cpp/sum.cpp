@@ -1,11 +1,12 @@
-// Same workload as benchmarks/c/sum.cpp counterpart and the RBL/Python/ASM
-// versions: 100M additions with a checked result.
+// Same workload as the RBL/Python/ASM versions. A runtime loop bound prevents
+// -O2 from replacing the complete accumulation loop with a constant.
 #include <cstdint>
-#include <cstdio>
+#include <cstdlib>
 
-int main()
+int main(int argc, char **argv)
 {
-    const std::int64_t n = 100000000;
+    if (argc != 2) return 2;
+    const std::int64_t n = std::strtoll(argv[1], nullptr, 10);
     std::int64_t s = 0;
     for (std::int64_t i = 0; i <= n; i++) {
         s += i;

@@ -1,15 +1,17 @@
 /* Same workload as benchmarks/python/calls.py and benchmarks/rbl_bench_calls.rbl:
-   10M calls to a one-line function. */
-#include <stdio.h>
+   10M calls to a one-line function. Runtime count and noinline preserve the
+   calls under -O2 instead of folding the result into x = n. */
+#include <stdlib.h>
 
-static long long inc(long long x)
+__attribute__((noinline)) static long long inc(long long x)
 {
     return x + 1;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
-    long long n = 10000000LL;
+    if (argc != 2) return 2;
+    long long n = strtoll(argv[1], NULL, 10);
     long long x = 0;
     for (long long i = 0; i < n; i++) {
         x = inc(x);

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import rbltool  # type: ignore
 
-VERSION = '0.7.0'
+VERSION = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
 
 
 def manifest_path(cwd: Path) -> Path:
@@ -137,7 +137,7 @@ def new_project(name: str, target: Path) -> int:
     (target / 'rbl.toml').write_text(
         '[package]\n'
         f'name = "{name}"\n'
-        'version = "0.7.0"\n'
+        'version = "0.1.0"\n'
         'entry = "src/main.rbl"\n', encoding='utf-8')
     (target / 'src' / 'main.rbl').write_text(
         'func main() (\n'
@@ -209,7 +209,7 @@ def main() -> int:
         (cwd / 'src').mkdir(exist_ok=True)
         (cwd / 'tests').mkdir(exist_ok=True)
         (cwd / 'benchmarks').mkdir(exist_ok=True)
-        mpath.write_text('[package]\nname = "%s"\nversion = "0.7.0"\nentry = "src/main.rbl"\n' % cwd.name, encoding='utf-8')
+        mpath.write_text('[package]\nname = "%s"\nversion = "0.1.0"\nentry = "src/main.rbl"\n' % cwd.name, encoding='utf-8')
         main = cwd / 'src' / 'main.rbl'
         if not main.exists():
             main.write_text('func main() (\n    print("Hello from RBL!")\n)\n', encoding='utf-8')

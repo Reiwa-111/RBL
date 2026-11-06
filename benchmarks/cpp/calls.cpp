@@ -1,15 +1,17 @@
-// Same workload as benchmarks/python/calls.py: 10M calls to a one-line function.
+// Same workload as benchmarks/python/calls.py. Runtime count and noinline keep
+// the function calls observable in the optimized executable.
 #include <cstdint>
-#include <cstdio>
+#include <cstdlib>
 
-static std::int64_t inc(std::int64_t x)
+__attribute__((noinline)) static std::int64_t inc(std::int64_t x)
 {
     return x + 1;
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    const std::int64_t n = 10000000;
+    if (argc != 2) return 2;
+    const std::int64_t n = std::strtoll(argv[1], nullptr, 10);
     std::int64_t x = 0;
     for (std::int64_t i = 0; i < n; i++) {
         x = inc(x);

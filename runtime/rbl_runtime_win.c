@@ -18,17 +18,20 @@
  *     0 = Unit, 1 = Int(i64), 2 = Float(f64 bits), 3 = String(char *), 4 = Bool
  *
  * All diagnostics go to stderr and terminate the process with exit code 1.
- * Behaviour, message strings and numeric formatting are byte-identical to the
- * Linux runtime (integers "%lld", floats "%.17g", strings "%s", print
- * arguments separated by one space, one trailing '\n', Unit prints nothing).
+ * Deterministic scalar/container behavior, diagnostics, message strings and
+ * numeric formatting are kept in parity with the Linux runtime (integers
+ * "%lld", floats "%.17g", strings "%s", print arguments separated by one
+ * space, one trailing '\n', Unit prints nothing). Clock, cwd and random outputs
+ * are platform-specific by design.
  *
  * Windows notes:
  *   - stdout/stderr are switched to binary mode once, and file I/O always uses
  *     "rb"/"wb", so only LF is emitted and output matches the Linux backend.
  *   - getline() is emulated with fgets() + realloc().
  *   - clock_gettime()/nanosleep() are replaced by GetTickCount64()/Sleep().
- *   - rand() (RAND_MAX == 32767 on Windows) is replaced by an internal
- *     glibc-style LCG with the same 2^31-1 range as the Linux runtime.
+ *   - rand() (RAND_MAX == 32767 on Windows) is replaced by a local linear
+ *     congruential generator with a 31-bit output range. Its sequence is not
+ *     intended to match the Linux C library's rand().
  *
  * C99 + Win32 only; compatible with both the UCRT and the msvcrt based
  * mingw-w64 variants, and with Windows 7+.
@@ -1381,7 +1384,7 @@ RBL_SYSV RBLValue rbl_fs_cwd(void)
         }
         free(buf);
         if (errno != ERANGE || cap > (size_t)1 << 20) {
-            rbl_fail("RBL runtime error: clock_gettime failed");
+            rbl_fail("RBL runtime error: getcwd failed");
         }
         cap *= 2;
     }
@@ -1393,7 +1396,7 @@ RBL_SYSV RBLValue rbl_fs_cwd(void)
 
 RBL_SYSV RBLValue rbl_time_now_ms(void)
 {
-    /* clock_gettime(CLOCK_REALTIME) in milliseconds */
+    /* GetTickCount64: milliseconds since system start (monotonic uptime). */
     return rbl_int_value((int64_t)GetTickCount64());
 }
 
@@ -1415,9 +1418,9 @@ RBL_SYSV RBLValue rbl_time_sleep_ms(uint64_t tag, uint64_t payload)
 /* ------------------------------------------------------------------ */
 /* stdlib: random                                                     */
 /* ------------------------------------------------------------------ */
-/* The Linux runtime seeds libc srand() once and uses rand() with
- * RAND_MAX == 2147483647.  Windows rand() only returns 15 bits, so an
- * internal glibc-style LCG with the same 2^31-1 range is used instead. */
+/* Windows rand() only returns 15 bits on this toolchain. Use a local LCG
+ * with a 31-bit output range so random_float/random_int have a useful range.
+ * This is not intended to reproduce the Linux libc random sequence. */
 
 static uint64_t rbl_rand_state = 0;
 static int rbl_rand_seeded = 0;
