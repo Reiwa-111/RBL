@@ -45,15 +45,16 @@ rbl.io.write_file("copy.txt", text)
 
 ## Namespace `rbl.math`
 
-Available operations: `abs`, `sqrt`, `pow`, `min`, `max`, `floor`, `ceil`, `round`, `sin`, `cos`, `tan`, `log`, `exp`, `log10`, `log2`, `trunc`, `fmod`, `hypot`, `degrees`, `radians`, `clamp`, `sign`, `is_nan` and `is_inf`.
+Implemented namespace methods: `abs`, `sqrt`, `pow`, `min`, `max`, `floor`, `ceil`, `round`, `sin`, `cos`, `tan`, `log`, `exp`, `log10`, `log2`, `trunc`, `sign`, `is_nan` and `is_inf`.
 
 The constants `rbl.math.pi` and `rbl.math.e` are values, not functions; do not add call parentheses.
 
 Details:
 
-- `fmod(a, b)` performs floating-point remainder using C `fmod` behavior: the result has the sign of the dividend.
+- The global `fmod(a, b)` function performs floating-point remainder using C `fmod` behavior: the result has the sign of the dividend.
 - The `%` operator is integer-only.
-- `clamp(x, low, high)` requires compatible numeric types.
+- The global `clamp(x, low, high)` function requires compatible numeric types; `rbl.math.clamp` is not implemented in 0.7.2.
+- `hypot`, `degrees` and `radians` are available as global functions, but not as `rbl.math` methods.
 - `sign(NaN)` returns `0` in the current implementation.
 - `is_nan` and `is_inf` accept numeric values; integers are neither NaN nor infinity.
 

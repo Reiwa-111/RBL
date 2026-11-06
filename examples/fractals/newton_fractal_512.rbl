@@ -1,0 +1,113 @@
+# Newton fractal for z^3 - 1 = 0, rendered as a portable graymap (P2).
+# Each pixel is iterated once; the converged root and iteration count are returned together.
+
+func nearest_root(real float, imaginary float) int (
+    set distance0 = (real - 1.0) * (real - 1.0) + imaginary * imaginary
+    set distance1 = (real + 0.5) * (real + 0.5) + (imaginary - 0.8660254038) * (imaginary - 0.8660254038)
+    set distance2 = (real + 0.5) * (real + 0.5) + (imaginary + 0.8660254038) * (imaginary + 0.8660254038)
+    if (distance0 <= distance1 and distance0 <= distance2) (
+        return 0
+    )
+    if (distance1 <= distance2) (
+        return 1
+    )
+    return 2
+)
+
+func newton_sample(real float, imaginary float, max_iterations int) (
+    set zr = real
+    set zi = imaginary
+    set iterations = 0
+    set converged = false
+    set z2r = 0.0
+    set z2i = 0.0
+    set z3r = 0.0
+    set z3i = 0.0
+    set fr = 0.0
+    set fi = 0.0
+    set dr = 0.0
+    set di = 0.0
+    set denominator = 0.0
+    set quotient_real = 0.0
+    set quotient_imaginary = 0.0
+    set residual_real = 0.0
+    set residual_imaginary = 0.0
+
+    for (iteration in 0..max_iterations) (
+        let z2r = zr * zr - zi * zi
+        let z2i = 2.0 * zr * zi
+        let z3r = z2r * zr - z2i * zi
+        let z3i = z2r * zi + z2i * zr
+        let fr = z3r - 1.0
+        let fi = z3i
+        let dr = 3.0 * z2r
+        let di = 3.0 * z2i
+        let denominator = dr * dr + di * di
+
+        if (denominator < 0.000000000001) (
+            break
+        )
+
+        let quotient_real = (fr * dr + fi * di) / denominator
+        let quotient_imaginary = (fi * dr - fr * di) / denominator
+        let zr = zr - quotient_real
+        let zi = zi - quotient_imaginary
+        let iterations = iteration + 1
+
+        # Test the residual after the update, without running Newton a second time.
+        let z2r = zr * zr - zi * zi
+        let z2i = 2.0 * zr * zi
+        let z3r = z2r * zr - z2i * zi
+        let z3i = z2r * zi + z2i * zr
+        let residual_real = z3r - 1.0
+        let residual_imaginary = z3i
+        if (residual_real * residual_real + residual_imaginary * residual_imaginary < 0.00000001) (
+            let converged = true
+            break
+        )
+    )
+
+    if (not converged) (
+        let iterations = max_iterations
+    )
+    return (nearest_root(zr, zi), iterations)
+)
+
+func main() (
+    set width = 512
+    set height = 512
+    set max_iterations = 32
+    set real = 0.0
+    set imaginary = 0.0
+    set sample = (0, 0)
+    set root = 0
+    set iterations = 0
+    set shade = 0
+    set value = 0
+    print("P2")
+    print(f"{width} {height}")
+    print("255")
+
+    for (y in 0..height) (
+        for (x in 0..width) (
+            let real = -1.6 + (float(x) / float(width - 1)) * 3.2
+            let imaginary = 1.6 - (float(y) / float(height - 1)) * 3.2
+            let sample = newton_sample(real, imaginary, max_iterations)
+            let root = sample[0]
+            let iterations = sample[1]
+            let shade = int((float(max_iterations - iterations) / float(max_iterations)) * 70.0)
+            let value = 0
+            if (root == 0) (
+                let value = 72 + shade
+            ) elif (root == 1) (
+                let value = 142 + shade
+            ) else (
+                let value = 214 + int((float(max_iterations - iterations) / float(max_iterations)) * 40.0)
+            )
+            if (value > 255) (
+                let value = 255
+            )
+            print(value)
+        )
+    )
+)

@@ -1,0 +1,14 @@
+// Lesson 2: read text, convert it to numbers and calculate.
+func main() (
+    set first_text = input("First whole number: ")
+    set second_text = input("Second whole number: ")
+
+    // input returns a string; int converts it to an integer.
+    set first = int(first_text)
+    set second = int(second_text)
+
+    print("Sum:", first + second)
+    print("Difference:", first - second)
+    print("Product:", first * second)
+    print("Quotient:", float(first) / float(second))
+)

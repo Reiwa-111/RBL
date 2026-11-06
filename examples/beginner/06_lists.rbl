@@ -1,0 +1,17 @@
+// Lesson 6: lists are ordered, mutable collections with zero-based indexes.
+func main() (
+    set colors = ["red", "green", "blue"]
+
+    print("First color:", colors[0])
+    print("Number of colors:", len(colors))
+
+    // let updates an existing list element.
+    let colors[1] = "yellow"
+    print("Updated second color:", colors[1])
+
+    print("Contains blue:", "blue" in colors)
+    print("All colors:")
+    for (color in colors) (
+        print(color)
+    )
+)

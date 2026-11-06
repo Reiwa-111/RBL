@@ -1,0 +1,19 @@
+// Lesson 17: recursion — a function calls itself until a base case is reached.
+func factorial(n int) int (
+    if (n <= 1) (
+        return 1
+    )
+    return n * factorial(n - 1)
+)
+
+func sum_to(n int) int (
+    if (n <= 0) (
+        return 0
+    )
+    return n + sum_to(n - 1)
+)
+
+func main() (
+    print("5! =", factorial(5))
+    print("Sum 1..5 =", sum_to(5))
+)

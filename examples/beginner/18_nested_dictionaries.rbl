@@ -1,0 +1,24 @@
+// Lesson 18: dictionaries can contain dictionaries as values.
+func main() (
+    set account = {
+        "name": "Mira",
+        "settings": {
+            "theme": "dark",
+            "notifications": true
+        },
+        "progress": {
+            "lessons": 18,
+            "completed": 12
+        }
+    }
+
+    print("Name:", account["name"])
+    print("Theme:", account["settings"]["theme"])
+    print("Completed:", account["progress"]["completed"])
+
+    // Use a variable for the nested dictionary before updating its key.
+    set preferences = account["settings"]
+    let preferences["theme"] = "light"
+    print("Updated theme:", account["settings"]["theme"])
+    print("Has progress:", "progress" in account)
+)

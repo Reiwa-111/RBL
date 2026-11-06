@@ -25,6 +25,7 @@ RBL compiles user programs to native executables. **RBL source code is not trans
 - [Highlights](#highlights)
 - [Quick start](#quick-start)
 - [A small RBL program](#a-small-rbl-program)
+- [Examples](#examples)
 - [Language overview](#language-overview)
 - [Compiler architecture](#compiler-architecture)
 - [Targets and toolchains](#targets-and-toolchains)
@@ -264,6 +265,66 @@ python3 rbl.py run hello.rbl
 ```
 
 More examples and precise syntax rules are available in the [language tutorial](docs/eng/tutorial/first-program.md) and [syntax reference](docs/eng/reference/syntax.md).
+
+---
+
+## Examples
+
+The [`examples/`](examples/README.md) directory contains **44 standalone RBL programs**: a 20-lesson beginner course, compact language and standard-library demonstrations, sorting/searching and prime-number algorithms, numerical solvers, a card-shuffling statistics experiment, physics simulations, Conway's Game of Life, Mandelbrot/Newton fractals, and procedural image generators.
+
+### Learn RBL through 20 short lessons
+
+The [Beginner Course](examples/beginner/README.md) teaches the language as a sequence of **20 small, practical articles**, each paired with a runnable `.rbl` example. It starts with variables and a first program, then builds up through control flow, functions, collections, structs, strings, files, recursion and the standard library. The guide explains the concepts and syntax; the lesson files let you experiment with them directly.
+
+- **[Русское руководство](examples/beginner/README_RUS.md)** · [English guide](examples/beginner/README_ENG.md)
+
+| Lesson | Topic | Example |
+|---:|---|---|
+| 01 | Hello world, variables and output | [`01_hello_variables.rbl`](examples/beginner/01_hello_variables.rbl) |
+| 02 | Calculator, input and arithmetic | [`02_calculator.rbl`](examples/beginner/02_calculator.rbl) |
+| 03 | Conditions, comparisons and `switch` | [`03_conditions.rbl`](examples/beginner/03_conditions.rbl) |
+| 04 | Loops, ranges, `break` and `continue` | [`04_loops.rbl`](examples/beginner/04_loops.rbl) |
+| 05 | Functions, parameters and return values | [`05_functions.rbl`](examples/beginner/05_functions.rbl) |
+| 06 | Lists and indexing | [`06_lists.rbl`](examples/beginner/06_lists.rbl) |
+| 07 | Dictionaries and tuples | [`07_dictionaries_tuples.rbl`](examples/beginner/07_dictionaries_tuples.rbl) |
+| 08 | Structs and receiver methods | [`08_structs.rbl`](examples/beginner/08_structs.rbl) |
+| 09 | Strings and string functions | [`09_strings.rbl`](examples/beginner/09_strings.rbl) |
+| 10 | Standard library overview | [`10_standard_library.rbl`](examples/beginner/10_standard_library.rbl) |
+| 11 | Nested loops | [`11_nested_loops.rbl`](examples/beginner/11_nested_loops.rbl) |
+| 12 | Condition-controlled loops | [`12_condition_loops.rbl`](examples/beginner/12_condition_loops.rbl) |
+| 13 | Nested lists | [`13_nested_lists.rbl`](examples/beginner/13_nested_lists.rbl) |
+| 14 | File input and output | [`14_file_io.rbl`](examples/beginner/14_file_io.rbl) |
+| 15 | Multiline strings and escape sequences | [`15_multiline_strings_escapes.rbl`](examples/beginner/15_multiline_strings_escapes.rbl) |
+| 16 | `break` and `continue` in nested loops | [`16_nested_break_continue.rbl`](examples/beginner/16_nested_break_continue.rbl) |
+| 17 | Recursion | [`17_recursion.rbl`](examples/beginner/17_recursion.rbl) |
+| 18 | Nested dictionaries | [`18_nested_dictionaries.rbl`](examples/beginner/18_nested_dictionaries.rbl) |
+| 19 | Logging and diagnostics | [`19_logging.rbl`](examples/beginner/19_logging.rbl) |
+| 20 | Math, time and filesystem APIs | [`20_math_time_filesystem.rbl`](examples/beginner/20_math_time_filesystem.rbl) |
+
+Run any lesson from the repository root, for example:
+
+```bash
+python3 rbl.py check examples/beginner/01_hello_variables.rbl
+python3 rbl.py run examples/beginner/01_hello_variables.rbl
+```
+
+The [example catalog](examples/README.md) documents the remaining programs, output formats, model assumptions and Linux/Windows run commands.
+
+The numerical programs stream structured **CSV** or plain-text **PGM (P2)** output to standard output. This keeps simulation and pixel generation inside RBL while allowing external tools to visualize or analyze the resulting data. See the [example catalog](examples/README.md) for output schemas, model assumptions and Linux/Windows run commands.
+
+```bash
+python3 rbl.py run examples/simulations/double_pendulum.rbl > double_pendulum.csv
+python3 rbl.py run examples/fractals/mandelbrot_256.rbl > mandelbrot_256.pgm
+```
+
+An optional Python visualization pipeline converts the scientific examples into PNG images, GIF animations and 2D/3D plots:
+
+```bash
+python3 -m pip install -r requirements-visualize.txt
+python3 tools/visualize_examples.py
+```
+
+Generated images, animations and plots are saved under `build/visualizations/`; the captured PGM/CSV text streams are retained in its `data/` subdirectory. The default pipeline renders a preview tile for the 4K Mandelbrot example; use `python3 tools/visualize_examples.py tile --full` to render and assemble all 30 tiles into a 3840×2160 PNG. See the [example catalog](examples/README.md) for all programs, output formats, model assumptions and commands.
 
 ---
 
@@ -1025,11 +1086,19 @@ RBL/
 │   └── launch.py
 │
 ├── tools/
-│   └── rbltool.py              # Lower-level toolchain driver
+│   ├── rbltool.py              # Lower-level toolchain driver
+│   └── visualize_examples.py   # Optional scientific-example visualizer
 │
 ├── tests/                      # Regression, smoke and differential tests
 ├── benchmarks/                 # Benchmark runners and recorded results
-├── examples/                   # RBL example programs
+├── examples/                   # Language and scientific/data examples
+│   ├── beginner/                # 20-lesson RBL language course (RU/EN guides)
+│   ├── algorithms/              # Sorting, searching and prime-number algorithms
+│   ├── fractals/                # Mandelbrot and Newton renderers
+│   ├── generators/              # Procedural image/data generators
+│   ├── numerical/               # Root finding, linear systems and ODE solvers
+│   ├── simulations/             # Game of Life, pendulum, N-body gravity
+│   └── statistics/              # ShuffleLab statistical experiment
 ├── docs/
 │   ├── eng/                    # English documentation
 │   └── ru/                     # Russian documentation
@@ -1041,6 +1110,7 @@ RBL/
 ├── RBLStudio.sh                # Linux IDE launcher
 ├── RBLStudio.cmd               # Windows IDE launcher
 ├── VERSION                     # Repository/compiler version
+├── requirements-visualize.txt  # Optional Python visualization dependencies
 ├── RELEASE_MANIFEST.txt        # Release implementation summary
 └── README.md
 ```

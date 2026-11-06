@@ -1,0 +1,54 @@
+# Trial-division prime generation and integer prime factorization.
+
+func is_prime(number int) bool (
+    if (number < 2) ( return false )
+    if (number == 2) ( return true )
+    if (number % 2 == 0) ( return false )
+    set divisor = 3
+    # Division avoids overflow from divisor * divisor near the int64 limit.
+    for (divisor <= number / divisor) (
+        if (number % divisor == 0) ( return false )
+        let divisor += 2
+    )
+    return true
+)
+
+func main() (
+    set limit = 100
+    set prime_count = 0
+    set value = 0
+    print("PRIME GENERATION — TRIAL DIVISION")
+    for (candidate in 2..=limit) (
+        if (is_prime(candidate)) (
+            print(candidate)
+            let prime_count += 1
+        )
+    )
+    print("prime count:", prime_count)
+
+    set original = 360360
+    set remaining = original
+    set factor = 2
+    set exponent = 0
+    print("PRIME FACTORIZATION")
+    print("number:", original)
+    for (remaining > 1) (
+        if (remaining % factor == 0) (
+            let exponent = 0
+            for (remaining % factor == 0) (
+                let remaining = remaining / factor
+                let exponent += 1
+            )
+            print(factor, "^", exponent)
+        )
+        if (factor == 2) (
+            let factor = 3
+        ) else (
+            let factor += 2
+        )
+        if (factor > remaining / factor and remaining > 1) (
+            print(remaining, "^ 1")
+            let remaining = 1
+        )
+    )
+)

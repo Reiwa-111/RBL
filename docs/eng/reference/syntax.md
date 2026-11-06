@@ -113,7 +113,7 @@ Format specifications such as `f"{value:.2f}"` are not implemented. The `\\0` es
 | `/` | Division. |
 | `%` | Integer remainder; operands must be `int`. |
 
-Integer division truncates toward zero. The remainder has the sign of the dividend: `-10 % 3 == -1`. For float remainder, use `rbl.math.fmod(a, b)`. Division or remainder by zero raises a runtime error.
+Integer division truncates toward zero. The remainder has the sign of the dividend: `-10 % 3 == -1`. For float remainder, use the global function `fmod(a, b)`. Division or remainder by zero raises a runtime error.
 
 ### Comparisons and logic
 
@@ -196,7 +196,7 @@ print(len(values))
 print(20 in values)
 ```
 
-Indexing is zero-based. An index must be an integer within the list bounds. Lists are mutable, can be nested and can contain mixed value types. The `in` operator checks immediate scalar elements in lists and tuples; nested lists, dictionaries and tuples are skipped, so membership is not recursive. For dictionaries, `key in dictionary` checks whether a key exists. Substring membership with `in` is not implemented; use `rbl.string.contains(text, part)`.
+Indexing is zero-based. An index must be an integer within the list bounds. Lists are mutable, can be nested and can contain mixed value types. The `in` operator checks immediate scalar elements in lists and tuples; nested lists, dictionaries and tuples are skipped, so membership is not recursive. For dictionaries, `key in dictionary` checks whether a key exists. When the right-hand operand is a string, `in` checks for a substring; `rbl.string.contains(text, part)` is also available.
 
 Negative indexing, slicing and list concatenation with `+` are not implemented.
 
@@ -250,7 +250,7 @@ Global built-ins and namespace functions are available without `import`. See the
 
 - Duplicate `set` declarations and `let` assignments to unknown names are errors.
 - Passing a value that does not match a declared parameter type is an error.
-- `%` with a float is invalid; use `rbl.math.fmod`.
+- `%` with a float is invalid; use the global `fmod` function.
 - Non-integer or out-of-range list indices are errors.
 - `break`/`continue` outside loops and ranges outside `for` headers are errors.
 - `and`/`or` evaluate both operands.

@@ -1,0 +1,15 @@
+// Lesson 20: more standard-library helpers: math, filesystem and time.
+func main() (
+    print("Hypotenuse:", hypot(3.0, 4.0))
+    print("Float remainder:", fmod(7.5, 2.0))
+    print("Degrees:", degrees(rbl.math.pi))
+    print("Random float:", rbl.random.float())
+
+    set path = "build/beginner_temp.txt"
+    write_file(path, "temporary text")
+    print("Exists:", rbl.fs.exists(path))
+    print("Current directory:", rbl.fs.cwd())
+    print("Clock milliseconds:", rbl.time.now_ms())
+    rbl.time.sleep_ms(10)
+    print("Deleted:", rbl.fs.delete(path))
+)

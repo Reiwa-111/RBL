@@ -1,0 +1,14 @@
+// Lesson 1: a first RBL program, output and variables.
+func main() (
+    // print writes values to the terminal.
+    print("Hello, RBL!")
+
+    // set creates a new variable. RBL determines its type from the value.
+    set name = "Alex"
+    set age = 16
+    set learning = true
+
+    print("Name:", name)
+    print("Age:", age)
+    print("Learning:", learning)
+)

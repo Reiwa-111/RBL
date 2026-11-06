@@ -1,0 +1,415 @@
+# SHUFFLE LAB — statistical card-shuffling experiment.
+# No Python or third-party libraries are used. Randomness comes from RBL's PRNG.
+
+func make_deck() list (
+    set deck = []
+    for (card in 0..52) (
+        let deck = list_push(deck, card)
+    )
+    return deck
+)
+
+func copy_deck(source list) list (
+    set result = []
+    for (i in 0..len(source)) (
+        let result = list_push(result, source[i])
+    )
+    return result
+)
+
+func is_valid_deck(deck list) bool (
+    if (len(deck) != 52) ( return false )
+    set seen = []
+    set current_card = 0
+    for (i in 0..52) (
+        let seen = list_push(seen, false)
+    )
+    for (position in 0..52) (
+        let current_card = deck[position]
+        if (current_card < 0 or current_card >= 52) ( return false )
+        if (seen[current_card]) ( return false )
+        let seen[current_card] = true
+    )
+    return true
+)
+
+func packet_size(mean float, remaining int) int (
+    set size = 1
+    set stop_probability = 1.0 / mean
+    for (size < remaining) (
+        if (random_float() < stop_probability) ( break )
+        let size += 1
+    )
+    return size
+)
+
+func shuffle_overhand(deck list) list (
+    set starts = []
+    set sizes = []
+    set position = 0
+    set packet = 0
+    for (position < 52) (
+        let packet = packet_size(5.0, 52 - position)
+        let starts = list_push(starts, position)
+        let sizes = list_push(sizes, packet)
+        let position += packet
+    )
+
+    set result = []
+    for (i in 0..52) (
+        let result = list_push(result, 0)
+    )
+    set write_index = 0
+    set packet_index = len(starts) - 1
+    set packet_start = 0
+    set packet_length = 0
+    for (packet_index >= 0) (
+        let packet_start = starts[packet_index]
+        let packet_length = sizes[packet_index]
+        for (offset in 0..packet_length) (
+            let result[write_index] = deck[packet_start + offset]
+            let write_index += 1
+        )
+        let packet_index -= 1
+    )
+    return result
+)
+
+func shuffle_riffle(deck list) list (
+    set cut = 0
+    for (i in 0..52) (
+        if (random_float() < 0.5) (
+            let cut += 1
+        )
+    )
+    set left_index = 0
+    set right_index = cut
+    set left_remaining = cut
+    set right_remaining = 52 - cut
+    set result = []
+    for (i in 0..52) (
+        let result = list_push(result, 0)
+    )
+    set write_index = 0
+    set take = 0
+    set clump = 0
+    set choose_left = false
+    for (write_index < 52) (
+        if (left_remaining == 0) (
+            let choose_left = false
+        ) elif (right_remaining == 0) (
+            let choose_left = true
+        ) else (
+            let choose_left = random_float() < float(left_remaining) / float(left_remaining + right_remaining)
+        )
+
+        if (choose_left) (
+            let clump = packet_size(1.5, left_remaining)
+        ) else (
+            let clump = packet_size(1.5, right_remaining)
+        )
+        for (take in 0..clump) (
+            if (choose_left) (
+                let result[write_index] = deck[left_index]
+                let left_index += 1
+                let left_remaining -= 1
+            ) else (
+                let result[write_index] = deck[right_index]
+                let right_index += 1
+                let right_remaining -= 1
+            )
+            let write_index += 1
+        )
+    )
+    return result
+)
+
+func shuffle_cut(deck list) list (
+    set offset = random_int(0, 51)
+    set result = []
+    for (i in 0..52) (
+        let result = list_push(result, deck[(offset + i) % 52])
+    )
+    return result
+)
+
+func shuffle_ideal(deck list) list (
+    set result = copy_deck(deck)
+    set index = 51
+    set other = 0
+    set temporary = 0
+    for (index > 0) (
+        let other = random_int(0, index)
+        let temporary = result[index]
+        let result[index] = result[other]
+        let result[other] = temporary
+        let index -= 1
+    )
+    return result
+)
+
+func shuffle_once(deck list) list (
+    set choice = random_int(1, 100)
+    if (choice <= 55) (
+        return shuffle_overhand(deck)
+    ) elif (choice <= 95) (
+        return shuffle_riffle(deck)
+    ) else (
+        return shuffle_cut(deck)
+    )
+)
+
+func permutation_metrics(deck list) (
+    set positions = []
+    set lis_lengths = []
+    for (i in 0..52) (
+        let positions = list_push(positions, 0)
+        let lis_lengths = list_push(lis_lengths, 1)
+    )
+    for (position in 0..52) (
+        let positions[deck[position]] = position
+    )
+
+    set fixed = 0
+    set displacement = 0
+    set squared_displacement = 0
+    set adjacent = 0
+    set concordant = 0
+    set discordant = 0
+    set suit_runs = 0
+    set previous_suit = -1
+    set current_suit = 0
+    set longest = 1
+    set best = 1
+    set distance = 0
+
+    for (card in 0..52) (
+        let distance = abs(positions[card] - card)
+        if (distance == 0) ( let fixed += 1 )
+        let displacement += distance
+        let squared_displacement += distance * distance
+        if (card < 51) (
+            if (positions[card + 1] == positions[card] + 1) (
+                let adjacent += 1
+            )
+        )
+        let current_suit = deck[card] / 13
+        if (current_suit != previous_suit) (
+            let suit_runs += 1
+            let previous_suit = current_suit
+        )
+    )
+
+    for (first in 0..52) (
+        for (second in first + 1..52) (
+            if (positions[first] < positions[second]) (
+                let concordant += 1
+            ) else (
+                let discordant += 1
+            )
+        )
+    )
+
+    for (i in 0..52) (
+        let best = 1
+        for (j in 0..i) (
+            if (deck[j] < deck[i]) (
+                if (lis_lengths[j] + 1 > best) (
+                    let best = lis_lengths[j] + 1
+                )
+            )
+        )
+        let lis_lengths[i] = best
+        if (best > longest) ( let longest = best )
+    )
+
+    set fixed_percent = float(fixed) * 100.0 / 52.0
+    set mean_displacement = float(displacement) / 52.0
+    set kendall = float(concordant - discordant) / 1326.0
+    # Spearman denominator is n * (n^2 - 1) = 140556 for n = 52.
+    set spearman = 1.0 - 6.0 * float(squared_displacement) / 140556.0
+    return (fixed_percent, mean_displacement, kendall, spearman, float(adjacent), float(longest), float(suit_runs))
+)
+
+func validate_reference_metrics() bool (
+    set identity = make_deck()
+    set reversed = []
+    for (i in 0..52) (
+        let reversed = list_push(reversed, 51 - i)
+    )
+    set identity_metrics = permutation_metrics(identity)
+    set reverse_metrics = permutation_metrics(reversed)
+    if (abs(identity_metrics[0] - 100.0) > 0.0000001) ( return false )
+    if (abs(identity_metrics[1]) > 0.0000001) ( return false )
+    if (abs(identity_metrics[2] - 1.0) > 0.0000001) ( return false )
+    if (abs(identity_metrics[3] - 1.0) > 0.0000001) ( return false )
+    if (identity_metrics[4] != 51.0 or identity_metrics[5] != 52.0 or identity_metrics[6] != 4.0) ( return false )
+    if (abs(reverse_metrics[0]) > 0.0000001) ( return false )
+    if (abs(reverse_metrics[2] + 1.0) > 0.0000001) ( return false )
+    if (abs(reverse_metrics[3] + 1.0) > 0.0000001) ( return false )
+    if (reverse_metrics[5] != 1.0) ( return false )
+    return true
+)
+
+func mean_confidence_interval(total float, squares float, count int) (
+    set mean = total / float(count)
+    if (count < 2) ( return (mean, mean, mean) )
+    set variance = (squares - total * total / float(count)) / float(count - 1)
+    if (variance < 0.0) ( let variance = 0.0 )
+    set margin = 1.96 * sqrt(variance) / sqrt(float(count))
+    return (mean, mean - margin, mean + margin)
+)
+
+func normalized_position_entropy(decks list) float (
+    if (len(decks) < 2) ( return 0.0 )
+    set counts = []
+    set row = []
+    set current_card = 0
+    set deck = []
+    set card_counts = []
+    set observed = 0
+    set probability = 0.0
+    set card_entropy = 0.0
+    for (card in 0..52) (
+        let row = []
+        for (position in 0..52) (
+            let row = list_push(row, 0)
+        )
+        let counts = list_push(counts, row)
+    )
+    for (experiment in 0..len(decks)) (
+        let deck = decks[experiment]
+        for (position in 0..52) (
+            let current_card = deck[position]
+            let card_counts = counts[current_card]
+            let card_counts[position] = card_counts[position] + 1
+        )
+    )
+    set entropy_sum = 0.0
+    set run_count = float(len(decks))
+    for (card_index in 0..52) (
+        let card_entropy = 0.0
+        for (position_index in 0..52) (
+            let observed = counts[card_index][position_index]
+            if (observed > 0) (
+                let probability = float(observed) / run_count
+                let card_entropy -= probability * log(probability)
+            )
+        )
+        let entropy_sum += card_entropy / log(52.0)
+    )
+    return entropy_sum / 52.0
+)
+
+func cross_run_similarity(decks list) float (
+    # Approximate the all-pairs mean with 1000 independently sampled pairs (with replacement).
+    set count = len(decks)
+    if (count < 2) ( return 0.0 )
+    set pair_total = 0.0
+    set pair_count = 1000
+    set matches = 0
+    set first = 0
+    set second = 0
+    for (sample in 0..pair_count) (
+        let first = random_int(0, count - 1)
+        let second = random_int(0, count - 2)
+        if (second >= first) ( let second += 1 )
+        let matches = 0
+        for (position in 0..52) (
+            if (decks[first][position] == decks[second][position]) (
+                let matches += 1
+            )
+        )
+        let pair_total += 100.0 * float(matches) / 52.0
+    )
+    return pair_total / float(pair_count)
+)
+
+func print_metric_line(label string, mixed_total float, mixed_squares float, ideal_total float, ideal_squares float, count int) (
+    set mixed = mean_confidence_interval(mixed_total, mixed_squares, count)
+    set ideal = mean_confidence_interval(ideal_total, ideal_squares, count)
+    print(label, "mixed:", mixed[0], "95% CI [", mixed[1], ",", mixed[2], "]")
+    print("  ideal:", ideal[0], "95% CI [", ideal[1], ",", ideal[2], "]")
+)
+
+func main() (
+    set experiments = 30
+    set pass_values = [0, 1, 2, 3, 5, 7, 10, 15, 20]
+    set original = make_deck()
+    set passes = 0
+    set mixed_deck = []
+    set ideal_deck = []
+    set mixed_metrics = ()
+    set ideal_metrics = ()
+    set mixed_sums = []
+    set mixed_squares = []
+    set ideal_sums = []
+    set ideal_squares = []
+    set mixed_decks = []
+    set ideal_decks = []
+    set metric_names = ["fixed cards (%)", "mean displacement", "Kendall tau", "Spearman rho", "adjacent pairs", "LIS length", "suit runs"]
+    set metric_index = 0
+    set metric_value = 0.0
+
+    print("SHUFFLE LAB — 52-card stochastic model")
+    print("mixed method = 55% overhand, 40% riffle, 5% cut")
+    print("ideal baseline = Fisher-Yates; experiments:", experiments)
+    print("PRNG: built-in RBL random generator; results are not seed-identical to Python")
+    if (validate_reference_metrics()) (
+        print("metric self-tests: identity and reverse permutations PASS")
+    ) else (
+        print("ERROR: permutation metric self-test failed")
+        return
+    )
+
+    for (pass_index in 0..len(pass_values)) (
+        let passes = pass_values[pass_index]
+        let mixed_sums = []
+        let mixed_squares = []
+        let ideal_sums = []
+        let ideal_squares = []
+        let mixed_decks = []
+        let ideal_decks = []
+        for (metric_index in 0..7) (
+            let mixed_sums = list_push(mixed_sums, 0.0)
+            let mixed_squares = list_push(mixed_squares, 0.0)
+            let ideal_sums = list_push(ideal_sums, 0.0)
+            let ideal_squares = list_push(ideal_squares, 0.0)
+        )
+
+        for (experiment in 0..experiments) (
+            let mixed_deck = copy_deck(original)
+            let ideal_deck = copy_deck(original)
+            for (shuffle_pass in 0..passes) (
+                let mixed_deck = shuffle_once(mixed_deck)
+            )
+            let ideal_deck = shuffle_ideal(ideal_deck)
+            if (is_valid_deck(mixed_deck) == false or is_valid_deck(ideal_deck) == false) (
+                print("ERROR: shuffle produced an invalid 52-card permutation")
+                return
+            )
+            let mixed_metrics = permutation_metrics(mixed_deck)
+            let ideal_metrics = permutation_metrics(ideal_deck)
+            let mixed_decks = list_push(mixed_decks, mixed_deck)
+            let ideal_decks = list_push(ideal_decks, ideal_deck)
+            for (metric_index in 0..7) (
+                let metric_value = mixed_metrics[metric_index]
+                let mixed_sums[metric_index] = mixed_sums[metric_index] + metric_value
+                let mixed_squares[metric_index] = mixed_squares[metric_index] + metric_value * metric_value
+                let metric_value = ideal_metrics[metric_index]
+                let ideal_sums[metric_index] = ideal_sums[metric_index] + metric_value
+                let ideal_squares[metric_index] = ideal_squares[metric_index] + metric_value * metric_value
+            )
+        )
+
+        print("-----------------------------------------------")
+        print("shuffle passes:", passes)
+        for (metric_index in 0..7) (
+            print_metric_line(metric_names[metric_index], mixed_sums[metric_index], mixed_squares[metric_index], ideal_sums[metric_index], ideal_squares[metric_index], experiments)
+        )
+        print("position entropy (0..1):", normalized_position_entropy(mixed_decks))
+        print("ideal position entropy (0..1):", normalized_position_entropy(ideal_decks))
+        print("cross-run similarity (%):", cross_run_similarity(mixed_decks))
+        print("ideal cross-run similarity (%):", cross_run_similarity(ideal_decks))
+    )
+)

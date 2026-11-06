@@ -1,0 +1,13 @@
+// Lesson 16: break and continue inside nested loops.
+// Both statements affect only the nearest enclosing loop.
+func main() (
+    for (row in 1..=3) (
+        print("Row:", row)
+        for (column in 1..=6) (
+            if (column == 2) ( continue )
+            if (column == 5) ( break )
+            print("  Cell:", row, column)
+        )
+        // The outer loop continues after the inner loop's break.
+    )
+)

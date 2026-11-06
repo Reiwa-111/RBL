@@ -1,0 +1,92 @@
+# Gauss-Jordan elimination with partial pivoting.
+# Solves a 3x3 linear system and reports the residual of every equation.
+
+func main() (
+    set matrix = [
+    [2.0, 1.0, -1.0, 8.0],
+    [-3.0, -1.0, 2.0, -11.0],
+    [-2.0, 1.0, 2.0, -3.0]
+    ]
+    set size = 3
+    set pivot_row = 0
+    set best_row = 0
+    set best_value = 0.0
+    set temporary = 0.0
+    set temporary_row = []
+    set pivot_data = []
+    set current_data = []
+    set pivot_value = 0.0
+    set factor = 0.0
+    set first_candidate = 0
+    set matrix_scale = 0.0
+
+    print("GAUSS-JORDAN ELIMINATION — PARTIAL PIVOTING")
+    print("augmented matrix:")
+    for (row in 0..size) (
+        print(matrix[row])
+    )
+
+    # Use a scale-relative pivot threshold so uniformly scaled systems remain solvable.
+    for (row in 0..size) (
+        for (column in 0..size) (
+            if (abs(matrix[row][column]) > matrix_scale) (
+                let matrix_scale = abs(matrix[row][column])
+            )
+        )
+    )
+    if (matrix_scale == 0.0) (
+        print("ERROR: singular coefficient matrix")
+        return
+    )
+
+    for (column in 0..size) (
+        let best_row = column
+        let best_value = abs(matrix[column][column])
+        let first_candidate = column + 1
+        for (candidate in first_candidate..size) (
+            if (abs(matrix[candidate][column]) > best_value) (
+                let best_value = abs(matrix[candidate][column])
+                let best_row = candidate
+            )
+        )
+
+        if (best_value < matrix_scale * 0.000000000001) (
+            print("ERROR: singular or numerically singular matrix")
+            return
+        )
+
+        if (best_row != column) (
+            let temporary_row = matrix[column]
+            let matrix[column] = matrix[best_row]
+            let matrix[best_row] = temporary_row
+        )
+
+        let pivot_value = matrix[column][column]
+        let pivot_data = matrix[column]
+        for (entry in column..=size) (
+            let pivot_data[entry] = pivot_data[entry] / pivot_value
+        )
+
+        for (row in 0..size) (
+            if (row != column) (
+                let factor = matrix[row][column]
+                let current_data = matrix[row]
+                for (entry in column..=size) (
+                    let current_data[entry] = current_data[entry] - factor * pivot_data[entry]
+                )
+            )
+        )
+    )
+
+    set x = matrix[0][3]
+    set y = matrix[1][3]
+    set z = matrix[2][3]
+    print("solution:")
+    print("x =", x)
+    print("y =", y)
+    print("z =", z)
+    print("residuals:")
+    print("eq1:", 2.0 * x + y - z - 8.0)
+    print("eq2:", -3.0 * x - y + 2.0 * z + 11.0)
+    print("eq3:", -2.0 * x + y + 2.0 * z + 3.0)
+)

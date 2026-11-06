@@ -1,0 +1,125 @@
+# Six-body Newtonian gravity in arbitrary simulation units (G = 1).
+# Velocity-Verlet integration with Plummer-style softening.
+# Output: one CSV row per body and sampled integration step.
+
+func orbital_state(radius float, phase float, inclination float, radial_velocity float, tangential_scale float, gravity float, central_mass float) (
+    set speed = tangential_scale * sqrt(gravity * central_mass / radius)
+    set radial_speed = radial_velocity
+    set px = radius * cos(phase)
+    set py = radius * sin(phase)
+    set vx = radial_speed * cos(phase) - speed * sin(phase)
+    set vy = radial_speed * sin(phase) + speed * cos(phase)
+    return (px, py * cos(inclination), py * sin(inclination), vx, vy * cos(inclination), vy * sin(inclination))
+)
+
+func update_accelerations(masses list, xs list, ys list, zs list, ax list, ay list, az list, gravity float, softening_squared float) (
+    set body_count = len(masses)
+    set first_j = 0
+    set dx = 0.0
+    set dy = 0.0
+    set dz = 0.0
+    set distance_squared = 0.0
+    set inverse_distance_cubed = 0.0
+    for (i in 0..body_count) (
+        let ax[i] = 0.0
+        let ay[i] = 0.0
+        let az[i] = 0.0
+    )
+
+    # Evaluate each pair once and apply equal-and-opposite forces.
+    for (i in 0..body_count) (
+        let first_j = i + 1
+        for (j in first_j..body_count) (
+            let dx = xs[j] - xs[i]
+            let dy = ys[j] - ys[i]
+            let dz = zs[j] - zs[i]
+            let distance_squared = dx * dx + dy * dy + dz * dz + softening_squared
+            let inverse_distance_cubed = 1.0 / (distance_squared * sqrt(distance_squared))
+
+            let ax[i] = ax[i] + gravity * masses[j] * dx * inverse_distance_cubed
+            let ay[i] = ay[i] + gravity * masses[j] * dy * inverse_distance_cubed
+            let az[i] = az[i] + gravity * masses[j] * dz * inverse_distance_cubed
+            let ax[j] = ax[j] - gravity * masses[i] * dx * inverse_distance_cubed
+            let ay[j] = ay[j] - gravity * masses[i] * dy * inverse_distance_cubed
+            let az[j] = az[j] - gravity * masses[i] * dz * inverse_distance_cubed
+        )
+    )
+)
+
+func main() (
+    set gravity = 1.0
+    set dt = 0.0005
+    set steps = 20000
+    set emit_every = 5
+    set softening_squared = 0.00001
+
+    set masses = [1000.0, 0.6, 2.4, 0.35, 4.2, 1.3]
+    set names = ["star", "planet_1", "planet_2", "planet_3", "planet_4", "planet_5"]
+    set radii = [2.4, 3.8, 5.7, 7.8, 10.5]
+    set phases = [0.4, 2.1, 4.7, 1.25, 3.55]
+    set inclinations = [0.035, 0.192, -0.35, 0.471, 0.750]
+    set radial_velocities = [-0.01, 0.015, -0.02, 0.008, -0.012]
+    set tangential_scales = [1.01, 0.985, 1.02, 0.97, 1.015]
+
+    # The star starts at the origin; each planet is initialized in its own plane.
+    set xs = [0.0]
+    set ys = [0.0]
+    set zs = [0.0]
+    set vxs = [0.0]
+    set vys = [0.0]
+    set vzs = [0.0]
+    set state = ()
+    for (i in 0..5) (
+        let state = orbital_state(radii[i], phases[i], inclinations[i], radial_velocities[i], tangential_scales[i], gravity, masses[0])
+        let xs = list_push(xs, state[0])
+        let ys = list_push(ys, state[1])
+        let zs = list_push(zs, state[2])
+        let vxs = list_push(vxs, state[3])
+        let vys = list_push(vys, state[4])
+        let vzs = list_push(vzs, state[5])
+    )
+
+    set body_count = len(masses)
+    set ax = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    set ay = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    set az = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    set elapsed = 0.0
+
+    # The initial acceleration must be evaluated before the first half-kick.
+    update_accelerations(masses, xs, ys, zs, ax, ay, az, gravity, softening_squared)
+
+    print("step,time_seconds,body,mass,x,y,z,vx,vy,vz")
+    for (step in 0..=steps) (
+        if (step % emit_every == 0) (
+            let elapsed = float(step) * dt
+            for (i in 0..body_count) (
+                print(f"{step},{elapsed},{names[i]},{masses[i]},{xs[i]},{ys[i]},{zs[i]},{vxs[i]},{vys[i]},{vzs[i]}")
+            )
+        )
+
+        if (step < steps) (
+            # First half-kick.
+            for (i in 0..body_count) (
+                let vxs[i] = vxs[i] + 0.5 * dt * ax[i]
+                let vys[i] = vys[i] + 0.5 * dt * ay[i]
+                let vzs[i] = vzs[i] + 0.5 * dt * az[i]
+            )
+
+            # Drift using the half-step velocities.
+            for (i in 0..body_count) (
+                let xs[i] = xs[i] + dt * vxs[i]
+                let ys[i] = ys[i] + dt * vys[i]
+                let zs[i] = zs[i] + dt * vzs[i]
+            )
+
+            update_accelerations(masses, xs, ys, zs, ax, ay, az, gravity, softening_squared)
+
+            # Second half-kick uses acceleration at the updated positions.
+            for (i in 0..body_count) (
+                let vxs[i] = vxs[i] + 0.5 * dt * ax[i]
+                let vys[i] = vys[i] + 0.5 * dt * ay[i]
+                let vzs[i] = vzs[i] + 0.5 * dt * az[i]
+            )
+        )
+    )
+)

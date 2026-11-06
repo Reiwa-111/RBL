@@ -1,0 +1,18 @@
+// Lesson 8: a struct groups named fields into a record.
+struct Book (
+    title string
+    pages int
+)
+
+func (book Book) describe() (
+    print(book.title, "-", book.pages, "pages")
+)
+
+func main() (
+    // Constructor arguments follow the field declaration order.
+    set favorite = Book("A Small RBL Book", 120)
+    favorite.describe()
+
+    let favorite.pages = 124
+    print("Updated page count:", favorite.pages)
+)

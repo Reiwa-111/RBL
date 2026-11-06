@@ -1,0 +1,21 @@
+// Lesson 4: repeat work with for, ranges, break and continue.
+func main() (
+    print("Numbers from 0 to 4:")
+    for (i in 0..5) (
+        print(i)
+    )
+
+    // A loop can accumulate a result in a variable.
+    set total = 0
+    for (number in 1..=5) (
+        let total += number
+    )
+    print("Sum from 1 to 5:", total)
+
+    // continue skips this iteration; break ends the loop.
+    for (number in 1..=8) (
+        if (number == 3) ( continue )
+        if (number == 6) ( break )
+        print("Selected:", number)
+    )
+)

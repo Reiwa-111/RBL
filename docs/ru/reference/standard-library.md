@@ -45,7 +45,7 @@ rbl.io.write_file("copy.txt", text)
 
 ## Namespace `rbl.math`
 
-Доступные операции: `abs`, `sqrt`, `pow`, `min`, `max`, `floor`, `ceil`, `round`, `sin`, `cos`, `tan`, `log`, `exp`, `log10`, `log2`, `trunc`, `fmod`, `hypot`, `degrees`, `radians`, `clamp`, `sign`, `is_nan`, `is_inf`.
+Реализованные методы namespace: `abs`, `sqrt`, `pow`, `min`, `max`, `floor`, `ceil`, `round`, `sin`, `cos`, `tan`, `log`, `exp`, `log10`, `log2`, `trunc`, `sign`, `is_nan`, `is_inf`.
 
 Константы `rbl.math.pi` и `rbl.math.e` — значения, не функции: круглые скобки после них не ставятся.
 
@@ -53,7 +53,8 @@ rbl.io.write_file("copy.txt", text)
 
 - `fmod(a, b)` выполняет float remainder с поведением C `fmod`: знак результата соответствует знаку делимого.
 - Оператор `%` предназначен только для `int`.
-- `clamp(x, low, high)` требует совместимые числовые типы.
+- Глобальная функция `clamp(x, low, high)` требует совместимые числовые типы; метода `rbl.math.clamp` в реализации 0.7.2 нет.
+- `fmod`, `hypot`, `degrees` и `radians` доступны как глобальные функции, но не как методы `rbl.math`.
 - `sign(NaN)` возвращает `0` в текущей реализации.
 - `is_nan` и `is_inf` принимают числовые значения; целые числа не являются NaN/Inf.
 

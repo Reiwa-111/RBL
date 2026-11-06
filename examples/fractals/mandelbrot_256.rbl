@@ -1,0 +1,49 @@
+# Mandelbrot set rendered as a portable graymap (P2).
+# Redirect stdout to a .pgm file; pixel values are streamed one at a time.
+
+func mandelbrot(real float, imaginary float, max_iterations int) int (
+    set zr = 0.0
+    set zi = 0.0
+    set iteration = 0
+    set zr_squared = 0.0
+    set zi_squared = 0.0
+    set next_zi = 0.0
+    for (iteration < max_iterations) (
+        let zr_squared = zr * zr
+        let zi_squared = zi * zi
+        if (zr_squared + zi_squared > 4.0) (
+            return iteration
+        )
+        let next_zi = 2.0 * zr * zi + imaginary
+        let zr = zr_squared - zi_squared + real
+        let zi = next_zi
+        let iteration += 1
+    )
+    return max_iterations
+)
+
+func main() (
+    set width = 256
+    set height = 256
+    set max_iterations = 128
+    set real = 0.0
+    set imaginary = 0.0
+    set iteration = 0
+    set value = 0
+    print("P2")
+    print(f"{width} {height}")
+    print("255")
+
+    for (y in 0..height) (
+        for (x in 0..width) (
+            let real = -2.25 + (float(x) / float(width - 1)) * 3.0
+            let imaginary = 1.5 - (float(y) / float(height - 1)) * 3.0
+            let iteration = mandelbrot(real, imaginary, max_iterations)
+            let value = 0
+            if (iteration < max_iterations) (
+                let value = 255 - int((float(iteration) / float(max_iterations)) * 255.0)
+            )
+            print(value)
+        )
+    )
+)

@@ -1,0 +1,8 @@
+// Lesson 19: emit informational output, warnings and errors.
+func main() (
+    print("Program started")
+    warn.log("This is a warning message")
+    print("The program continues after a warning")
+    error.log("This is an error-level log message")
+    print("Logging calls do not automatically stop this program")
+)

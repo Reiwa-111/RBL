@@ -1,0 +1,16 @@
+// Lesson 12: for (condition) repeats while its condition is true.
+func main() (
+    set counter = 0
+    for (counter < 4) (
+        print("Counter:", counter)
+        let counter += 1
+    )
+
+    // for (true) is an intentional open-ended loop; break ends it.
+    set attempts = 0
+    for (true) (
+        let attempts += 1
+        print("Attempt:", attempts)
+        if (attempts == 3) ( break )
+    )
+)

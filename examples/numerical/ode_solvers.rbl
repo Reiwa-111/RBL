@@ -1,0 +1,63 @@
+# Numerical ODE examples using classical fourth-order Runge-Kutta (RK4).
+# 1) Harmonic oscillator: x'' + omega^2*x = 0.
+# 2) Logistic growth: y' = r*y*(1-y/K).
+
+func oscillator_derivative(position float, velocity float, omega float) (
+    return (velocity, -omega * omega * position)
+)
+
+func logistic_derivative(population float, rate float, capacity float) float (
+    return rate * population * (1.0 - population / capacity)
+)
+
+func main() (
+    set omega = 2.0
+    set dt = 0.01
+    set steps = 200
+    set position = 1.0
+    set velocity = 0.0
+    set k1 = ()
+    set k2 = ()
+    set k3 = ()
+    set k4 = ()
+    set time_value = 0.0
+
+    print("HARMONIC OSCILLATOR — RK4")
+    print("time,position,velocity,total_energy")
+    for (step in 0..=steps) (
+        if (step % 10 == 0) (
+            let time_value = float(step) * dt
+            print(f"{time_value},{position},{velocity},{0.5 * (velocity * velocity + omega * omega * position * position)}")
+        )
+        if (step < steps) (
+            let k1 = oscillator_derivative(position, velocity, omega)
+            let k2 = oscillator_derivative(position + 0.5 * dt * k1[0], velocity + 0.5 * dt * k1[1], omega)
+            let k3 = oscillator_derivative(position + 0.5 * dt * k2[0], velocity + 0.5 * dt * k2[1], omega)
+            let k4 = oscillator_derivative(position + dt * k3[0], velocity + dt * k3[1], omega)
+            let position = position + (dt / 6.0) * (k1[0] + 2.0 * k2[0] + 2.0 * k3[0] + k4[0])
+            let velocity = velocity + (dt / 6.0) * (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1])
+        )
+    )
+
+    set rate = 1.2
+    set capacity = 1000.0
+    set population = 25.0
+    set logistic_k1 = 0.0
+    set logistic_k2 = 0.0
+    set logistic_k3 = 0.0
+    set logistic_k4 = 0.0
+    print("LOGISTIC GROWTH — RK4")
+    print("time,population")
+    for (step in 0..=100) (
+        if (step % 10 == 0) (
+            print(f"{float(step) * 0.05},{population}")
+        )
+        if (step < 100) (
+            let logistic_k1 = logistic_derivative(population, rate, capacity)
+            let logistic_k2 = logistic_derivative(population + 0.025 * logistic_k1, rate, capacity)
+            let logistic_k3 = logistic_derivative(population + 0.025 * logistic_k2, rate, capacity)
+            let logistic_k4 = logistic_derivative(population + 0.05 * logistic_k3, rate, capacity)
+            let population = population + (0.05 / 6.0) * (logistic_k1 + 2.0 * logistic_k2 + 2.0 * logistic_k3 + logistic_k4)
+        )
+    )
+)

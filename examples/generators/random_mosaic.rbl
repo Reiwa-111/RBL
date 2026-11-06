@@ -1,0 +1,65 @@
+# Random rectangle mosaic generated from a small text palette.
+# This is an ASCII output generator; it does not read or write image files.
+
+func main() (
+    set width = 48
+    set height = 18
+    set rectangle_count = 46
+    set palette = [".", ":", "+", "=", "*", "#", "%", "@"]
+    set board = []
+    set cell_count = width * height
+    set x = 0
+    set y = 0
+    set rectangle_width = 0
+    set rectangle_height = 0
+    set palette_index = 0
+    set symbol = " "
+    set cell_index = 0
+    set row = ""
+    set border = "+"
+
+    for (i in 0..cell_count) (
+        let board = list_push(board, " ")
+    )
+
+    for (rectangle in 0..rectangle_count) (
+        let x = random_int(0, width - 1)
+        let y = random_int(0, height - 1)
+        let rectangle_width = random_int(2, 13)
+        let rectangle_height = random_int(1, 6)
+        let palette_index = random_int(0, len(palette) - 1)
+        let symbol = palette[palette_index]
+
+        if (x + rectangle_width > width) (
+            let rectangle_width = width - x
+        )
+        if (y + rectangle_height > height) (
+            let rectangle_height = height - y
+        )
+
+        for (dy in 0..rectangle_height) (
+            for (dx in 0..rectangle_width) (
+                let cell_index = (y + dy) * width + x + dx
+                let board[cell_index] = symbol
+            )
+        )
+    )
+
+    print("RANDOM RECTANGLE MOSAIC")
+    print("size:", width, "x", height, " rectangles:", rectangle_count)
+    print("palette: . : + = * # % @")
+    for (dash in 0..width) (
+        let border = border + "-"
+    )
+    let border = border + "+"
+    print(border)
+    for (line in 0..height) (
+        let row = "|"
+        for (column in 0..width) (
+            let row = row + board[line * width + column]
+        )
+        let row = row + "|"
+        print(row)
+    )
+    print(border)
+)

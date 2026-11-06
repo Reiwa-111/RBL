@@ -1,0 +1,14 @@
+// Lesson 15: triple-quoted strings and supported escape sequences.
+func main() (
+    set paragraph = """This is line one.
+This is line two.
+This is line three."""
+
+    print(paragraph)
+    print("Tab:[\t] End")
+    print("New line:\nNext line")
+    print("Quote: [\"] and backslash: [\\]")
+    print("Hex A: [\x41]")
+    print("Unicode check: [\u2713]")
+    print("Unicode symbol: [\U0001F680]")
+)

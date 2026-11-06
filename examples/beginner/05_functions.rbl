@@ -1,0 +1,20 @@
+// Lesson 5: define a function, pass arguments and return a value.
+func greet(name string) (
+    print("Hello,", name)
+)
+
+func add(a int, b int) int (
+    return a + b
+)
+
+func is_adult(age int) bool (
+    return age >= 18
+)
+
+func main() (
+    greet("RBL learner")
+
+    set result = add(12, 30)
+    print("12 + 30 =", result)
+    print("Is age 20 adult?", is_adult(20))
+)

@@ -1,0 +1,16 @@
+// Lesson 14: write, read, check and delete a text file.
+// Run this example from the repository root; the build directory is created by the CLI.
+func main() (
+    set path = "build/beginner_course_notes.txt"
+    set text = "RBL 0.7.2\nFiles are text data.\n"
+
+    write_file(path, text)
+    print("File exists:", rbl.fs.exists(path))
+
+    set loaded = read_file(path)
+    print("Read back:")
+    print(loaded)
+
+    print("Deleted:", rbl.fs.delete(path))
+    print("Exists after delete:", rbl.fs.exists(path))
+)

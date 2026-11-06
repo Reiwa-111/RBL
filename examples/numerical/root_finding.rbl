@@ -1,0 +1,67 @@
+# Newton-Raphson and bisection for f(x) = x^3 - 2x - 5.
+
+func function_value(x float) float (
+    return x * x * x - 2.0 * x - 5.0
+)
+
+func derivative_value(x float) float (
+    return 3.0 * x * x - 2.0
+)
+
+func main() (
+    set tolerance = 0.0000000001
+    set max_iterations = 100
+
+    set newton_x = 2.5
+    set newton_iterations = 0
+    set residual = 0.0
+    set slope = 0.0
+    set newton_converged = false
+    for (newton_iterations < max_iterations) (
+        let residual = function_value(newton_x)
+        if (abs(residual) < tolerance) ( break )
+        let slope = derivative_value(newton_x)
+        if (abs(slope) < 0.000000000001) ( break )
+        let newton_x = newton_x - residual / slope
+        let newton_iterations += 1
+    )
+    if (abs(function_value(newton_x)) < tolerance) (
+        let newton_converged = true
+    )
+
+    set low = 2.0
+    set high = 3.0
+    set middle = 0.0
+    set bisection_iterations = 0
+    set bisection_converged = false
+    if (function_value(low) * function_value(high) > 0.0) (
+        print("ERROR: bisection interval does not bracket a root")
+        return
+    )
+    for (bisection_iterations < max_iterations) (
+        let middle = (low + high) / 2.0
+        let residual = function_value(middle)
+        if (abs(residual) < tolerance or (high - low) < tolerance) ( break )
+        if (function_value(low) * residual < 0.0) (
+            let high = middle
+        ) else (
+            let low = middle
+        )
+        let bisection_iterations += 1
+    )
+    if (abs(function_value(middle)) < tolerance or (high - low) < tolerance) (
+        let bisection_converged = true
+    )
+
+    print("ROOT FINDING: x^3 - 2x - 5 = 0")
+    print("method,newton")
+    print("root:", newton_x)
+    print("residual:", function_value(newton_x))
+    print("iterations:", newton_iterations)
+    print("converged:", newton_converged)
+    print("method,bisection")
+    print("root:", middle)
+    print("residual:", function_value(middle))
+    print("iterations:", bisection_iterations)
+    print("converged:", bisection_converged)
+)

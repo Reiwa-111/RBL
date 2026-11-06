@@ -1,0 +1,16 @@
+// Lesson 9: combine strings, interpolate values and use string helpers.
+func main() (
+    set language = "RBL"
+    set topic = "strings"
+
+    print(language + " makes " + topic + " easy to explore.")
+    print(f"Welcome to {language}!")
+
+    set messy = "   learn RBL   "
+    set clean = rbl.string.trim(messy)
+    print("Trimmed:", clean)
+    print("Uppercase:", rbl.string.upper(clean))
+    print("Contains RBL:", rbl.string.contains(clean, "RBL"))
+    print("Starts with learn:", rbl.string.starts_with(clean, "learn"))
+    print("Length:", rbl.string.len(clean))
+)

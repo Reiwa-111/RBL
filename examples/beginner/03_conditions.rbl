@@ -1,0 +1,25 @@
+// Lesson 3: comparisons, if/elif/else and switch.
+func main() (
+    set score = 76
+
+    if (score >= 90) (
+        print("Result: excellent")
+    ) elif (score >= 60) (
+        print("Result: passed")
+    ) else (
+        print("Result: try again")
+    )
+
+    set day = 2
+    switch (day) (
+        case 1 ( print("Monday") )
+        case 2 ( print("Tuesday") )
+        case 3 ( print("Wednesday") )
+        default ( print("Another day") )
+    )
+
+    set has_ticket = true
+    if (has_ticket and score >= 60) (
+        print("Both conditions are true")
+    )
+)

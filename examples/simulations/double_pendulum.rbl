@@ -1,0 +1,65 @@
+# Double pendulum with fourth-order Runge-Kutta integration.
+# Output: CSV trajectory sampled every `emit_every` integration steps.
+
+func derivative(theta1 float, omega1 float, theta2 float, omega2 float, length1 float, length2 float, mass1 float, mass2 float, gravity float) (
+    set delta = theta1 - theta2
+    set denominator1 = length1 * (2.0 * mass1 + mass2 - mass2 * cos(2.0 * delta))
+    set numerator1 = -gravity * (2.0 * mass1 + mass2) * sin(theta1)
+    let numerator1 = numerator1 - mass2 * gravity * sin(theta1 - 2.0 * theta2)
+    let numerator1 = numerator1 - 2.0 * sin(delta) * mass2 * (omega2 * omega2 * length2 + omega1 * omega1 * length1 * cos(delta))
+
+    set denominator2 = length2 * (2.0 * mass1 + mass2 - mass2 * cos(2.0 * delta))
+    set numerator2 = 2.0 * sin(delta) * (omega1 * omega1 * length1 * (mass1 + mass2) + gravity * (mass1 + mass2) * cos(theta1) + omega2 * omega2 * length2 * mass2 * cos(delta))
+
+    return (omega1, numerator1 / denominator1, omega2, numerator2 / denominator2)
+)
+
+func main() (
+    set length1 = 1.0
+    set length2 = 1.0
+    set mass1 = 1.0
+    set mass2 = 1.0
+    set gravity = 9.81
+    set dt = 0.002
+    set steps = 30000
+    set emit_every = 10
+
+    set theta1 = 2.0
+    set omega1 = 0.0
+    set theta2 = 2.000001
+    set omega2 = 0.0
+    set x1 = 0.0
+    set y1 = 0.0
+    set x2 = 0.0
+    set y2 = 0.0
+    set elapsed = 0.0
+    set k1 = ()
+    set k2 = ()
+    set k3 = ()
+    set k4 = ()
+
+    print("step,time_seconds,theta1_rad,omega1_rad_s,theta2_rad,omega2_rad_s,x1,y1,x2,y2")
+
+    for (step in 0..=steps) (
+        if (step % emit_every == 0) (
+            let x1 = length1 * sin(theta1)
+            let y1 = -length1 * cos(theta1)
+            let x2 = x1 + length2 * sin(theta2)
+            let y2 = y1 - length2 * cos(theta2)
+            let elapsed = float(step) * dt
+            print(f"{step},{elapsed},{theta1},{omega1},{theta2},{omega2},{x1},{y1},{x2},{y2}")
+        )
+
+        if (step < steps) (
+            let k1 = derivative(theta1, omega1, theta2, omega2, length1, length2, mass1, mass2, gravity)
+            let k2 = derivative(theta1 + 0.5 * dt * k1[0], omega1 + 0.5 * dt * k1[1], theta2 + 0.5 * dt * k1[2], omega2 + 0.5 * dt * k1[3], length1, length2, mass1, mass2, gravity)
+            let k3 = derivative(theta1 + 0.5 * dt * k2[0], omega1 + 0.5 * dt * k2[1], theta2 + 0.5 * dt * k2[2], omega2 + 0.5 * dt * k2[3], length1, length2, mass1, mass2, gravity)
+            let k4 = derivative(theta1 + dt * k3[0], omega1 + dt * k3[1], theta2 + dt * k3[2], omega2 + dt * k3[3], length1, length2, mass1, mass2, gravity)
+
+            let theta1 = theta1 + (dt / 6.0) * (k1[0] + 2.0 * k2[0] + 2.0 * k3[0] + k4[0])
+            let omega1 = omega1 + (dt / 6.0) * (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1])
+            let theta2 = theta2 + (dt / 6.0) * (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2])
+            let omega2 = omega2 + (dt / 6.0) * (k1[3] + 2.0 * k2[3] + 2.0 * k3[3] + k4[3])
+        )
+    )
+)

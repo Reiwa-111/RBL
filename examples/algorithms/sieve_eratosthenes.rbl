@@ -1,0 +1,36 @@
+# Sieve of Eratosthenes: generate all primes up to a configurable limit.
+
+func main() (
+    set limit = 200
+    set prime_flags = []
+    set prime_count = 0
+    set p = 0
+    set multiple = 0
+
+    for (i in 0..=limit) (
+        let prime_flags = list_push(prime_flags, true)
+    )
+    let prime_flags[0] = false
+    let prime_flags[1] = false
+
+    for (p in 2..=limit) (
+        if (prime_flags[p] and p * p <= limit) (
+            let multiple = p * p
+            for (multiple <= limit) (
+                let prime_flags[multiple] = false
+                let multiple += p
+            )
+        )
+    )
+
+    print("SIEVE OF ERATOSTHENES")
+    print("limit:", limit)
+    print("primes:")
+    for (p in 2..=limit) (
+        if (prime_flags[p]) (
+            print(p)
+            let prime_count += 1
+        )
+    )
+    print("prime count:", prime_count)
+)

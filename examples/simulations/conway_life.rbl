@@ -1,0 +1,200 @@
+# Conway's Game of Life — sparse frontier update over dense backing arrays.
+# Output: CSV rows (generation,population,x,y), one row per live cell.
+
+func key(x int, y int, width int) int (
+    return y * width + x
+)
+
+func main() (
+    set width = 256
+    set height = 256
+    set generations = 2000
+    set emit_every = 2
+    set sizes = [8, 9, 11, 11, 11, 13, 13, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 18, 18]
+    set cluster_count = len(sizes)
+    set cell_count = width * height
+
+    set expected_population = 0
+    for (cluster in 0..cluster_count) (
+        let expected_population += sizes[cluster]
+    )
+
+    # Fixed-capacity arrays avoid rebuilding the 256x256 world each generation.
+    set occupied = []
+    set neighbour_counts = []
+    set live = []
+    set next_live = []
+    set candidates = []
+    set cluster_cells = []
+    set origin_x = 0
+    set origin_y = 0
+    set start_x = 0
+    set start_y = 0
+    set first_cell = 0
+    set cluster_size = 0
+    set placed = false
+    set source_index = 0
+    set source_cell = 0
+    set source_x = 0
+    set source_y = 0
+    set direction = 0
+    set next_x = 0
+    set next_y = 0
+    set next_cell = 0
+
+    for (i in 0..cell_count) (
+        let occupied = list_push(occupied, false)
+        let neighbour_counts = list_push(neighbour_counts, 0)
+        let live = list_push(live, 0)
+        let next_live = list_push(next_live, 0)
+        let candidates = list_push(candidates, 0)
+    )
+    for (i in 0..18) (
+        let cluster_cells = list_push(cluster_cells, 0)
+    )
+
+    # Seed independently grown connected clusters; no named patterns are injected.
+    set live_count = 0
+    for (cluster in 0..cluster_count) (
+        let origin_x = (cluster % 5) * 50
+        let origin_y = (cluster / 5) * 64
+        let start_x = origin_x + 14 + random_int(0, 21)
+        let start_y = origin_y + 20 + random_int(0, 23)
+        let first_cell = key(start_x, start_y, width)
+        let occupied[first_cell] = true
+        let live[live_count] = first_cell
+        let live_count += 1
+        let cluster_cells[0] = first_cell
+        let cluster_size = 1
+
+        for (j in 1..sizes[cluster]) (
+            let placed = false
+            for (attempt in 0..=4095) (
+                if (not placed) (
+                    let source_index = random_int(0, cluster_size - 1)
+                    let source_cell = cluster_cells[source_index]
+                    let source_x = source_cell % width
+                    let source_y = source_cell / width
+                    let direction = random_int(0, 3)
+                    let next_x = source_x
+                    let next_y = source_y
+
+                    if (direction == 0) (
+                        let next_x = source_x + 1
+                    ) elif (direction == 1) (
+                        let next_x = source_x - 1
+                    ) elif (direction == 2) (
+                        let next_y = source_y + 1
+                    ) else (
+                        let next_y = source_y - 1
+                    )
+
+                    if (next_x >= origin_x + 3 and next_x < origin_x + 47 and next_y >= origin_y + 3 and next_y < origin_y + 61) (
+                        let next_cell = key(next_x, next_y, width)
+                        if (not occupied[next_cell]) (
+                            let occupied[next_cell] = true
+                            let live[live_count] = next_cell
+                            let live_count += 1
+                            let cluster_cells[cluster_size] = next_cell
+                            let cluster_size += 1
+                            let placed = true
+                        )
+                    )
+                )
+            )
+            if (not placed) (
+                print("ERROR: could not finish a connected seed cluster")
+                return
+            )
+        )
+    )
+
+    if (live_count != expected_population) (
+        print("ERROR: unexpected initial population")
+        return
+    )
+
+    # CSV is intentionally streamed; no frame-sized string is assembled.
+    print("generation,population,x,y")
+    set candidate_count = 0
+    set next_count = 0
+    set x = 0
+    set y = 0
+    set dx = 0
+    set dy = 0
+    set cell = 0
+    set value = 0
+    set is_alive = false
+    set neighbours = 0
+    set temporary = []
+
+    for (generation in 0..=generations) (
+        if (generation % emit_every == 0) (
+            if (live_count == 0) (
+                print(f"{generation},0,,")
+            ) else (
+                for (i in 0..live_count) (
+                    let cell = live[i]
+                    let x = cell % width
+                    let y = cell / width
+                    print(f"{generation},{live_count},{x},{y}")
+                )
+            )
+        )
+
+        if (generation < generations) (
+            let candidate_count = 0
+
+            # Mark current live cells with 100, then add each neighbour once.
+            for (i in 0..live_count) (
+                let cell = live[i]
+                let neighbour_counts[cell] = 100
+                let candidates[candidate_count] = cell
+                let candidate_count += 1
+            )
+
+            for (i in 0..live_count) (
+                let cell = live[i]
+                let x = cell % width
+                let y = cell / width
+                for (dy in -1..=1) (
+                    for (dx in -1..=1) (
+                        if (dx != 0 or dy != 0) (
+                            let next_x = x + dx
+                            let next_y = y + dy
+                            if (next_x >= 0 and next_x < width and next_y >= 0 and next_y < height) (
+                                let next_cell = key(next_x, next_y, width)
+                                if (neighbour_counts[next_cell] == 0) (
+                                    let candidates[candidate_count] = next_cell
+                                    let candidate_count += 1
+                                    let neighbour_counts[next_cell] = 1
+                                ) else (
+                                    let neighbour_counts[next_cell] = neighbour_counts[next_cell] + 1
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+
+            let next_count = 0
+            for (i in 0..candidate_count) (
+                let cell = candidates[i]
+                let value = neighbour_counts[cell]
+                let is_alive = value >= 100
+                let neighbours = value % 100
+                if ((is_alive and (neighbours == 2 or neighbours == 3)) or ((not is_alive) and neighbours == 3)) (
+                    let next_live[next_count] = cell
+                    let next_count += 1
+                )
+                let neighbour_counts[cell] = 0
+            )
+
+            # Swap list references instead of copying the full board.
+            let temporary = live
+            let live = next_live
+            let next_live = temporary
+            let live_count = next_count
+        )
+    )
+)

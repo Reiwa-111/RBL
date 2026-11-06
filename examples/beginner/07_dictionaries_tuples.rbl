@@ -1,0 +1,14 @@
+// Lesson 7: dictionaries connect keys to values; tuples group fixed values.
+func main() (
+    set profile = {"name": "Mira", "level": 3}
+
+    print("Name:", profile["name"])
+    print("Has level:", "level" in profile)
+    let profile["level"] = 4
+    print("New level:", profile["level"])
+
+    set position = (12, 25)
+    print("X:", position[0])
+    print("Y:", position[1])
+    print("Tuple length:", len(position))
+)

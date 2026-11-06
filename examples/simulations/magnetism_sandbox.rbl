@@ -1,0 +1,146 @@
+# 2D magnetic dipole sandbox. Educational CLI model, not a Maxwell/FEM solver.
+# Sources are [x, y, mx, my]; all calculations and the field map run in RBL.
+
+func field_at(x float, y float, sources list, skip int, mat_x float, mat_y float, mat_radius float, mu_r float) (
+    set bx = 0.0
+    set by = 0.0
+    set source = []
+    set rx = 0.0
+    set ry = 0.0
+    set r2 = 0.0
+    set invr = 0.0
+    set invr3 = 0.0
+    set invr5 = 0.0
+    set mdotr = 0.0
+    set factor = 1.0
+    set sigma = max(0.2, mat_radius * 0.6)
+    set distance2 = (x - mat_x) * (x - mat_x) + (y - mat_y) * (y - mat_y)
+    set index = 0
+    for (index in 0..len(sources)) (
+        if (index != skip) (
+            let source = sources[index]
+            let rx = x - source[0]
+            let ry = y - source[1]
+            let r2 = rx * rx + ry * ry + 0.0001
+            let invr = 1.0 / sqrt(r2)
+            let invr3 = invr * invr * invr
+            let invr5 = invr3 * invr * invr
+            let mdotr = source[2] * rx + source[3] * ry
+            let bx += 0.0000001 * (3.0 * mdotr * invr5 * rx - source[2] * invr3)
+            let by += 0.0000001 * (3.0 * mdotr * invr5 * ry - source[3] * invr3)
+        )
+    )
+    let factor = 1.0 + 0.20 * max(0.0, mu_r - 1.0) * exp(-distance2 / (2.0 * sigma * sigma))
+    let factor = min(8.0, max(0.35, factor))
+    return (bx * factor, by * factor)
+)
+
+func energy_at(x float, y float, mx float, my float, sources list, skip int, mat_x float, mat_y float, mat_radius float, mu_r float) float (
+    set field = field_at(x, y, sources, skip, mat_x, mat_y, mat_radius, mu_r)
+    return -(mx * field[0] + my * field[1])
+)
+
+func main() (
+    # Match the original Magnetism Sandbox seeded scene and dipole moments.
+    set pi = rbl.math.pi
+    set second_angle = pi * 0.7
+    set second_magnitude = 18.0
+    set coil_magnitude = 8.0 * 110.0 * pi * 1.1 * 1.1 * 0.03
+    set sources = [
+    [-3.5, 1.8, 22.0, 0.0],
+    [2.8, -0.8, second_magnitude * cos(second_angle), second_magnitude * sin(second_angle)],
+    [0.0, 2.6, 0.0, coil_magnitude]
+    ]
+    set names = ["bar magnet A", "bar magnet B", "coil C"]
+    set mat_x = 0.8
+    set mat_y = -2.7
+    set mat_radius = 1.7
+    set mu_r = 10.0
+    set probe_x = 0.0
+    set probe_y = 0.0
+    set field = field_at(probe_x, probe_y, sources, -1, mat_x, mat_y, mat_radius, mu_r)
+    set magnitude = sqrt(field[0] * field[0] + field[1] * field[1])
+
+    print("MAGNETISM SANDBOX — 2D DIPOLE MODEL")
+    print("Sources: original seeded scene (2 magnets + 1 coil)")
+    print("Coil equivalent moment:", coil_magnitude)
+    print("Material: smooth local permeability mask; mu_r =", mu_r)
+    print("Probe Bx, By, |B|:", field[0], field[1], magnitude)
+    print("ASCII field map: arrows show the local field direction")
+    print(" ")
+
+    set y_index = 0
+    set x_index = 0
+    set x = 0.0
+    set y = 0.0
+    set sample = ()
+    set bx = 0.0
+    set by = 0.0
+    set strength = 0.0
+    set glyph = "."
+    set row = ""
+    for (y_index in 0..16) (
+        let y = 7.5 - float(y_index)
+        let row = ""
+        for (x_index in 0..41) (
+            let x = -10.0 + float(x_index) * 0.5
+            let sample = field_at(x, y, sources, -1, mat_x, mat_y, mat_radius, mu_r)
+            let bx = sample[0]
+            let by = sample[1]
+            let strength = sqrt(bx * bx + by * by)
+            let glyph = "."
+            if (strength > 0.00000001) (
+                if (abs(bx) > abs(by) * 2.414) (
+                    if (bx > 0.0) ( let glyph = ">" ) else ( let glyph = "<" )
+                ) elif (abs(by) > abs(bx) * 2.414) (
+                    if (by > 0.0) ( let glyph = "^" ) else ( let glyph = "v" )
+                ) elif (bx > 0.0) (
+                    if (by > 0.0) ( let glyph = "/" ) else ( let glyph = "\\" )
+                ) else (
+                    if (by > 0.0) ( let glyph = "\\" ) else ( let glyph = "/" )
+                )
+            )
+            if (abs(x + 3.5) < 0.2 and abs(y - 1.8) < 0.55) ( let glyph = "A" )
+            if (abs(x - 2.8) < 0.3 and abs(y + 0.8) < 0.55) ( let glyph = "B" )
+            if (abs(x) < 0.2 and abs(y - 2.6) < 0.55) ( let glyph = "C" )
+            if (abs(x - mat_x) < 0.3 and abs(y - mat_y) < 0.55) ( let glyph = "M" )
+            let row = row + glyph
+        )
+        print(row)
+    )
+
+    print(" ")
+    print("OBJECT INTERACTIONS (finite-difference force, dipole torque)")
+    set object_index = 0
+    set object = []
+    set energy = 0.0
+    set fx = 0.0
+    set fy = 0.0
+    set torque = 0.0
+    set delta = 0.12
+    set ex1 = 0.0
+    set ex0 = 0.0
+    set ey1 = 0.0
+    set ey0 = 0.0
+    set own_field = ()
+    for (object_index in 0..len(sources)) (
+        let object = sources[object_index]
+        let energy = energy_at(object[0], object[1], object[2], object[3], sources, object_index, mat_x, mat_y, mat_radius, mu_r)
+        let ex1 = energy_at(object[0] + delta, object[1], object[2], object[3], sources, object_index, mat_x, mat_y, mat_radius, mu_r)
+        let ex0 = energy_at(object[0] - delta, object[1], object[2], object[3], sources, object_index, mat_x, mat_y, mat_radius, mu_r)
+        let ey1 = energy_at(object[0], object[1] + delta, object[2], object[3], sources, object_index, mat_x, mat_y, mat_radius, mu_r)
+        let ey0 = energy_at(object[0], object[1] - delta, object[2], object[3], sources, object_index, mat_x, mat_y, mat_radius, mu_r)
+        let fx = -(ex1 - ex0) / (2.0 * delta)
+        let fy = -(ey1 - ey0) / (2.0 * delta)
+        let own_field = field_at(object[0], object[1], sources, object_index, mat_x, mat_y, mat_radius, mu_r)
+        let torque = object[2] * own_field[1] - object[3] * own_field[0]
+        print(names[object_index], "position:", object[0], object[1], "moment:", object[2], object[3])
+        print("  energy:", energy, "force:", fx, fy, "torque:", torque)
+    )
+    print(" ")
+    print("Model notes: point dipoles, softened near-field distance, finite-difference force.")
+    print("The material mask is an educational local field multiplier, not a solved constitutive boundary problem.")
+    print("Scene parameters match the original seeded magnets, coil and material.")
+    print("The original GUI, streamlines, editable controls and optional motion loop are not ported.")
+    print("No GUI, OpenCL, PNG, Python computation or external packages are used.")
+)

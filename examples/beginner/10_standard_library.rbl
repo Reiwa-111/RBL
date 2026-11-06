@@ -1,0 +1,13 @@
+// Lesson 10: a small tour of useful built-in and namespaced functions.
+func main() (
+    print("Square root of 81:", rbl.math.sqrt(81))
+    print("Pi:", rbl.math.pi)
+    print("Clamp 15 to 0..10:", clamp(15, 0, 10))
+
+    // Random values are pseudorandom, not suitable for secrets.
+    print("Random number from 1 to 6:", rbl.random.int(1, 6))
+    print("Random boolean:", rbl.random.bool())
+
+    print("Current directory:", rbl.fs.cwd())
+    print("A clock value in milliseconds:", rbl.time.now_ms())
+)
