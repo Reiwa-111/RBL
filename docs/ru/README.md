@@ -8,7 +8,7 @@
 
 | Раздел | Для чего нужен | Основные материалы |
 |---|---|---|
-| **Tutorial** | Последовательно пройти путь от исходного файла до работающей программы | [Первая программа](tutorial/first-program.md) |
+| **Курс для начинающих** | Пройти 20 уроков с запускаемыми примерами | [Курс для начинающих](../../examples/beginner/README_RUS.md) |
 | **How-to** | Решить конкретную практическую задачу | [Работа с проектом](how-to/project-workflow.md), [Windows и WSL](how-to/windows-toolchain.md), [Тестирование](how-to/testing.md), [RBL Studio](how-to/ide.md), [Измерение скорости](how-to/benchmarking.md) |
 | **Reference** | Найти точное описание синтаксиса, функций или команды | [Синтаксис](reference/syntax.md), [Стандартная библиотека](reference/standard-library.md), [CLI](reference/cli.md), [Манифест](reference/manifest.md), [Ограничения](reference/limitations.md) |
 | **Explanation** | Понять устройство и причины технических решений | [Архитектура](explanation/architecture.md), [Модель выполнения](explanation/execution-model.md), [Оптимизации](explanation/optimization.md), [Производительность](explanation/performance.md), [Результаты benchmark](explanation/performance-results.md), [Принципы проектирования](explanation/design.md) |

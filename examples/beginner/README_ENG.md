@@ -786,7 +786,7 @@ Practical assessment:
 - [RBL 0.7.2 standard library](../../docs/eng/reference/standard-library.md)
 - [RBL 0.7.2 limitations](../../docs/eng/reference/limitations.md)
 - [CLI reference](../../docs/eng/reference/cli.md)
-- [First program tutorial](../../docs/eng/tutorial/first-program.md)
+- [Project workflow](../../docs/eng/how-to/project-workflow.md)
 - [Project workflow](../../docs/eng/how-to/project-workflow.md)
 - [Testing guide](../../docs/eng/how-to/testing.md)
 - [All examples](../README.md)

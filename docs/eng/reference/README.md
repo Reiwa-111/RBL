@@ -10,4 +10,4 @@ Normative RBL 0.7.2 reference pages:
 - [Manifest](manifest.md) — the `rbl.toml` format and resolution rules.
 - [Limitations](limitations.md) — features not implemented in the current version.
 
-For guided learning, open the [Tutorial](../tutorial/README.md); for task-oriented instructions, see [How-to](../how-to/README.md).
+For guided learning, open the [20-lesson beginner course](../../../examples/beginner/README_ENG.md); for task-oriented instructions, see [How-to](../how-to/README.md).

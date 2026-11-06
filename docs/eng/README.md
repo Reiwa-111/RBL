@@ -8,7 +8,7 @@ This documentation describes **RBL 0.7.2** and follows [Diátaxis](https://diata
 
 | Section | Purpose | Main pages |
 |---|---|---|
-| **Tutorial** | Follow a guided path from a source file to a running program | [Your first program](tutorial/first-program.md) |
+| **Beginner course** | Follow 20 guided lessons with runnable examples | [Beginner course](../../examples/beginner/README_ENG.md) |
 | **How-to** | Complete a specific practical task | [Project workflow](how-to/project-workflow.md), [Windows and WSL](how-to/windows-toolchain.md), [Testing](how-to/testing.md), [RBL Studio](how-to/ide.md), [Benchmarking](how-to/benchmarking.md) |
 | **Reference** | Look up exact syntax, functions or commands | [Syntax](reference/syntax.md), [Standard library](reference/standard-library.md), [CLI](reference/cli.md), [Manifest](reference/manifest.md), [Limitations](reference/limitations.md) |
 | **Explanation** | Understand implementation details and design trade-offs | [Architecture](explanation/architecture.md), [Execution model](explanation/execution-model.md), [Optimizations](explanation/optimization.md), [Performance](explanation/performance.md), [Benchmark results](explanation/performance-results.md), [Design principles](explanation/design.md) |

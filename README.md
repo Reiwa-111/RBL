@@ -9,7 +9,7 @@
   ·
   <a href="docs/README.md">Documentation</a>
   ·
-  <a href="docs/eng/tutorial/first-program.md">First program</a>
+  <a href="examples/beginner/README_ENG.md">Beginner course</a>
   ·
   <a href="docs/ru/README.md">Русская документация</a>
 </p>
@@ -221,7 +221,7 @@ The project is created with an `rbl.toml` manifest and a starter source file at 
 
 **CLI invocation note:** RBL does not install a global `rbl` executable. Use `python3 rbl.py` on Linux/WSL or `python rbl.py` in PowerShell from the checkout root. From another project directory, invoke the script by its relative or absolute path. The repository also contains Bash and Windows wrapper scripts.
 
-For a guided setup from project creation to execution, follow the [first-program tutorial](docs/eng/tutorial/first-program.md).
+For a guided introduction from the first program through core language features, follow the [20-lesson beginner course](examples/beginner/README_ENG.md).
 
 ---
 
@@ -264,7 +264,7 @@ Save it as `hello.rbl` and run it through the CLI:
 python3 rbl.py run hello.rbl
 ```
 
-More examples and precise syntax rules are available in the [language tutorial](docs/eng/tutorial/first-program.md) and [syntax reference](docs/eng/reference/syntax.md).
+More examples and precise syntax rules are available in the [20-lesson beginner course](examples/beginner/README_ENG.md) and [syntax reference](docs/eng/reference/syntax.md).
 
 ---
 
@@ -954,7 +954,7 @@ Start at [`docs/README.md`](docs/README.md) to choose a language.
 
 | Section | Purpose | Main entry |
 |---|---|---|
-| Tutorial | A guided first program | [Your first RBL program](docs/eng/tutorial/first-program.md) |
+| Beginner course | 20 guided lessons with runnable examples | [Beginner course](examples/beginner/README_ENG.md) |
 | How-to | Practical workflows | [Project workflow](docs/eng/how-to/project-workflow.md), [Windows/WSL](docs/eng/how-to/windows-toolchain.md), [IDE](docs/eng/how-to/ide.md), [Testing](docs/eng/how-to/testing.md), [Benchmarking](docs/eng/how-to/benchmarking.md) |
 | Reference | Exact language and tool contracts | [Syntax](docs/eng/reference/syntax.md), [Standard library](docs/eng/reference/standard-library.md), [CLI](docs/eng/reference/cli.md), [Manifest](docs/eng/reference/manifest.md), [Limitations](docs/eng/reference/limitations.md) |
 | Explanation | Internal architecture and design trade-offs | [Architecture](docs/eng/explanation/architecture.md), [Execution model](docs/eng/explanation/execution-model.md), [Optimization](docs/eng/explanation/optimization.md), [Design](docs/eng/explanation/design.md) |
@@ -963,7 +963,7 @@ Start at [`docs/README.md`](docs/README.md) to choose a language.
 
 | Раздел | Назначение | Основные материалы |
 |---|---|---|
-| Tutorial | Обучение на последовательном примере | [Первая программа](docs/ru/tutorial/first-program.md) |
+| Курс для начинающих | 20 уроков с запускаемыми примерами | [Курс для начинающих](examples/beginner/README_RUS.md) |
 | How-to | Практические инструкции | [Работа с проектом](docs/ru/how-to/project-workflow.md), [Windows и WSL](docs/ru/how-to/windows-toolchain.md), [IDE](docs/ru/how-to/ide.md), [Тестирование](docs/ru/how-to/testing.md), [Benchmark](docs/ru/how-to/benchmarking.md) |
 | Reference | Точный синтаксис и интерфейсы | [Синтаксис](docs/ru/reference/syntax.md), [Стандартная библиотека](docs/ru/reference/standard-library.md), [CLI](docs/ru/reference/cli.md), [Манифест](docs/ru/reference/manifest.md), [Ограничения](docs/ru/reference/limitations.md) |
 | Explanation | Архитектура и проектные решения | [Архитектура](docs/ru/explanation/architecture.md), [Модель выполнения](docs/ru/explanation/execution-model.md), [Оптимизации](docs/ru/explanation/optimization.md), [Принципы дизайна](docs/ru/explanation/design.md) |

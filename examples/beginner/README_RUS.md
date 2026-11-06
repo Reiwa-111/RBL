@@ -789,7 +789,7 @@ python3 ../rbl.py run
 - [Стандартная библиотека RBL 0.7.2](../../docs/ru/reference/standard-library.md)
 - [Ограничения RBL 0.7.2](../../docs/ru/reference/limitations.md)
 - [CLI reference](../../docs/ru/reference/cli.md)
-- [Первый проект](../../docs/ru/tutorial/first-program.md)
+- [Рабочий процесс проекта](../../docs/ru/how-to/project-workflow.md)
 - [Рабочий процесс проекта](../../docs/ru/how-to/project-workflow.md)
 - [Проверка и тестирование](../../docs/ru/how-to/testing.md)
 - [Все примеры](../README.md)
