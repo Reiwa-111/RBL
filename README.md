@@ -4,7 +4,7 @@
 
 RBL is a compiled programming language and native development toolchain. The repository includes a C-based compiler that emits x86-64 assembly directly, platform runtimes, RBL Studio, a project CLI, tests and benchmarks.
 
-**Repository version:** `0.7.2` . The CLI reads this value; newly generated user projects have their own manifest version, initialized to `0.1.0`.
+**Repository version:** `0.7.2` The CLI reads this value; newly generated user projects have their own manifest version, initialized to `0.1.0`.
 
 ## Current scope
 
