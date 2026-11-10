@@ -1,4 +1,0 @@
-func main() (
-    set число = 42
-    print(число)
-)

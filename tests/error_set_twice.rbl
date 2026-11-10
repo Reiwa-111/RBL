@@ -1,4 +1,0 @@
-func main() (
-    set x = 1
-    set x = print("RHS MUST NOT RUN")
-)

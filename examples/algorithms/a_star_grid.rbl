@@ -1,0 +1,149 @@
+# A* pathfinding on a small four-neighbour grid.
+# Flat arrays keep the example independent of nested-container lookup costs.
+# The open set uses an indexed array and a linear minimum scan for clarity.
+
+func heuristic(node int, goal int, width int) int (
+    set x = node % width
+    set y = node / width
+    set goal_x = goal % width
+    set goal_y = goal / width
+    return abs(goal_x - x) + abs(goal_y - y)
+)
+
+func main() (
+    set width = 12
+    set height = 8
+    set start = 0
+    set goal = width * height - 1
+    set walls = [2, 14, 26, 50, 62, 74, 86, 6, 18, 30, 42, 54, 78, 90, 9, 21, 33, 45, 57, 69, 81]
+    set dx = [1, -1, 0, 0]
+    set dy = [0, 0, 1, -1]
+    set g_score = []
+    set parent = []
+    set closed = []
+    set in_open = []
+    set open_nodes = []
+    set open_count = 0
+    set found = false
+    set expanded = 0
+    set best_index = 0
+    set current = 0
+    set best_score = 0
+    set candidate = 0
+    set score = 0
+    set current_x = 0
+    set current_y = 0
+    set next_x = 0
+    set next_y = 0
+    set neighbour = 0
+    set tentative = 0
+    set row = ""
+    set node = 0
+    set cell = "."
+
+    for (i in 0..(width * height)) (
+        let g_score = list_push(g_score, 1000000)
+        let parent = list_push(parent, -1)
+        let closed = list_push(closed, false)
+        let in_open = list_push(in_open, false)
+    )
+
+    let g_score[start] = 0
+    let open_nodes = list_push(open_nodes, start)
+    let open_count = 1
+    let in_open[start] = true
+
+    for (open_count > 0) (
+        # Find the node with the lowest f = g + h score.
+        let best_index = 0
+        let current = open_nodes[0]
+        let best_score = g_score[current] + heuristic(current, goal, width)
+        for (i in 1..open_count) (
+            let candidate = open_nodes[i]
+            let score = g_score[candidate] + heuristic(candidate, goal, width)
+            if (score < best_score) (
+                let best_score = score
+                let best_index = i
+                let current = candidate
+            )
+        )
+
+        # Remove the selected item in O(1) by replacing it with the last entry.
+        let open_count -= 1
+        if (best_index < open_count) (
+            let open_nodes[best_index] = open_nodes[open_count]
+        )
+        let in_open[current] = false
+        let closed[current] = true
+        let expanded += 1
+
+        if (current == goal) (
+            let found = true
+            break
+        )
+
+        let current_x = current % width
+        let current_y = current / width
+        for (direction in 0..4) (
+            let next_x = current_x + dx[direction]
+            let next_y = current_y + dy[direction]
+            if (next_x >= 0 and next_x < width and next_y >= 0 and next_y < height) (
+                let neighbour = next_y * width + next_x
+                if (not closed[neighbour] and not (neighbour in walls)) (
+                    let tentative = g_score[current] + 1
+                    if (tentative < g_score[neighbour]) (
+                        let parent[neighbour] = current
+                        let g_score[neighbour] = tentative
+                        if (not in_open[neighbour]) (
+                            if (open_count < len(open_nodes)) (
+                                let open_nodes[open_count] = neighbour
+                            ) else (
+                                let open_nodes = list_push(open_nodes, neighbour)
+                            )
+                            let open_count += 1
+                            let in_open[neighbour] = true
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    set path = []
+    if (found) (
+        set cursor = goal
+        for (cursor != -1) (
+            let path = list_push(path, cursor)
+            if (cursor == start) ( break )
+            let cursor = parent[cursor]
+        )
+    )
+
+    print("A* GRID PATHFINDING")
+    print(f"grid: {width}x{height} | expanded nodes: {expanded}")
+    if (found) (
+        print(f"path length: {len(path) - 1} steps")
+    ) else (
+        print("No path found")
+    )
+    print("legend: S=start G=goal #=wall *=path .=free")
+    for (y in 0..height) (
+        let row = ""
+        for (x in 0..width) (
+            let node = y * width + x
+            let cell = "."
+            if (node in walls) (
+                let cell = "#"
+            ) elif (found and node in path) (
+                let cell = "*"
+            )
+            if (node == start) (
+                let cell = "S"
+            ) elif (node == goal) (
+                let cell = "G"
+            )
+            let row = row + cell
+        )
+        print(row)
+    )
+)

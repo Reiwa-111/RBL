@@ -1,4 +1,4 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | PROJECT WORKFLOW RECHECK
 
 ## How-to: project workflow
 
@@ -85,4 +85,15 @@ python3 /path/to/RBLStudio/rbl.py env
 
 ## What does `rbl test` do?
 
-`rbl test` runs the regression suite and separate standard-library checks from the RBL checkout. It is not a universal test runner for arbitrary projects and does not automatically execute files under `my_app/tests/`.
+`rbl test` runs the following suites sequentially from the RBL checkout:
+
+1. Direct compiler regression cases (`tests/run_tests.py`).
+2. Standard-library and input smoke tests (`tests/test_stdlib.py`).
+3. Same-basename build-cache isolation (`tests/test_build_cache.py`).
+4. Linux Runtime SysV call-alignment instrumentation (`tests/test_asm_call_alignment.py`; on Windows this uses WSL).
+5. Runtime ABI compatibility/startup tests (`tests/test_runtime_abi.py`).
+6. Managed-string ownership and deterministic collector OOM tests (`tests/test_string_ownership.py`).
+7. Repeated `input()`/`read_file()` under garbage-collection pressure (`tests/test_string_io_gc.py`).
+8. Compiler source-diagnostics tests (`tests/test_diagnostics.py`).
+
+It is not a universal test runner for arbitrary projects and does not automatically execute files under `my_app/tests/`. For the individual test contracts and backend-differential checks, see the [testing guide](testing.md) and [CLI reference](../reference/cli.md).

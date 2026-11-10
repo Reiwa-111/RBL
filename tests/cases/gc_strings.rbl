@@ -1,0 +1,46 @@
+// Dynamic strings must survive while reachable from locals and containers,
+// while repeated temporary strings create enough pressure to trigger GC.
+func relay(value string) string (
+    return value
+)
+
+func recurse(depth int) int (
+    if (depth == 0) (
+        return 0
+    )
+    return recurse(depth - 1)
+)
+
+func main() (
+    set kept = []
+    set lookup = {}
+    set nested = []
+    set i = 0
+    set alias = ""
+    set text = ""
+    set returned = ""
+    set recursion_result = 0
+    for (i < 120000) (
+        // Exercise managed formatting allocations through repeated GC cycles.
+        let text = f"value-{i:>6d}"
+        if (i % 1000 == 0) (
+            let recursion_result = recurse(3)
+            let returned = relay(text)
+            let kept = list_push(kept, returned)
+            let lookup = dict_set(lookup, returned, returned + "-stored")
+            let nested = list_push(nested, [dict_set({}, returned, returned + "-nested")])
+        )
+        if (i == 0) (
+            let alias = text
+        )
+        let i += 1
+    )
+    print(len(kept))
+    print(kept[0])
+    print(kept[119])
+    print(lookup["value-119000"])
+    print(nested[119][0]["value-119000"])
+    print(alias)
+    print(kept[0] == alias)
+    print("static-after-gc")
+)

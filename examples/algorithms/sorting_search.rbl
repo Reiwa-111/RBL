@@ -84,32 +84,59 @@ func heap_sort(values list) (
     )
 )
 
-func partition(values list, low int, high int) int (
-    set pivot = values[high]
-    set boundary = low
+func median_of_three(a int, b int, c int) int (
+    if (a < b) (
+        if (b < c) ( return b )
+        if (a < c) ( return c )
+        return a
+    )
+    if (a < c) ( return a )
+    if (b < c) ( return c )
+    return b
+)
+
+# Dutch-national-flag partition. The returned tuple is the inclusive equal range.
+func partition_three_way(values list, low int, high int) (
+    set middle = low + (high - low) / 2
+    set pivot = median_of_three(values[low], values[middle], values[high])
+    set less = low
+    set scan = low
+    set greater = high
     set temporary = 0
-    for (scan in low..high) (
-        if (values[scan] <= pivot) (
-            let temporary = values[boundary]
-            let values[boundary] = values[scan]
+
+    for (scan <= greater) (
+        if (values[scan] < pivot) (
+            let temporary = values[less]
+            let values[less] = values[scan]
             let values[scan] = temporary
-            let boundary += 1
+            let less += 1
+            let scan += 1
+        ) elif (values[scan] > pivot) (
+            let temporary = values[greater]
+            let values[greater] = values[scan]
+            let values[scan] = temporary
+            let greater -= 1
+        ) else (
+            let scan += 1
         )
     )
-    let temporary = values[boundary]
-    let values[boundary] = values[high]
-    let values[high] = temporary
-    return boundary
+    return (less, greater)
 )
 
 func quick_sort(values list, low int, high int) (
-    if (low < high) (
-        set pivot_index = partition(values, low, high)
-        if (pivot_index > low) (
-            quick_sort(values, low, pivot_index - 1)
-        )
-        if (pivot_index < high) (
-            quick_sort(values, pivot_index + 1, high)
+    set equal_range = ()
+    for (low < high) (
+        let equal_range = partition_three_way(values, low, high)
+        if (equal_range[0] - low < high - equal_range[1]) (
+            if (low < equal_range[0] - 1) (
+                quick_sort(values, low, equal_range[0] - 1)
+            )
+            let low = equal_range[1] + 1
+        ) else (
+            if (equal_range[1] < high) (
+                quick_sort(values, equal_range[1] + 1, high)
+            )
+            let high = equal_range[0] - 1
         )
     )
 )
@@ -145,9 +172,16 @@ func main() (
     set merged = [42, 7, 19, -4, 0, 19, 88, 3, 51, 12, -9, 27]
     set heap = [42, 7, 19, -4, 0, 19, 88, 3, 51, 12, -9, 27]
     set quick = [42, 7, 19, -4, 0, 19, 88, 3, 51, 12, -9, 27]
+    set duplicates = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
+    set ordered = [-8, -4, -1, 0, 2, 3, 7, 9, 12]
+    set reverse = [12, 9, 7, 3, 2, 0, -1, -4, -8]
+    set stress = []
     set temporary = []
     for (i in 0..len(source)) (
         let temporary = list_push(temporary, 0)
+    )
+    for (i in 0..100) (
+        let stress = list_push(stress, (i * 13) % 7 - 3)
     )
 
     print("SORTING AND SEARCHING — RBL")
@@ -156,10 +190,18 @@ func main() (
     merge_sort(merged, temporary, 0, len(merged) - 1)
     heap_sort(heap)
     quick_sort(quick, 0, len(quick) - 1)
+    quick_sort(duplicates, 0, len(duplicates) - 1)
+    quick_sort(ordered, 0, len(ordered) - 1)
+    quick_sort(reverse, 0, len(reverse) - 1)
+    quick_sort(stress, 0, len(stress) - 1)
 
     print("merge sort:", merged, "valid:", is_sorted(merged))
     print("heap sort :", heap, "valid:", is_sorted(heap))
     print("quick sort:", quick, "valid:", is_sorted(quick))
+    print("quick sort duplicates:", duplicates, "valid:", is_sorted(duplicates))
+    print("quick sort ordered:", ordered, "valid:", is_sorted(ordered))
+    print("quick sort reverse:", reverse, "valid:", is_sorted(reverse))
+    print("quick sort 100 duplicate-heavy values valid:", is_sorted(stress))
     print("binary search 19 -> index", binary_search(merged, 19))
     print("binary search 100 -> index", binary_search(merged, 100))
 )

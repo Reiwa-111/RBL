@@ -1,4 +1,4 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | COMPILER PERFORMANCE AUDIT
 
 ## Explanation: RBL performance
 
@@ -9,7 +9,9 @@ Measurements describe specific programs in a specific environment. They are not 
 1. `benchmarks/run_benchmarks.py` measures RBL only: build time, total process runtime, startup-adjusted net time and executable size. It works through the active backend.
 2. `benchmarks/compare_all.py` compares five implementations of the same synthetic workloads: RBL, C `-O2`, C++ `-O2`, CPython and handwritten x86-64 assembly. It runs on Linux/WSL because the assembly baseline uses Linux syscalls.
 
-See the [benchmarking how-to](../how-to/benchmarking.md) for execution details and the [measurement from 2026-11-06](../../../benchmarks/RESULTS.md) for the recorded result.
+See the [benchmarking how-to](../how-to/benchmarking.md) for execution details and [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md) for the current RBL 0.8.0 ten-sample runtime measurement. The run was CPU-pinned but took place while a separate RENA training process was active; its background-load caveat is recorded with the results.
+
+The separate [compiler performance audit](../../../benchmarks/PERFORMANCE_AUDIT.md) isolates the cost of translation-unit boundaries, measures parallel/incremental builds and profiles compiler hot paths. Those figures must not be confused with the runtime benchmark results: they measure the compiler itself, not the generated program.
 
 ## Reading the results
 
@@ -25,4 +27,4 @@ The current compiler has specialized integer/Boolean fast paths and limited loop
 
 ## Reproducibility
 
-Any newly published result should include the exact benchmark code revision, CPU, OS/kernel, compiler/linker versions, warmups, timed repetitions, raw samples and backend. Update the results table only after a new measurement; a historical snapshot does not update automatically when the toolchain changes.
+Every new benchmark result should include the exact benchmark code revision, CPU, OS/kernel, compiler/linker versions, warmups, timed repetitions, raw samples and backend. Update the results table only after rerunning the measurement with the current sources.

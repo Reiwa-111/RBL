@@ -1,5 +1,8 @@
 // Interpolated strings (RBL 0.8): f"…" with {expression} parts.
 // Literal runs keep normal escape handling; {{ and }} produce literal braces.
+func unit_value() (
+)
+
 func main() (
     set name = "Reiwa"
     set n = 42
@@ -12,4 +15,22 @@ func main() (
     print(f"{name}{name}")
     print(len(f""))
     print(f"no parts here")
+    print(f"empty spec [{name:}] and default [{name}]")
+    print(f"bases {255:d} {255:b} {255:o} {255:x} {255:X}")
+    set pi = 3.141592653589793
+    set label = "cat"
+    set unicode_label = "é猫"
+    print(f"floats {pi:.2f} {pi:.2F} {pi:.2e} {pi:.2E} {pi:.4g} {pi:.4G} {pi:.4} {pi:.0f}")
+    print(f"float precision 17 {pi:.17g}")
+    print(f"width [{42:>6d}] [{42:<6d}] [{42:^6d}]")
+    print(f"default alignment [{42:6d}] [{label:6}]")
+    print(f"fill [{label:*>6}] [{label:.^7}]")
+    print(f"fill variants [{label:0>6}] [{label:#>6}] [{label:.^6}]")
+    print(f"alignment fills [{label:<<6}] [{label:>>6}] [{label:^^7}]")
+    print(f"integer signs {-255:d} {-255:x} zero {255:0>4x}")
+    set min_int = -9223372036854775807 - 1
+    print(f"minimum integer {min_int:x}")
+    print(f"unicode [{unicode_label:>4}] [{label:界^7}]")
+    print(f"""string conversion [{42:s}] [{pi:s}] [{name:s}] [{true:s}] [{[1, 2]:s}] [{dict_set({}, "key", 7):s}] [{(1, 2):s}] [{unit_value():s}] [{null:s}]""")
+    print(len(f"{1:1000000d}"))
 )

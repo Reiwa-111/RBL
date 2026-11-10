@@ -8,6 +8,8 @@ func main() (
     print("int:", int("123"))
     print("float:", float("3.25"))
     print("str:", str(456))
-    write_file("/tmp/rbl_example.txt", "Hello from RBL")
-    print(read_file("/tmp/rbl_example.txt"))
+    set path = "rbl_example.txt"
+    write_file(path, "Hello from RBL")
+    print(read_file(path))
+    rbl.fs.delete(path)
 )

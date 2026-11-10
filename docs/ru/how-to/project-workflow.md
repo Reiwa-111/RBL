@@ -1,4 +1,4 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | PROJECT WORKFLOW RECHECK
 
 ## How-to: работа с проектом
 
@@ -85,4 +85,15 @@ python3 /path/to/RBLStudio/rbl.py env
 
 ## Что означает `rbl test`
 
-`rbl test` запускает regression suite и отдельную проверку стандартной библиотеки из checkout RBL. Это не универсальный тестовый runner для тестов произвольного проекта и не выполняет автоматически файлы из `my_app/tests/`.
+`rbl test` последовательно запускает следующие наборы из checkout RBL:
+
+1. Прямые compiler regression cases (`tests/run_tests.py`).
+2. Smoke-тесты standard library и input (`tests/test_stdlib.py`).
+3. Изоляция build cache для одинаковых имён исходников (`tests/test_build_cache.py`).
+4. Проверка SysV call alignment в Linux Runtime (`tests/test_asm_call_alignment.py`; в Windows запускается через WSL).
+5. Проверки совместимости и startup Runtime ABI (`tests/test_runtime_abi.py`).
+6. Тесты владения managed strings и детерминированных OOM collector (`tests/test_string_ownership.py`).
+7. Повторные `input()`/`read_file()` под нагрузкой сборщика мусора (`tests/test_string_io_gc.py`).
+8. Тесты source diagnostics компилятора (`tests/test_diagnostics.py`).
+
+Это не универсальный тестовый runner для произвольных проектов и команда не выполняет автоматически файлы из `my_app/tests/`. Контракты отдельных наборов и межплатформенные проверки описаны в [руководстве по тестированию](testing.md) и [справочнике CLI](../reference/cli.md).

@@ -1,10 +1,10 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.10 | RELEASE READINESS RECHECK
 
 ## Purpose and status
 
-This is the authoritative RBL development plan from version **0.7.2** onward. It supersedes the former roadmap retained under the historical archive. It separates verified implementation, unfinished work and future proposals. It defines sequencing, dependencies and exit criteria, not calendar promises.
+This is the authoritative RBL development plan. It separates the implemented 0.8.0 baseline, unfinished engineering work and future proposals. It defines sequencing, dependencies and exit criteria, not calendar promises.
 
-**Current baseline:** the root VERSION contains 0.7.2; the CLI and both Linux/Windows compiler binaries report 0.7.2. The current checkout passes 59 direct regression cases and the standard-library smoke test. This verifies the working tree; it does not prove that a v0.7.2 release tag has been published.
+**Current source tree:** root VERSION, CLI and bundled compiler binaries report 0.8.0. This roadmap describes the implementation in that source tree and the remaining engineering milestones. Release publication is managed separately.
 
 ## Principles
 
@@ -16,78 +16,91 @@ This is the authoritative RBL development plan from version **0.7.2** onward. It
 6. **No paper features.** Parsing or a prototype alone is not completion. Require implementation, positive and negative tests, documentation and both-platform checks.
 7. **Release with evidence.** Clean builds, regression, smoke and differential tests, synchronized RU/EN docs and release notes are required.
 
-## Completed history and current baseline
+## Current baseline — RBL 0.8.0
 
-### v0.7.1 — released foundation
+RBL 0.8.0 is a native, single-source-file language/toolchain targeting x86-64 Linux ELF64 and x86-64 Windows PE/COFF. One shared C frontend and code generator emit assembly directly; user RBL source is not translated to C.
 
-**Status: complete.** This release established direct x86-64 ASM generation from the shared C frontend for Linux ELF64 and Windows PE/COFF. User RBL code is not translated to C. Platform runtimes and a shared C container runtime are present, together with scalar fast paths and limited loop-local register allocation.
+The compiler is split into `common.c`, `lexer.c`, `ast.c`, `parser.c`, `sema.c`, `codegen.c` and `driver.c`, with private interfaces in `rblc_internal.h`. Variable, function and string-pool lookup use open-addressed hash indexes. The frontend retains one semantic implementation for both platform targets.
 
-The language baseline includes functions and recursion, conditions and loops, break/continue, switch, conditional expressions, strings and f-string interpolation, lists, dictionaries, tuples, null, in/is, record-like structs and receiver-method syntax. The CLI, RBL Studio, standard library and test infrastructure are also present.
+The language includes typed function parameters, recursion, conditionals, loops, `switch`, lists, dictionaries, tuples, record-like structs, strings, f-string interpolation and bounded f-string format specifications. The standard library exposes global built-ins and the `rbl.io`, `rbl.math`, `rbl.string`, `rbl.fs`, `rbl.time` and `rbl.random` namespaces.
 
-The collector uses conservative mark-and-sweep for container objects. It does not reclaim all dynamically allocated strings.
+Runtime ABI `1.2.0` describes the tagged value representation, calling convention and required runtime features. The Runtime manages dynamic strings and containers through a conservative, non-moving mark-and-sweep collector. Compiler diagnostics preserve source coordinates through lexing, parsing, semantic checks and code generation. The CLI, optional RBL Studio IDE, testing tools and benchmark suites are part of the toolchain.
 
-### v0.7.2 — current working baseline
+The current language and runtime contract is specified in the [syntax](../reference/syntax.md), [standard-library](../reference/standard-library.md), [execution-model](execution-model.md), [Runtime ABI](../reference/runtime-abi.md) and [limitations](../reference/limitations.md) references.
 
-**Status: changes exist in the checkout; publishing a release tag is a separate action.**
+## Next approved milestone
 
-- VERSION is the single repository-version source; the CLI and both rblc-asm binaries report 0.7.2.
-- Documentation is split into complete Russian and English Diataxis editions.
-- Release notes follow Keep a Changelog; the 0.7.1 history remains and a 0.7.2 entry has been added.
-- The five-way RBL/C/C++/CPython/ASM benchmark was corrected so compiler optimization cannot remove the C/C++ workload entirely; methodology, results and limitations are documented.
-- Some Windows runtime diagnostics and platform caveats were clarified.
-- Verified in the current checkout: 59/59 regression cases, standard-library smoke test and CLI/compiler version checks for both targets.
-
-**Not included in 0.7.2:** compiler modularization, RBL IR, CFG, global register allocation, source imports or multi-file compilation.
+The next language/compiler work package is **v0.9.1 — IR specification and verifier**. The current compiler is still AST-to-assembly; no IR, CFG or IR backend is implemented. Start with the IR RFC/contract and malformed-IR verifier tests. Do not begin AST lowering, CFG construction or backend migration until that contract is reviewed and frozen. The v1.0 source-module system is a later milestone and likewise requires its own RFC before implementation.
 
 ## Release plan
 
-## v0.8 — compiler and runtime stabilization
+## RBL 0.8.0 — compiler and runtime stabilization
 
-**Goal:** prepare the internal architecture for growth without changing language semantics. 0.8 is an engineering release, not the module-system release.
+**Goal:** stabilize the compiler/runtime architecture, introduce bounded f-string format specifications and preserve existing language behavior outside that explicit syntax addition. RBL 0.8.0 does not include the source-module system.
 
-### 0.8.1 — split the compiler source
+### 0.8.0 — compiler source modularization and lookup performance
 
-- Split the monolithic compiler source into common/diagnostics, lexer, AST, parser, semantic analysis, codegen and driver/CLI.
-- Define ownership of AST nodes, tokens, strings and temporary buffers; avoid implicit shared ownership.
-- Move shared structures into headers and define small internal interfaces.
-- Keep one frontend and one semantic contract for both platforms.
-- Do not combine a mechanical split with a parser rewrite, syntax changes or IR introduction.
+**Status: implemented.**
 
-**Done when:** all current tests pass without behavior changes; clean source builds work on both platforms; frontend logic is not duplicated; CLI and value ABI remain intact.
+- The compiler source is organized into `common.c`, `lexer.c`, `ast.c`, `parser.c`, `sema.c`, `codegen.c` and `driver.c`, with private contracts in `rblc_internal.h`.
+- A single frontend and semantic contract serve both platforms; semantic fast-path eligibility is decided during semantic analysis, not by the assembly emitter.
+- Variable, function and string-pool lookup use open-addressed hash indexes while preserving array order and last-definition-wins behavior.
+- Makefile and Windows/WSL bootstrap paths track compiler source, header and version dependencies.
+- Module-isolation measurements compare compiler-only latency; the one-TU/seven-TU builds emit byte-identical assembly on deterministic workloads.
 
-### 0.8.2 — runtime ABI and diagnostics
+**Completion:** full regression and negative-diagnostic suites pass; clean source builds work on both platforms; all examples compile; frontend logic is shared; CLI behavior is intact; the Runtime ABI is explicitly versioned and checked; benchmark results are reproducible.
 
-- Specify the value ABI: tags, payload, arguments, returns, calling convention and caller/callee responsibilities.
-- Add a separate compiler/runtime ABI version and compatibility check. Language version and ABI version are distinct.
-- Preserve source spans (file, line, column and range) through diagnostics.
-- Align Linux/Windows diagnostics except for necessary platform-specific errors.
+### 0.8.0 work package - Runtime ABI and diagnostics
 
-**Done when:** incompatible compiler/runtime objects are detected during build; frontend errors report correct source locations on both targets.
+- The value ABI defines tags, payload, arguments, returns, calling convention and caller/callee responsibilities.
+- Compiler/runtime ABI has its own version and compatibility check, independent of the language version.
+- Source positions (file, UTF-8 byte offset, one-based line and column) are retained through lexer, parser, AST, semantic validation and code generation.
+- Linux/Windows diagnostics use the same source-location contract apart from necessary platform-specific errors.
 
-### 0.8.3 — string memory model
+**Current contract:** Runtime ABI `1.2.0` includes tagged values, the System V AMD64 helper convention, stack value arrays, containers, GC-managed strings and the f-string formatting helper. The diagnostic pipeline preserves source coordinates through every compiler stage.
 
-- Inventory string allocation paths: literals, concatenation, str(), file I/O, formatting and container conversions.
-- Separate static program-owned strings from dynamic heap strings.
-- Define roots, reachability and reclamation of dynamic strings in relation to the container GC.
-- Verify that reachable strings are never freed and unreachable strings are not retained indefinitely.
-- Add long-running stress tests for strings and mixed string/container graphs.
+**Completion:** incompatible compiler/runtime pairs are rejected at link time or before entering RBL main; lexer/parser/semantic/codegen diagnostics report correct source positions and excerpts on both targets. This does not imply general compile-time type checking or source spans/ranges.
 
-**Done when:** the lifetime model of every dynamic string is documented and tested. Until then, do not claim complete garbage collection.
+### 0.8.0 work package - string memory model
 
-### 0.8.4 — finish the started language surface
+- String allocation paths cover literals, concatenation, `str()`, file I/O, formatting and container conversions.
+- Static program-owned strings are distinct from dynamic heap strings.
+- Root discovery, reachability and reclamation of dynamic strings are integrated with the container collector.
+- Ownership and stress tests cover reachable strings, collection, mixed string/container graphs and allocation failures.
+- Long-running tests exercise repeated allocation and I/O under GC pressure.
 
-- Specify and implement f-string format specs: numeric precision, integer bases, width and alignment.
-- Define valid type/specifier combinations, invalid-specifier behavior and Unicode/alignment rules.
-- Keep Linux/Windows behavior consistent; never pass user-controlled format strings directly into an unsafe varargs call.
-- Add positive and negative tests for every supported format.
+**Completion criteria:** the lifetime model of every dynamic string is documented and tested.
 
-**0.8 exit criteria:** modular compiler source; checked ABI; documented and tested string lifetime model; implemented and consistent f-string format specs; clean builds, regression, smoke and differential tests. Unfinished items must not be marked as shipped.
+**Status: implemented and validated.** Native Windows and WSL suites pass, including fault-injected initial/growing/compacting registry, mark-stack/survivor/replacement-registry allocation failures, rollback/retry, native stack-borrowed roots, explicit-release idempotence, and repeated `input()`/`read_file()` under GC pressure. The differential runner checks 83 selected source cases: 61 successful programs and 11 expected runtime-error programs compare exit code/stdout/stderr, 7 expected-negative fixtures are rejected with matching diagnostics, and 4 with platform/random output must build and exit successfully without output comparison. All 30 diagnostic differential cases pass. The repository contains 121 RBL source files across `examples/` and compiler-test sources in `tests/` (53 examples and 68 test sources; one uppercase `.RBL` IDE fixture is intentionally excluded): 114 expected successful compilations and 7 expected negative cases. All 114 positive sources compile and assemble on both Windows and WSL; all 53 examples pass `check` on both targets. Conservative retention from stale stack words and the absence of a native pinning/root-handle API remain documented limitations.
+
+### 0.8.0 work package - f-string format specifications
+
+**Status: implemented and validated.** The syntax reference defines `[[fill]align][width][.precision][type]`, width 0..1,000,000 code points, precision 0..17, integer bases, float conversion types, `s` conversion, defaults and runtime incompatibilities. Parser diagnostics cover malformed specifications, explicit dynamic/nested-spec rejection at the beginning or after width, and limits; the shared runtime formatter uses fixed conversion formats and managed RBL string allocation. Direct regression covers bases including the signed 64-bit minimum, precision through 17 digits, width through 1,000,000, alignment, fill (including `<`, `>` and `^` as fill characters), Unicode width and explicit zero fill; the GC stress case exercises repeated formatting allocations. All 61 direct regression cases and 63 diagnostic cases pass, and the f-string case produces identical output on WSL/Linux and native Windows.
+
+**0.8 completion state:** the modular compiler, versioned ABI, documented string lifetime model, bounded f-string format specs and cross-platform verification criteria are implemented. Remaining limitations are listed in the language reference and manifest.
+
+### 0.8.0 release checklist
+
+This checklist records the implementation and verification state of RBL 0.8.0. It does not authorize publication.
+
+**Scope clarification:** 6/6 means the compiler/Runtime 0.8.0 work packages and their recorded verification are complete. It does not mean the complete desktop product is release-ready. IDE interactive acceptance and the Windows bundled-toolchain corresponding-source/source-offer review are separate open distribution gates tracked in [`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt).
+
+1. [x] **Architecture** — modular compiler, private module boundaries, lookup indexes, preserved semantics and reproducible compiler/build measurements.
+2. [x] **Runtime ABI** — versioned descriptor, link/startup compatibility checks, value layout, calling convention and required feature bits.
+3. [x] **Diagnostics** — source positions and excerpts through lexer/parser/semantic/codegen, including UTF-8 and cross-platform parity.
+4. [x] **Memory** — documented dynamic-string/container ownership, deterministic collector OOM rollback/retry, native C borrow limits and repeated I/O under GC pressure.
+5. [x] **F-string formatting** — bounded grammar, parser/runtime agreement, runtime type errors, managed output and boundary/differential coverage.
+6. [x] **Final verification** — 61 direct regression cases pass; all 114 positive sources across the 53-example/68-test inventory compile and assemble, while 7 negative sources are rejected; the 63-scenario diagnostics suite passes; the 83-case differential runner passes with 61 successful-output comparisons, 11 expected-runtime-error comparisons, 7 expected-negative diagnostic comparisons and 4 nondeterministic build/exit comparisons, and all 30 diagnostic differential cases match. Runtime ABI, instrumented Linux Runtime call alignment, cache isolation, deterministic OOM/GC/ownership and repeated I/O-under-GC tests pass. The tracked corpus and documentation validators pass. Runtime, module-isolation and Makefile build benchmarks are recorded with environment and measurement caveats. Fresh source-only compiler/Runtime builds and execution pass in Windows and WSL sandboxes. English/Russian documentation, README, VERSION and the release-candidate manifest are synchronized.
+
+[`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt) is the single manifest for the RBL 0.8.0 release candidate. Its pre-release status must remain explicit until publication is authorized.
 
 ## v0.9 — RBL IR, CFG and optimizer
 
 **Goal:** separate language semantics from machine code generation. IR must become a verifiable contract between the frontend and backend.
 
 ### 0.9.1 — IR specification and verifier
+
+**Current artifact:** [IR v0.1 design proposal](ir-rfc.md) (proposed, not frozen). It recommends SSA-like immutable temporaries with block arguments and explicit mutable local slots; the open decisions in the RFC require review before this becomes a stable contract.
 
 - Define values, instructions, operands/results, functions, parameters, locals and temporaries.
 - Define basic blocks, terminators, control-flow edges and call representation.
@@ -197,4 +210,4 @@ Before implementation, create an RFC and freeze a testable contract:
 
 ## Roadmap governance
 
-This is the single authoritative release roadmap. design.md records principles and links here; archive/ROADMAP.md and archive/NEXT_STEPS.md are historical snapshots. A task may move to “done” only after implementation and its exit criteria pass. When priorities change, update both language editions first; update release notes only when a release actually ships.
+This is the single authoritative release roadmap. design.md records principles and links here. A task may move to “done” only after implementation and its exit criteria pass. When priorities change, update both language editions first. Candidate changes may be summarized in the release notes; a publication date is added only when the version is actually published.

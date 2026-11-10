@@ -1,4 +1,4 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.10 | CLI AND TEST SUITE DOCUMENTATION
 
 ## Reference: RBL CLI
 
@@ -18,13 +18,13 @@ The main entry point is the `rbl.py` Python script in the RBL repository. It doe
 | `rbl.py build [FILE]` | Compiles, assembles and links an executable. |
 | `rbl.py run [FILE]` | Builds and runs a program. |
 | `rbl.py asm [FILE]` | Runs the assembly preview and displays generated assembly. |
-| `rbl.py test` | Runs the repository regression suite and standard-library smoke test. |
+| `rbl.py test` | Runs compiler/Runtime regression and diagnostics plus build-cache/cleanup, GC, toolchain, launcher, filesystem-security, worker-lifecycle and DPI checks; Windows adds registry/save-cleanup tests. |
 | `rbl.py bench` | Runs the portable RBL-only benchmark suite. |
-| `rbl.py bench3way [--reps N] [--warmups N]` | Runs the five-implementation Linux/WSL comparison. The command name remains for compatibility. |
+| `rbl.py bench5way [--reps N] [--warmups N]` | Runs the five-implementation Linux/WSL comparison; `bench3way` is a legacy alias. |
 | `rbl.py diff [--a MODE] [--b MODE] [PATH ...]` | Compares two backends. Defaults to `wsl` and `native`. |
 | `rbl.py fmt [FILE] [--check]` | Formats a file or checks whether formatting is already applied. |
 | `rbl.py doc [FILE] [-o FILE]` | Generates a simple function-declaration table. |
-| `rbl.py clean` | Removes `build/` from the current directory. |
+| `rbl.py clean` | Safely removes only the compiler cache at `build/sources/`; preserves other build evidence and user data. |
 
 The `FILE` argument for `check`, `build`, `run`, `asm`, `fmt` and `doc` is optional. When omitted, the CLI uses `package.entry` from the manifest, or `src/main.rbl` by default. If that path does not exist and a root-level `main.rbl` exists in the current project, it is used instead.
 
@@ -52,15 +52,16 @@ python rbl.py run examples\test.rbl
 
 `check` is not parser-only validation: it processes the source, performs analysis and generates assembly into a temporary stream. It does not invoke the assembler or linker, produce an executable, or save a normal assembly output file.
 
-## `bench` and `bench3way`
+## `bench` and `bench5way`
 
 These commands invoke different scripts:
 
 - `bench` → `benchmarks/run_benchmarks.py`, RBL-only measurements available through the active backend.
-- `bench3way` → `benchmarks/compare_all.py`, five implementations and a Linux syscall assembly baseline; Linux/WSL only.
+- `bench5way` → `benchmarks/compare_all.py`, five implementations and a Linux syscall assembly baseline; Linux/WSL only.
+- `bench3way` remains a backwards-compatible alias for `bench5way`.
 
-The current CLI does not accept `--reps` or `--warmups` for `bench`; those options belong to `bench3way`. See the [benchmarking guide](../how-to/benchmarking.md).
+The current CLI does not accept `--reps` or `--warmups` for `bench`; those options belong to `bench5way`. See the [benchmarking guide](../how-to/benchmarking.md).
 
 ## Low-level driver
 
-For diagnostics and scripting, use `tools/rbltool.py`. It provides `doctor`, `check`, `build`, `run` and `asm`. The higher-level `rbl.py` adds project creation/initialization, tests, benchmarks, formatting, API listing and cleanup.
+For diagnostics and scripting, use `tools/rbltool.py`. It provides `doctor`, `check`, `build`, `run` and `asm`. The higher-level `rbl.py` adds project creation/initialization, tests, benchmarks, formatting, API listing and cleanup. For compiler-stage labels, source coordinates and diagnostic test coverage, see the [diagnostics reference](diagnostics.md).

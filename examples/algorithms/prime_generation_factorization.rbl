@@ -13,6 +13,34 @@ func is_prime(number int) bool (
     return true
 )
 
+func prime_factors(number int) list (
+    set factors = []
+    if (number < 2) ( return factors )
+    set remaining = number
+    set factor = 2
+    set exponent = 0
+    for (remaining > 1) (
+        if (remaining % factor == 0) (
+            let exponent = 0
+            for (remaining % factor == 0) (
+                let remaining = remaining / factor
+                let exponent += 1
+            )
+            let factors = list_push(factors, (factor, exponent))
+        )
+        if (factor == 2) (
+            let factor = 3
+        ) else (
+            let factor += 2
+        )
+        if (remaining > 1 and factor > remaining / factor) (
+            let factors = list_push(factors, (remaining, 1))
+            let remaining = 1
+        )
+    )
+    return factors
+)
+
 func main() (
     set limit = 100
     set prime_count = 0
@@ -27,28 +55,12 @@ func main() (
     print("prime count:", prime_count)
 
     set original = 360360
-    set remaining = original
-    set factor = 2
-    set exponent = 0
+    set factors = prime_factors(original)
     print("PRIME FACTORIZATION")
     print("number:", original)
-    for (remaining > 1) (
-        if (remaining % factor == 0) (
-            let exponent = 0
-            for (remaining % factor == 0) (
-                let remaining = remaining / factor
-                let exponent += 1
-            )
-            print(factor, "^", exponent)
-        )
-        if (factor == 2) (
-            let factor = 3
-        ) else (
-            let factor += 2
-        )
-        if (factor > remaining / factor and remaining > 1) (
-            print(remaining, "^ 1")
-            let remaining = 1
-        )
+    for (entry in factors) (
+        print(entry[0], "^", entry[1])
     )
+    print("edge cases: factorize(0) ->", len(prime_factors(0)), "factors")
+    print("edge cases: factorize(1) ->", len(prime_factors(1)), "factors")
 )

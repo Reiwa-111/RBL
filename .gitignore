@@ -1,5 +1,6 @@
 # Local Python environment
 .venv/
+target/
 
 # Temporary analysis scripts/files
 .analysis-tmp/
@@ -9,8 +10,10 @@ build/
 
 # Python cache
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
+life_report.txt
 
 # Logs
 *.log

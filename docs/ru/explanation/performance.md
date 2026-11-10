@@ -1,4 +1,4 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | COMPILER PERFORMANCE AUDIT
 
 ## Explanation: производительность RBL
 
@@ -9,7 +9,9 @@
 1. `benchmarks/run_benchmarks.py` измеряет только RBL: сборку, полное время запуска, startup-adjusted net и размер исполняемого файла. Он поддерживает активный backend.
 2. `benchmarks/compare_all.py` сопоставляет пять реализаций одинаковых синтетических workloads: RBL, C `-O2`, C++ `-O2`, CPython и handwritten x86-64 ASM. Запускается на Linux/WSL из-за Linux syscalls в ASM baseline.
 
-Детали запуска и рекомендации — в [how-to benchmark](../how-to/benchmarking.md). Сохранённый результат — [измерение 2026-11-06](../../../benchmarks/RESULTS.md).
+Детали запуска и рекомендации — в [how-to benchmark](../how-to/benchmarking.md). В [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md) приведено текущее десятисерийное runtime-измерение RBL 0.8.0. Финальный запуск был привязан к одному CPU, но выполнялся во время обучения RENA; ограничение фоновой нагрузки указано рядом с результатами.
+
+Отдельный [performance-аудит компилятора](../../../benchmarks/PERFORMANCE_AUDIT.md) изолирует стоимость translation-unit boundaries, проверяет параллельную/инкрементальную сборку и профилирует hot paths. Эти значения нельзя смешивать с runtime benchmark: они измеряют сам компилятор, а не сгенерированную программу.
 
 ## Как читать результаты
 
@@ -25,4 +27,4 @@
 
 ## Воспроизводимость
 
-Любой новый опубликованный результат должен включать точную ревизию кода benchmark, CPU, OS/kernel, compiler/linker versions, warmups, timed repetitions, сырые выборки и backend. Менять таблицу результатов следует после нового измерения; исторический snapshot не обновляется автоматически при изменении toolchain.
+Каждый новый benchmark result должен включать точную ревизию кода benchmark, CPU, OS/kernel, compiler/linker versions, warmups, timed repetitions, сырые выборки и backend. Обновляйте таблицу после повторного измерения на текущих исходниках.

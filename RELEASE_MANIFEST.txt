@@ -1,60 +1,1050 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# RBL Studio — RBL 0.8.0 release manifest
+# Snapshot: RBL 0.8.0 / 2026-11-10 (wx frontend follow-up, regression and packaging audit)
+# Status: UNRELEASED — not published, tagged or distributed; GUI acceptance and source-distribution blockers remain open.
 
-RBL Studio — Direct x86-64 ASM IDE + CLI
-Release: v0.7.2
-Base commit: f285840bddf930c2bf95a074e6ca7b9bd620974e
-Backend: two targets from one code generator
-  - Linux x86-64 ELF : RBL -> ASM -> GNU as --64 -> GNU ld + libc/libm
-  - Windows x86-64 PE: RBL -> ASM -> GNU as --64 -> MinGW-w64 gcc + runtime objects
+## Version and targets
 
-No C source is generated for user RBL programs on either target. The Windows C
-compiler builds the Windows platform runtime and shared container runtime, then
-acts as the linker driver. The Linux build links the assembly platform runtime
-and the shared C container runtime.
+Repository/compiler version: 0.8.0 (`VERSION` is authoritative).
+Runtime ABI: 1.2.0 (`runtime/rbl_abi.h` is authoritative).
+Required features: TAGGED_VALUES, SYSV_AMD64, STACK_VALUE_ARRAYS, CONTAINERS,
+GC_MANAGED_STRINGS and FSTRING_FORMAT (bit 5).
+Targets: x86-64 Linux ELF64 and x86-64 Windows PE/COFF.
+User programs compile through the shared C frontend/code generator to native
+x86-64 assembly; user RBL programs are not compiled through C.
 
-Current implementation in v0.7.2:
-- Direct x86-64 assembly generation for Linux ELF64 and Windows PE/COFF.
-- The bootstrap compiler is one C translation unit (`compiler/rblc_asm.c`)
-  containing lexer, parser/AST, analysis and code generation, with conservative
-  scalar fast paths and loop-local register allocation; there is no explicit
-  RBL IR/CFG.
-- Lists, dictionaries, tuples, `null`, identity (`is`), membership (`in`) and
-  record-like `struct` declarations with receiver-method syntax.
-- Shared C container runtime with conservative mark-and-sweep collection for
-  list, tuple and dictionary objects. String allocations are not all reclaimed.
-- Built-in `rbl.io`, `rbl.math`, `rbl.string`, `rbl.fs`, `rbl.time`, and
-  `rbl.random` namespaces; no source-module import system is implemented.
-- 59 direct regression cases plus separate standard-library/input smoke tests.
-- Differential runner for comparing the Linux and native Windows paths when
-  run on Windows with WSL and MinGW-w64 configured. Random values and current
-  working-directory output are compared by exit status only.
-- Five-implementation Linux benchmark: RBL, C (-O2), C++ (-O2), CPython and
-  hand-written x86-64 assembly over three workloads.
-- CLI version reads 0.7.2 from the root VERSION; newly generated user projects
-  initialize their own rbl.toml package version to 0.1.0.
+## Implemented 0.8.0 scope
 
-New in v0.7.2:
-- Documentation reorganized into matching Russian and English Diataxis editions.
-- Five-way benchmark methodology corrected so C/C++ runtime workloads cannot be optimized away; results and limitations are documented.
-- Windows runtime reports getcwd failures accurately and documents its platform-specific monotonic clock and pseudorandom sequence.
+- Compiler split into common.c, lexer.c, ast.c, parser.c, sema.c, codegen.c
+  and driver.c, with private declarations in compiler/rblc_internal.h.
+- Open-addressed indexes for variables, functions and string constants;
+  source order and last-definition-wins function behavior are preserved.
+- Versioned Runtime ABI descriptor/startup handshake and link-time major guard.
+- Canonical C declarations for shared container Runtime entry points in
+  `runtime/rbl_abi.h`; Linux/Windows build paths enforce missing/redundant
+  prototype checks for shared Runtime C objects.
+- Source-position diagnostics through lexer, parser, semantic analysis and
+  code generation, including UTF-8 and original f-string offsets.
+- Runtime-owned dynamic strings integrated with conservative non-moving
+  mark-and-sweep collection for strings and containers.
+- Deterministic OOM coverage for initial/growing/compacting string registries,
+  container registry, mark stack, survivor vector and pre-sweep replacement
+  registry; failed collections preserve the heap and can retry.
+- Native C ownership limits documented. Runtime state is process-global and
+  unsynchronized; only the thread entering generated RBL main is supported.
+  There is no pinning/root-handle API, public FFI or multithreaded Runtime API.
+- Bounded f-string specs `[[fill]align][width][.precision][type]`, including
+  documented conversions, Unicode fill/width, runtime checks and managed output.
+- The five-implementation benchmark is exposed as `bench5way`; `bench3way` is
+  retained only as a backwards-compatible alias.
+- Proven non-allocating integer/Boolean scalar statements and fast loops omit
+  redundant GC safe points; allocating statements and unknown calls retain them.
+- A dedicated code-generation regression test verifies scalar safe-point elision
+  and retained safe points for allocating statements; the full suite runs it.
+- Linux/Windows runtime and toolchain paths include ABI, container and format
+  objects; the standalone Linux rebuild script builds the complete Runtime.
+- RBL Studio's primary desktop frontend is the native C++20/wxWidgets 3.2 /
+  Scintilla application in `native/wx-ui/`, paired with `rbl-studio-worker`.
+  The former Rust/egui source remains as a legacy reference; when wx is
+  unavailable, `RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately
+  built executable from a developer checkout. It is not included in the wx
+  installer. The primary frontend uses no Chromium, WebView, WebKit or CEF runtime.
+- IDE compiler integration uses the existing `tools/rbltool.py` driver with
+  argument-safe process creation, streamed output, cancellable process-tree
+  termination, unsaved-buffer snapshots and atomic source/settings writes.
+- Windows native user-program builds include a private, pruned MSYS2 UCRT64
+  MinGW-w64 toolchain under `toolchain/windows-x86_64/`. The 43-file payload
+  (21,821,374 bytes) contains GCC driver, GNU assembler/linker, collect2,
+  required startup/static libraries, recursively resolved non-system DLLs and
+  the applicable upstream license texts, including MinGW-w64 CRT ZPL-2.1,
+  statically linked runtime notices and libwinpthread notices. GCC's C frontend, headers, C++ tools, debugger, make,
+  MSYS2 shell and LTO plugin are excluded. RBL disables the linker plugin because
+  its emitted objects do not use GCC LTO. `tools/package_windows_toolchain.py`
+  rebuilds the bundle from a UCRT64 prefix and verifies its SHA-256 manifest.
+  Exact package versions and license metadata are listed in
+  `toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md`; source-offer and corresponding-
+  source compliance review is still required before redistribution.
 
-New in v0.7.1:
-- Continued support for native Windows PE/COFF builds through MinGW-w64, with WSL retained as an alternative; this backend predates 0.7.1.
-- Windows runtime type checking for list/dictionary/tuple/null parameter values.
-- More reliable native toolchain discovery, compiler/runtime rebuild handling,
-  build caching, console encoding and Windows/WSL diagnostics.
-- Compiler fast-path updates for eligible integer leaf comparisons and in-place
-  updates to register-held integer locals, with explicit overflow checks retained.
-- Expanded regression coverage, including deterministic Game of Life using
-  dictionaries and container operations.
+## Verification record
 
-New in v0.7.0 (historical baseline):
-- Canonical parenthesized block syntax.
-- Standard-library built-ins and namespaces for I/O, math, strings, filesystem,
-  time and pseudorandom values.
-- Decimal floating-point literals and updated IDE indentation/formatting.
-- Typed scalar fast paths and loop-local register allocation retained.
+The numbered verification snapshots below are chronological evidence. Counts in
+older dated entries are retained as measured at those checkpoints; the latest
+documentation and licensing reconciliation is recorded at the end of this file.
 
-See docs/ for the current language, backend, runtime, toolchain and roadmap
-references. See the historical notes in docs/ for early implementation context that are not current
-language or implementation specifications.
+- 61/61 direct RBL regression cases.
+- 63 diagnostic-suite scenarios: 45 invalid-source diagnostics, 8 valid controls,
+  4 expected runtime errors and 6 malformed-UTF-8 byte-sequence cases.
+- 82 selected Linux/Windows differential source cases: 60 successful programs
+  compare exit code/stdout/stderr; 11 expected runtime-error programs compare
+  non-zero exit code/stdout/stderr; 7 expected-negative compiler fixtures are
+  rejected with matching diagnostics; 4 random/platform-dependent programs must
+  build and exit successfully, but their output is not compared.
+- 30/30 Linux/Windows diagnostic differential cases match.
+- 121 unique example/test sources: all 114 expected-positive sources compile
+  and assemble on both targets; all 7 expected-negative sources are rejected.
+- All 53 example `.rbl` files passed compiler `check` on Windows native and WSL; the four new A*, SIR, Monte Carlo and regression examples also execute successfully on Windows native.
+- Documentation readiness: 70 source Markdown files and 489 relative links checked;
+  no missing targets or unresolved heading fragments. All 23 RU/EN reference,
+  how-to and explanation page pairs have matching inventories and heading levels.
+- The documented Windows PowerShell stdin workflows for Beginner Lesson 2 and
+  the unit converter were executed successfully with the expected output.
+- Runtime ABI compatibility/startup/symbol and generated-fast-call alignment
+  tests pass. The Linux Runtime alignment harness instruments all 157 textual
+  CALL sites (177 emitted calls after macro expansion) and executes the regression
+  suite plus string-call probes. A separate static control-flow audit confirms
+  RSP mod 16 is zero at every Linux Runtime call site on all incoming paths.
+- Build-cache tests confirm same-basename source files and Linux/Windows outputs
+  use isolated artifact directories. Standard-library input smoke uses a private
+  temporary source file and removes its isolated build outputs.
+- Differential runs execute each program in a private temporary working directory
+  so examples that write relative files do not overwrite repository/user files.
+- Ownership, deterministic OOM rollback/retry, native stack-borrow and repeated
+  input()/read_file() GC-pressure tests pass.
+- Strict prototype/warning builds and GCC `-fanalyzer` pass for all seven compiler
+  C modules and the three shared Runtime C modules (containers, ABI and formatter).
+- Native IDE Rust tests cover Unicode source load/save, UTF-8/UTF-16 encoding,
+  BOM and line-ending preservation, document-wide delta Undo/Redo across large
+  editor windows, Replace/Replace All history, UTF-8-safe paging and search,
+  editor tokenization, cursor offsets, memory-budget accounting, settings,
+  project-tree filtering, `.rbl`-only compiler gating, safe compiler arguments,
+  relative-import snapshots, process-tree cancellation and no embedded browser
+  engine crates.
+- Python syntax checks and `git diff --check` pass.
+- The bundled Windows toolchain manifest validates all 43 payload files and
+  SHA-256 hashes. On Windows 11, `doctor`, RBL `check`, `build` and `run` passed
+  with `RBL_MINGW` unset and a sanitized `PATH` that omitted MSYS2; a dedicated
+  test verifies bundle priority, explicit external override and no timestamp-
+  triggered C bootstrap when prebuilt release artifacts are present. The full
+  `python rbl.py test` suite passes; its standalone native C ABI/ownership probes
+  explicitly skip under the minimal bundle because GCC `cc1`/headers are not
+  part of the end-user runtime toolchain.
+- Controlled post-ABI five-way runtime results (2 warmups, 10 samples, CPU-pinned;
+  background training load noted): see `benchmarks/RESULTS.md`.
+- Final release/compiler, module-isolation and Makefile build revalidations are
+  recorded in `benchmarks/PERFORMANCE_AUDIT.md`; the Makefile benchmark ran in
+  a disposable source sandbox to preserve tracked build outputs.
+- Fresh source-only compiler/Runtime builds in disposable Windows and WSL
+  sandboxes linked and executed the f-string and fast-integer-loop fixtures.
+- Compiler/build performance methodology and measurements:
+  `benchmarks/PERFORMANCE_AUDIT.md`.
+
+### Initial IDE readiness snapshot — 2026-11-09 (historical)
+
+- At this snapshot, the native wxWidgets 3.2 / Scintilla frontend was being built
+  in `native/wx-ui/`; the existing Rust/egui Cargo frontend remained present as
+  rollback/reference. The wx application now serves as the primary launcher/
+  install target. It includes
+  the full toolchain task menu (Run, Build, Check, ASM, Tests, Benchmarks,
+  Doctor), asynchronous Rust worker supervision, interactive stdin/EOF/cancel,
+  32-tab and 16/64 MiB document limits, UTF-8/UTF-16 LE/BE open/save, external
+  modification checks, dirty-tab prompts, project tree, bounded asynchronous
+  Find in Files, Problems navigation, editor settings and AUI persistence.
+  Its custom lexer/folding is still approximate and not shared with the
+  compiler. Windows UCRT64 and Linux/WSL CMake builds pass; worker unit tests,
+  Clippy `-D warnings` and the two-input unit-converter smoke pass on both
+  platforms. One Windows idle sample measured about 30.5 MiB GUI working set
+  plus 9.8 MiB worker working set. This does not establish 32-tab/large-file/
+  active-process peak memory or full interactive acceptance. At that historical
+  snapshot it was not yet the default frontend; no commit, tag, push or release
+  was performed. Details and build instructions: `native/wx-ui/README.md`.
+- IDE follow-up engineering pass: the existing 256×256 RBL PNG is now wired to
+  the native window icon; Settings now exposes RBL syntax highlighting and soft
+  wrapping, supports Restore defaults and can be resized. Invalid settings files
+  now produce a visible warning and are preserved until the user explicitly
+  saves new settings. Project-tree scanning moved off the UI frame, repeated
+  refreshes are coalesced, and filesystem scan failures are surfaced. Also fixed
+  global shortcuts stealing input from dialog fields, duplicate Save As tab
+  ownership, Replace All caret restoration, project-search coverage being
+  artificially capped at 5,000 files, and stream read failures being reported
+  as successful task exits.
+
+### wxWidgets IDE verification update (2026-11-09)
+
+- Rebuilt the current wxWidgets 3.2 / Scintilla candidate on Windows UCRT64 and
+  Linux/WSL. Windows standalone startup succeeded with PATH restricted to
+  Windows system directories, and the adjacent Rust worker connected. Windows
+  worker interactive smoke passed. Linux worker verification passed 21/21
+  tests, Clippy `-D warnings`, formatting check and interactive smoke.
+- The full Windows `python rbl.py test` suite passed, including 61 direct ASM
+  regression cases, 63 diagnostics cases, Runtime ABI checks, SysV call-site
+  alignment instrumentation, GC pressure, stdin and streaming tests.
+- Windows Rust worker unit tests could not be rerun in this environment:
+  MinGW ld could not resolve Rust standard-library files under the non-ASCII
+  user-profile path. The Windows Release worker did build and its interactive
+  smoke passed. Do not describe Windows worker unit tests as freshly passed.
+- Interactive GUI evidence: invalid AUI layout recovery renders the Project,
+  editor and Output panes; 32 blank tabs were opened and the UI displayed
+  `Tab limit reached (32)` on further creation attempts. A post-load sample
+  with the project tree expanded measured approximately 86.9 MiB GUI Working
+  Set plus 10.0 MiB worker Working Set, with no active compiler child.
+- Direct GUI validation: PyCharm Community Edition 2024.3 was launched with the
+  repository and captured as `build/wx-ui-win/reference-pycharm.png`. The wx
+  candidate was opened beside it and visually reviewed. `unit_converter.rbl`
+  was opened through the IDE, Run was started from the toolbar, and `1` and `10`
+  were sent through the GUI stdin field. Console output contained
+  `10.000 km = 6.214 mi`, exit code was 0, and the status bar returned to
+  Finished. Check was invoked through the GUI and Problems remained empty for
+  the valid source. Evidence: `ide-final-visual.png`, `ide-run-complete.png`,
+  and `ide-check-pass.png` under `build/wx-ui-win/`.
+- Still open: GUI EOF/cancel; unsaved-buffer diagnostic navigation;
+  Save/Save As and external-change prompts; UTF-16 LE/BE and EOL round-trips;
+  malformed encoding; 16 MiB and aggregate 64 MiB boundary tests; Find in
+  Files cancellation/large-result responsiveness; settings migration and
+  persistence; active-process peak memory and aggregate process-tree profiling.
+  The existing egui resource report is not evidence for wx memory. The 512 MiB
+  whole-process-tree target remains unproven. The wx frontend remains a
+  candidate and is not accepted as the default application.
+- No commit, push, tag or release was made.
+
+### wxWidgets visual pass (2026-11-09)
+
+- Added a compact File/Run/Tools action toolbar, a consistent dark workspace
+  palette, active editor-tab styling, a four-part status bar, icon-backed
+  Project/Console/Problems/Search views, a distinct `.rbl` tree glyph and
+  automatic root expansion.
+- Added stale-layout recovery for AUI perspectives created before the toolbar
+  pane existed, and darkened the Scintilla line-number gutter.
+- Added a custom RBL application icon and hand-drawn folder, `.rbl` source and
+  generic text-file glyphs. Corrected the toolbar's white native background,
+  console text contrast and a non-ASCII dash in the stdin placeholder after
+  inspecting actual Windows screenshots.
+- Windows and Linux builds passed after the visual pass; Windows worker smoke
+  and Linux worker tests/Clippy/smoke passed.
+- PyCharm Community Edition 2024.3 was launched locally with the repository and
+  captured as a real visual reference. The wx window was captured and reviewed
+  after the final icon/theme pass. At this 2026-11-09 snapshot the wx frontend
+  was still a candidate; no commit/tag/push/release.
+- Legacy egui snapshot only: Project-tree panel was bounded-resizable (190–360 egui points, 245 default)
+  with a visible separator. Output now sits above the bottom-most status strip.
+  The reported ~30 px editor strip is consistent with the reserved 18-point RBL
+  fold gutter when line numbers are disabled; it is not a second top-level panel.
+  Its exact on-screen position still requires GUI confirmation.
+- Windows child processes now start suspended, enter their Job Object, and only
+  then resume. The immediate-descendant regression passed five consecutive
+  Windows GNU runs; the test no longer relies on a timing delay.
+- Run now receives an actual piped stdin channel. The Run panel exposes an
+  auto-focused line-input field and forwards each submitted line through the
+  process supervisor to the toolchain driver and native program. Runtime `print()`
+  flushes stdout on both Windows and Linux so output preceding a prompt is visible
+  even when stdout is a pipe. An end-to-end streaming test runs an RBL program
+  with two sequential `input()` calls and verifies that `print()` output arrives
+  before the first prompt/input is sent.
+- Run input now also has an explicit EOF control. The process writer closes the
+  child stdin when it receives `CloseStdin`; a child-process regression verifies
+  that EOF reaches the child. A process-level integration test runs the actual
+  `examples/utilities/unit_converter.rbl` through the supervisor, waits for both
+  prompts, submits `1` and `10`, and checks `10.000 km = 6.214 mi`.
+- RBL block folding is matched from grammar-level block parentheses for `func`,
+  `if`, `elif`, `else`, `for`, `switch`, `case` and `struct`; comments, ordinary
+  strings and triple-quoted strings are skipped. It does not fold arbitrary
+  grouping parentheses. Fold state is a sorted vector capped at 1,024 entries,
+  cleared on page changes, edits and successful Undo/Redo, and accounted in the
+  document budget. For large documents only complete blocks inside the active
+  64 KiB page can fold; the scanner carries triple-string state from preceding
+  pages. Folded text is read-only and clicking the editor expands current-page
+  folds before editing, avoiding source/projection offset corruption.
+- RBL indentation guides now use the same matched structural block-parenthesis
+  ranges as folding; comments, strings and expression grouping are excluded.
+  Plain-text guides use bounded contiguous indentation spans (maximum rendered
+  guide depth 32); both guide paths have nested-block regression tests.
+  Editor viewport dimensions no longer impose artificial 200 px / 120 px floors;
+  output is row-virtualized. The project separator is visible, while the editor
+  gutter now blends with the code background. Editor scroll state is keyed by
+  the active 64 KiB page, preventing the next page from inheriting the previous
+  page's scroll offset. These changes address panel ordering, narrow-window
+  geometry and irregular page scrolling; GUI confirmation is still required for
+  the reported strip and full visual acceptance.
+- Post-change IDE verification: Linux/WSL `cargo test --all-targets` 100/100;
+  Windows GNU `cargo test --all-targets` 98/98; Clippy `-D warnings`, formatting,
+  Linux and Windows GNU release builds, and both native `--self-test` checks pass.
+  Windows `python rbl.py test` passes (61 direct ASM cases, stdlib/input, ABI,
+  diagnostics and toolchain tests); corpus verification at that 2026-11-09 snapshot passed (120 sources,
+  113 assembled positives and 7 expected negatives); documentation check passes
+  (64 Markdown / 455 relative links). `tests/test_rbltool_streaming.py` passes on
+  both Windows and WSL, including the interactive two-input RBL program.
+  These checks do not replace interactive GUI acceptance.
+
+- Accepted IDE resource measurements cover idle and one 16 MiB document on
+  Windows and WSL, plus a Windows 32-tab memory scenario (32 × 1 MiB; 194.7 MiB
+  IDE working-set peak / 254.6 MiB IDE-plus-descendants private-byte peak; one
+  process). The 32-tab run did not validate editing operations. Sustained
+  multi-document editing, Find/Replace/Undo and active compiler process-tree
+  scenarios remain unverified; the 512 MiB target is not proven for these loads.
+- Interactive Windows GUI automation has not reliably acquired foreground
+  keyboard focus; its edit/undo/redo workload must not be marked passed.
+- Initial independent read-only source audits for layout, editor and process
+  handling are complete; their findings and the folding limitation are recorded
+  in the RU/EN engineering audit. Real interactive GUI acceptance, stress-memory
+  measurements and a final cross-platform audit remain open.
+  See `docs/ru/explanation/ide-engineering-audit.md` and
+  `docs/eng/explanation/ide-engineering-audit.md` for readiness criteria.
+- Architecture research compared egui panel ordering/resizing with Zed's
+  DisplayMap and Helix's rope/transaction/view separation; Lapce was reviewed as
+  another native Rust editor reference. A full source/display map is required
+  for editing inside collapsed regions, so the current bounded TextEdit
+  integration was retained instead of adding an unproven heavyweight editor
+  stack. This is an explicit remaining editor limitation, not a claim of
+  PyCharm-equivalent folding.
+- These open IDE verification items do not change the compiler/runtime version
+  or imply publication. RBL 0.8.0 remains UNRELEASED.
+- Exact-version source-only archives for 9 toolchain and 11 wx/runtime package
+  sources have now been downloaded and signature-verified (20/20); upstream
+  source hashes, the CRT/winpthreads git commit and default-manifest source hash
+  were checked. Evidence and SHA-256 values are in
+  `toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md`. The archives remain in the
+  local build audit directory and are not included in the runtime bundle or Git
+  snapshot. A 330,067,308-byte source-material archive has been assembled
+  locally at `build/source-material/RBL-0.8.0-Windows-Source-Materials-20261110.tar.zst`
+  (SHA-256 `6bc84404a077bcc438bafd0b6add5436bb8d1058f339aa5d1ebd988529c7fa57`).
+  It has not yet been attached to a distributable binary package, and no
+  applicable written offer has been legally reviewed. Neither distribution
+  step nor legal review is complete. Binutils is now 2.47-4; the linker emits
+  PE/COFF (`i386pep`/`i386pe`) and readelf is not shipped. BFD nevertheless
+  recognizes ELF input vectors, so the output-emulation list is not a general
+  input-format restriction. The exact-source review confirmed that
+  `cache_bwrite` is reachable during ordinary PE output writes; whether the
+  vulnerable write-size condition can be met by the supported RBL workflow is
+  unresolved. The default RBL path uses compiler-generated COFF objects and does
+  not accept arbitrary object inputs or pass `--gc-sections -w`, which narrows
+  exposure but does not establish N/A. CVE-2026-90801 remains release-blocking;
+  see the source archive audit and third-party notices.
+  License texts alone do not close these obligations.
+
+## Known boundaries, not 0.8.0 blockers
+
+- Conservative stack scanning may retain unreachable allocations when stale
+  pointer-shaped words remain in scanned memory; reclamation timing is not
+  deterministic.
+- Native heap/global storage and non-entry threads are not scanned. No native
+  pinning/root-registration API or concurrent Runtime use is supported.
+- No general user FFI/plugin ABI, source imports, multi-file compilation,
+  package manager, IR/CFG optimizer or whole-function register allocator.
+- Linux/Windows clocks, current-directory paths and PRNG sequences retain
+  documented platform-specific behavior.
+
+## Verification commands
+
+- `python rbl.py test` — complete checkout test suite on the selected backend.
+- `make test` — Linux/WSL compiler, Runtime and complete test suite.
+- `make analyze` — reproducible GCC `-fanalyzer` pass for compiler and shared Runtime C sources.
+- `python tests/differential.py --a wsl --b native` — 60 success-output, 11 expected-runtime-error, 7 expected-negative diagnostic and 4 nondeterministic build/exit comparisons.
+- `python tests/differential_diagnostics.py` — diagnostic parity.
+- `python tests/check_corpus.py` — positive/negative corpus and assembler checks.
+- `python tests/check_documentation.py` — Markdown links, anchors and RU/EN structure (64 source Markdown files / 455 relative links; 2026-11-09 audit; generated and scratch trees excluded).
+- `python tools/package_windows_toolchain.py --check` — verify bundled MinGW-w64 manifest and payload hashes.
+- `tools/build_wx_ide.ps1` pins GCC's assembler/linker search to the repository's
+  signature-verified Binutils 2.47-4 via `COMPILER_PATH` and fails closed if
+  `gcc -print-prog-name` resolves either tool elsewhere. A standalone GCC
+  compile/link smoke with this environment passed.
+- `python tests/test_build_cache.py` — same-basename and cache-isolation regression.
+- `python tests/test_asm_call_alignment.py` — instrumented Linux Runtime call alignment.
+- `cargo test` and `cargo run --release -- --self-test` — native IDE tests and
+  source/lockfile integration checks.
+- `make ide-test` — native IDE test and headless startup checks.
+- `python3 benchmarks/compare_all.py --warmups 2 --reps 10` — controlled
+  five-way runtime benchmark on Linux/WSL.
+
+## wxWidgets primary frontend status — 2026-11-10
+
+The primary `native/wx-ui/` frontend uses C++20, wxWidgets 3.2.11,
+`wxStyledTextCtrl`/Scintilla and the Rust `rbl-studio-worker`. The top-level
+CMD/VBS/SH launchers and user-scope Windows/Linux installers select wx by
+default. The older Cargo/egui frontend source remains in the repository;
+`RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately built executable
+from a developer checkout when wx is unavailable, but it is not included in the
+wx installer payload.
+The wx application remains
+UNRELEASED until GUI, installer, security and distribution gates are complete.
+
+Latest completed checks in this follow-up:
+
+- Windows UCRT64 wx CMake Release build passed after the startup, search EOL,
+  global project-tree bound and settings-profile changes.
+- Ubuntu 24.04/WSL wx CMake Release build passed. The Release worker passed
+  `cargo fmt -- --check`, 23/23 unit tests, Clippy `-D warnings`, stdin/EOF smoke
+  and output-backpressure integration. Windows worker stdin/EOF smoke and
+  backpressure integration also passed. The prior Windows GNU worker unit run
+  was 22/22; it was not repeated in this final pass.
+- Windows `python rbl.py test`: exit 0; 61 direct ASM and 63 diagnostics tests,
+  Runtime ABI/call alignment, GC/string I/O pressure, streaming/backpressure,
+  toolchain manifest and build-cache checks. Two developer-only native C probes
+  were skipped because GCC `cc1`/headers are not in the minimal Windows bundle.
+- Windows corpus check: 121 source candidates, 114 positive sources assembled,
+  7 expected negative fixtures rejected, 0 failures.
+- Documentation check: 66 Markdown files, 474 relative links, 0 missing targets
+  and 0 invalid fragments. `git diff --check` passed.
+- `tests/wx_gui_file_roundtrip.py`: 27/27 PASS for Save/Save As, edited-buffer
+  saving, exact UTF-8/BOM/UTF-16 and LF/CRLF/CR/mixed-EOL round-trips, external
+  modification/deletion decisions, dirty tab/window prompts and malformed
+  surrogate rejection, plus hard-link warning/cancel/confirm behavior.
+- `tests/wx_gui_file_size_limit.py`: 2/2 PASS; exactly 16 MiB opens, while
+  16 MiB + 1 byte is rejected by the real GUI warning without closing the IDE.
+- `tests/wx_gui_diagnostics.py`: saved-file and unsaved-snapshot navigation
+  passed; stale diagnostic activation after closing the source tab was safe.
+- `tests/wx_gui_settings_migration.py`: 4/4 PASS for valid, oversized, negative
+  and malformed legacy settings, including persisted values loaded by a second
+  GUI launch.
+- `tests/wx_gui_find_in_files.py`: CR-only/CRLF/LF search locations passed 3/3.
+  Cancellation/re-entry and close-during-search GUI tests passed.
+- `benchmarks/wx_search_resource_acceptance.py`: 12,000 candidate hits were
+  capped at 10,000; 50-row result batching completed in 6.16 s at 76.4 MiB RSS /
+  28.7 MiB USS peak and 264.7 ms maximum UI ping.
+- `tests/wx_gui_cancel_input.py`: repeated Run/Stop passed 2/2; stdin/Send/EOF
+  disabled immediately after cancellation and the same worker served the next
+  task. `tests/wx_gui_stdin_eof.py` verified immediate line+EOF FIFO delivery in
+  the real GUI.
+- `tests/wx_gui_task_dispatch.py`: Check, Build, Run and Tests each reached
+  `Finished` (4/4). Restoring a saved workspace starts exactly one worker.
+- Project-tree acceptance passed the 1,500-entry per-directory cap and the
+  50,000-node global cap. The 34 × 1,500-file expansion reached 50,000 nodes at
+  276.3 MiB process-tree RSS / 224.7 MiB USS. Directory-heavy expansion with
+  35 × 1,500 child directories reached 49,999 nodes with placeholders counted,
+  at 88.5 MiB RSS.
+- An earlier 319.5 s Windows resource sample (313 process-tree samples) used 32 tabs /
+  64 MiB, edit-history operations, the actual Tests task and Close All Tabs.
+  Peak tree Working Set / Private Bytes were 257.2 / 191.1 MiB; peak GUI-only
+  values were 192.2 / 169.9 MiB; final post-close tree values were 57.6 / 17.7
+  MiB. The sample stayed below 512 MiB but is not a worst-case bound.
+- The latest sustained sample on current binaries lasted 319.9 s / 313 samples.
+  Peak process-tree Working Set / Private Bytes were 263.0 / 192.4 MiB; mean tree
+  Working Set was 205.5 MiB; final post-close values were 57.9 / 16.2 MiB.
+  Current GUI SHA-256:
+  `F84AEE828DD9E9F5A782C46623BF6B32E21FDBF06CA9D88FE763DA6F7E5665CB`; worker:
+  `05B144E3AF0FE31D2D7E9696DED305F0AA9E1B7443D6BA642F84EDDE504790AE`.
+- Recovered `wx-resource-soak-20261110-070042.csv`: 313 samples over ~321 s;
+  peak process-tree Working Set / Private Bytes were 261.8 / 192.2 MiB, and UI
+  ping p95/p99/max was 0.1 / 0.3 / 106.9 ms. The memory and 500 ms responsiveness
+  thresholds passed for this sample, but it did not complete the requested 7,200 s.
+  The corrected acceptance script now checks actual duration/early exit and
+  records process handles plus GDI/USER counts; a new multi-hour run is pending.
+- Corrected acceptance-script smoke `wx-resource-soak-20261110-080424.csv`:
+  80 samples over 60.5 s, peak Working Set / Private Bytes 265.2 / 193.4 MiB,
+  1,218 process-tree handles, 355 GDI objects, 110 USER objects, UI ping
+  p95/p99/max 0.1 / 0.4 / 109.7 ms; `DURATION=PASS`. This validates the new
+  duration guard and counters only, not the multi-hour leak criterion.
+- POSIX security tests: metadata harness 16 named scenarios; Find in Files 4/4;
+  Project Tree pinned-root/identity 12/12; Save dirfd transaction 4/4. The full
+  WSL `python3 rbl.py test` suite exited 0, including 61 direct ASM tests and
+  63 diagnostics tests. Documentation check at that checkpoint: 479 links, 0 missing; corpus check:
+  121 source files, 114 built, 7 expected rejects, 0 unexpected failures.
+- Windows IDE build `tools/build_wx_ide.ps1 -BuildDir
+  build/wx-ui-win-rc-20261110-final` completed successfully. It uses a fresh
+  per-build Cargo target directory and pins GCC subprogram lookup to the
+  repository's Binutils 2.47-4. PE import audit covered 21 EXE/DLL files and
+  271 imports with 0 unresolved non-system dependencies.
+  GUI SHA-256: `6E44BC6F676514908A47B277273806387FB81618419F3AD88885DF6B055541F9`;
+  worker SHA-256: `EDF65709CF3F1DAD9360F99FEBC05AB482C114598FFBEBDBF4601A408CE8BFE8`.
+- Latest isolated 10,000-result Find in Files stress: 3.72 s, 76.9 MiB process-
+  tree RSS / 29.2 MiB USS peak, 92.0 ms maximum UI ping. A combined batch under
+  concurrent GUI-test load once exceeded the 1 s test timeout; isolated rerun
+  passed.
+- `tests/wx_gui_tests_process.py` verified command ID 6020 by observing the real
+  child `python.exe .../tests/run_tests.py` process and its successful `Finished`
+  status. This supplements the 4/4 GUI task-dispatch check.
+
+### Application/workspace roots and primary-launcher transition — 2026-11-10
+
+- The wx frontend now separates the immutable application root from the active
+  workspace. Worker `initialize` receives the application root; each task
+  request carries its workspace root. The worker resolves compiler/test/
+  benchmark scripts from the installed application and uses the workspace for
+  task working directory and source snapshots. This allows an external project
+  to use the installed IDE toolchain without expecting compiler scripts inside
+  the project. `tests/studio_worker_root_split.py` passed.
+- `ResolveApplicationRoot` now canonicalizes the executable path itself with
+  `weakly_canonical` before walking parent directories, so launching the GUI
+  through an executable symlink still discovers the actual installation root.
+  Invalid explicit `RBL_STUDIO_ROOT` overrides remain fail-closed. The POSIX
+  symlink discovery regression was added to `app_root_test.cpp`; the focused
+  CMake target and CTest passed 1/1. `cargo fmt --check` passed and `cargo test`
+  passed 109 main-crate plus 26 worker tests in the focused verification run.
+- Top-level CMD/VBS/SH launchers and user-scope installers now select the wx GUI
+  and adjacent worker by default; the Rust/egui source remains as a legacy
+  reference and is not included in the wx installer. Launcher/install/uninstall static review
+  corrected relative build-pointer resolution, registry rollback/ownership,
+  manifest path validation and Linux MIME restoration. Isolated Linux
+  registered/no-register and Windows `-NoRegister` acceptance results are
+  recorded below; registered Windows install/upgrade/uninstall acceptance now
+  passes in an isolated GUID subtree under the constrained registry root.
+- Remaining installer acceptance limits: Windows registry export/import does
+  not preserve custom registry ACLs; native registry import-failure injection
+  and host-HKCU rollback are not tested (the latter is intentionally avoided to
+  protect user associations). A Windows `-NoRegister`
+  install/uninstall test passed in a path with spaces, including wx/worker
+  payload verification and preservation of an unowned user file; the check for
+  foreign ProgID entries is now correctly bypassed in `-NoRegister` mode. A
+  Linux isolated install/uninstall acceptance passed XDG-root persistence
+  across environment changes, no-register behavior, symlink/dangling-symlink
+  refusal, and injected MIME-rename failure with previous-install rollback.
+  CMD/VBS launcher round-trip passed for spaces, trailing backslash, Unicode,
+  and root/worker environment paths. The VBS `QuoteWindowsArgument` function
+  additionally round-tripped empty strings, embedded quotes, trailing
+  backslashes and Unicode through a native argv-capture stub. CMD batch `%*`
+  remains intended for valid file-path arguments; arbitrary embedded quotes are
+  not supported by cmd.exe batch expansion (Windows file names cannot contain
+  a quote). Windows registered install/upgrade/uninstall acceptance now passes
+  in a unique isolated HKCU GUID subtree; the real Classes root was not touched.
+  Windows reparse checks remain path-based and retain a concurrent
+  ancestor-swap TOCTOU window. Linux install failure cleanup preserves the
+  failed candidate and restores the prior install, including on INT/TERM; XDG
+  files are staged and rolled back before commit, while MIME/desktop cache
+  refresh remains best-effort.
+- The wx Quick Reference accelerator text was corrected to match the actual
+  menu: `Ctrl+Shift+S` is Save All, not Save As; Check is `F7`. RU/EN IDE guides
+  now document Save As as a File-menu action and include the project-folder and
+  Stop shortcuts.
+- The Linux launcher now resolves relative and absolute symlink chains before
+  deriving `APP_ROOT`; otherwise its explicit `RBL_STUDIO_ROOT` could point at
+  the symlink directory instead of the installation. A POSIX regression test
+  also verifies paths containing spaces and preserves quoted command-line
+  arguments. WSL result: 1/1 PASS; the test is integrated into `rbl.py test`.
+- The Linux installer now canonicalizes `XDG_DATA_HOME`, requires it to be
+  absolute, rejects symlink components in the application/icon/MIME integration
+  directories, and refuses both live and dangling symlink integration files
+  before writing desktop/MIME payloads. It also stores the canonical XDG data
+  and config roots in the install-state manifest so upgrades/uninstall restore
+  MIME defaults and remove integration from the same locations even if the
+  environment changes later. Existing stored paths are revalidated against
+  symlink substitution. Desktop/MIME files are now staged in their destination
+  directories, existing owned files are backed up, and failed pre-commit writes
+  roll back without leaving a partial desktop integration. Icon files already
+  present are preserved rather than overwritten. MIME/desktop cache refresh
+  remains best-effort. The isolated Ubuntu installer acceptance below exercises
+  XDG-root persistence, symlink refusal and rollback under injected failure.
+- RU/EN IDE guides, top-level READMEs, native wx README, engineering audit and
+  resource report now describe wx as the primary launcher/install frontend,
+  identify egui as a source-only legacy reference, and keep historical egui
+  measurements separate. At that checkpoint, docs checker: 67 Markdown files, 481 relative
+  links, 0 missing targets, 0 bad fragments; EN/RU paired headings all match.
+- Python 3.9 grammar probe now covers 59/59 files, including the new Linux
+  launcher regression test and the strengthened resource-acceptance harness.
+- The resource-acceptance harness now verifies that all 32 Scintilla document
+  controls actually opened and that each document length matches its source or
+  EOL-normalized fixture size, with the aggregate within the 64 MiB document
+  limit. It checks append/undo/redo through Scintilla document length before/after
+  each operation, verifies Close All Tabs leaves one empty new document, and
+  requires successful completion of
+  Check, Build, Run and Tests rather than treating any non-zero exit or a
+  still-running task at the end of the settle window as acceptance. The
+  already-running soak loaded the earlier harness revision; it remains useful
+  preliminary evidence but cannot satisfy these stricter final acceptance checks.
+- The resource harness UI ping timeout is now longer than the 500 ms acceptance
+  threshold (at least 1,000 ms). The previous 200 ms timeout capped the recorded
+  failure sample below the threshold and could not detect a 500 ms stall; the
+  strengthened harness records timed-out pings as failures.
+- The corrected 7,200-second Windows resource soak started at 08:13:45 on the
+  current pre-final build and was still running at the 09:34 checkpoint. Its
+  CSV/verdict must be collected after process exit; it is not yet a PASS and
+  does not replace a later soak on the final release-candidate binaries.
+- Full wx GUI rebuild and additional Windows GUI tests are deliberately deferred
+  until that soak exits. The next Windows acceptance must rebuild the final
+  source, record GUI/worker SHA-256 values, and run the soak again if any change
+  affecting the measured binary or workload invalidates the current evidence.
+
+The current wx GUI includes the first-terminator EOL mode fix, CR-only search
+line handling, a 50,000-node global tree cap, a single-worker workspace restore
+path, isolated config-profile support, and deferred close after search
+cancellation. Real Windows GUI acceptance now covers file round-trips,
+diagnostic navigation, settings migration/persistence, Find in Files EOL and
+cancellation, worker startup, project-tree bounds and Check/Build/Run/Tests
+dispatch. Remaining GUI gaps are multi-DPI visual acceptance (only 100%/96 DPI
+was available), long continuous compiler/search stress, completed strengthened
+multi-hour leak observation, filesystem permission/error edge cases and very
+large diagnostic lists. The 512 MiB target is supported by measured
+workloads and explicit limits, not a hard allocator quota or proof for every
+possible workload.
+
+Save re-hashes the destination after the temporary file is flushed and closed,
+rechecks identity/content before replacement, and now warns before splitting a
+multiply hard-linked file. POSIX metadata copying preserves owner/group, mode,
+Linux access ACLs and supported xattrs; inherited destination-only access ACLs
+are removed. `security.*`/`trusted.*` xattrs are intentionally skipped with a
+warning, and non-Linux POSIX ACL/xattr preservation remains unavailable. Windows
+`ReplaceFileW` preserves the existing DACL and named streams by documented
+behavior, but owner/group/SACL preservation is not verified. Temp creation is
+exclusive (`CREATE_NEW` / `O_EXCL`), POSIX FIFO opens are nonblocking, and POSIX
+directory fsync now brackets recovery-link cleanup. POSIX Save pins the parent
+directory FD and uses descriptor-relative operations throughout the transaction,
+eliminating parent-path redirection. On Linux filesystems supporting
+`renameat2(RENAME_EXCHANGE)`, it atomically exchanges the new temporary name with
+the destination, validates the displaced identity/content and attempts a
+conditional exchange-back if the displaced leaf is not the checked original.
+At this audit timestamp, filesystems without exchange support (notably DrvFS)
+still retained a warned `renameat` compatibility fallback and its narrow leaf
+check-to-replace race. That fallback was removed by the later POSIX Save
+hardening update below; current existing-target saves fail closed instead.
+Windows pins parent directories but not the destination leaf; path-based
+`ReplaceFileW` can still race, although its backup path and identity validation
+preserve a displaced object on mismatch. Windows recovery cleanup now reopens
+each artifact with `FILE_FLAG_OPEN_REPARSE_POINT`, validates the file ID on the
+opened handle and uses `SetFileInformationByHandle(FileDispositionInfo)` rather
+than deleting a re-resolved path. It removes the new-content recovery link
+before the original-content backup, retaining the old file if cleanup fails.
+Before `ReplaceFileW`, Windows also creates a separate hard link to the original
+destination and revalidates the target, temporary file, original backup and
+new-content recovery link. The distinct displaced-file path records whatever
+occupied the target at replacement time; the remaining leaf check-to-replace
+interval is still not compare-and-swap.
+Recovery hard-links are not immutable
+snapshots against concurrent in-place writes and neither platform provides full
+compare-and-swap for such writes. Undo
+history accounting remains conservative rather than an exact allocation cap.
+Search-close defers normal frame destruction until the completion event, but a
+blocking OS filesystem read can still delay cancellation. The latest Linux/WSL wx
+build and full WSL test suite passed; the Windows IDE build also completed from a
+fresh Cargo target using the pinned Binutils overlay. Windows GUI hard-link
+round-trip, 10,000-row diagnostics/crash acceptance, and corrected multi-hour
+resource acceptance remain pending on the final binary.
+
+The independent worker/backend audit found a shutdown ordering bug: the GUI
+stopped polling stdout before its shutdown wait, allowing pipe backpressure to
+discard `Finished`/`bye`; Windows also used `wxSIGTERM` as a fallback for a
+console worker. The wx destructor now keeps draining both redirected pipes for
+up to five seconds, then uses `wxSIGKILL` with child cleanup. Worker restart has
+a bounded five-second hard-kill fallback while polling remains active. Worker
+backpressure now degrades bulk output after two seconds while retaining ordered
+control frames; if the parent resumes reading, `Finished` precedes `bye`.
+Windows runtime tests passed with a three-second paused reader (7,350 output
+events before terminal frames), a 6,156,119-byte backpressure fixture, stdin/EOF,
+smoke and root protocol checks. The separate worker Rust test target passed
+25/25. The POSIX C++ metadata test also passes the new atomic-exchange regression.
+
+At that checkpoint, a parent that never resumed reading could leave the writer
+blocked, and the control reserve was not protected against a sustained request
+flood. The second-pass audit below fixes request intake at the output high-water
+mark. Unix post-reap process-group cleanup still retains a very small PGID-reuse
+race. The Windows GUI lifecycle change still requires a fresh full wx build and
+GUI acceptance after the active resource soak.
+
+The portable Windows dependency builder records the UCRT64 package inventory in
+its generated notices. The zlib runtime was updated from 1.3.2-2 to signed MSYS2
+package 1.4-2; package/source signatures and the installed DLL hash were
+verified. Corresponding-source archives for all 20 unique toolchain and
+wx/runtime package sources are now collected and signature-verified, but remain
+outside the runtime bundle and repository snapshot. A separate source-material
+bundle must accompany any binary distribution, or a legally reviewed written
+offer must be prepared. The corresponding-source bundle is assembled locally
+but is not yet attached to a binary distribution. Neither step is complete.
+The Scintilla/SciTE copyright and permission notice from the exact wxWidgets
+3.2.11 source archive is now included in `licenses/Scintilla/License.txt` by
+the Windows and Linux build/install paths. Binutils 2.47-4 is bundled. A
+source-level review of the exact signed source archive confirmed that
+`cache_bwrite` is reachable during ordinary PE output linking: BFD recognizes
+ELF input vectors and the COFF final-link path can copy foreign sections through
+the generic BFD write path. The default RBL workflow has a narrower input path
+(compiler-generated COFF objects; no arbitrary object files or `--gc-sections -w`),
+but the CVE's vulnerable write-size condition has not been ruled out.
+Ubuntu still lists 24.04 as needing evaluation and Debian lists 2.47.50 as
+unfixed; this is a security blocker, not a claim of known exploitation or a
+confirmed unaffected target. Binary redistribution remains blocked. See
+`native/wx-ui/THIRD_PARTY_NOTICES.md`,
+`toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md`,
+`toolchain/windows-x86_64/SOURCE_CODE.md` and
+`toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md`.
+
+**Status: ENGINEERING TESTS PASS / GUI ACCEPTANCE SUBSTANTIAL WITH REMAINING
+GAPS / RELEASE BLOCKED / UNRELEASED.** No commit, push, tag or publication has
+been made.
+
+This is the current RBL 0.8.0 pre-release manifest. Keep its candidate status explicit until release publication is separately authorized.
+
+## Late verification update — 2026-11-10, 11:31 local
+
+- The Windows registered installer acceptance now passes using a unique
+  `HKCU:\Software\RBLStudioAcceptance\<GUID>\Classes` root. It exercised
+  snapshot export/import round-trip, foreign ProgID refusal, install/upgrade,
+  manifest-root mismatch refusal, uninstall restoration of the prior
+  association, and preservation of a user-changed default. The real
+  `HKCU:\Software\Classes` root was not touched. The first live run exposed
+  that `New-Item -Force` could clear an existing registry key's default value;
+  the installer now creates `.rbl` and ProgID keys only when absent. Pure policy
+  tests pass. Native registry import/rollback failure injection and custom ACL
+  preservation remain untested.
+- The existing `build/wx-ui-win` directory lacks
+  `licenses/Scintilla/License.txt`; it is not a complete installer payload.
+  The registered acceptance used a temporary payload with the exact source
+  notice copied from `native/wx-ui/licenses/Scintilla-LICENSE.txt`. Installer
+  preflight and acceptance now reject a build directory missing that notice.
+  A fresh packaging build with `tools/build_wx_ide.ps1` is required after the
+  active soak; do not rebuild its current build directory while it is running.
+- DPI static checks passed 12/12 and app-root CTest passed 1/1. No live
+  125–200% or multi-monitor display acceptance was possible on the available
+  96-DPI display; visual DPI acceptance remains open.
+- The strengthened 7,200-second Windows resource soak started at 10:52:12 and
+  remained active at this update. No final PASS is claimed until normal process
+  exit, duration/resource/UI verdict and CSV inspection.
+- The 330,067,308-byte source-material archive was verified in place; SHA-256
+  is `6bc84404a077bcc438bafd0b6add5436bb8d1058f339aa5d1ebd988529c7fa57`. It is
+  not attached to a distributable package, and no written offer has been
+  legally reviewed. Binary redistribution remains blocked.
+- The exact Binutils 2.47-4 source review confirms `cache_bwrite` is reachable
+  during ordinary PE output linking through BFD's generic foreign-section
+  write path. The default RBL path uses compiler-generated COFF objects and
+  does not accept arbitrary object inputs or pass `--gc-sections -w`; this
+  narrows exposure but does not rule out the vulnerable write-size condition.
+  CVE-2026-90801 remains unresolved and release-blocking.
+
+The release remains **UNRELEASED / RELEASE BLOCKED**. Final packaging rebuild,
+high-DPI visual acceptance, worker shutdown GUI build/acceptance, final soak
+verdict, remaining filesystem-race disposition and legal/security gates are
+still open.
+
+## Source integration follow-up — 2026-11-10, 12:00 local
+
+- POSIX Save now prefers Linux `renameat2(RENAME_EXCHANGE)` when supported. It
+  atomically exchanges the temporary and destination names, validates the
+  displaced identity/link count/content against the original snapshot and
+  attempts a guarded exchange-back on mismatch. Unsupported filesystems (e.g.
+  DrvFS) retain the explicit warned `renameat` fallback. The WSL C++ metadata
+  regression passed, including `renameat2-exchange-preserves-raced-destination`.
+  This was the behavior at this follow-up's timestamp; the fallback was removed
+  by the later POSIX Save hardening update below.
+- The POSIX C++ metadata regression is registered with Linux CTest. CTest also
+  registers Save security and worker lifecycle static tests; Windows CTest
+  registers the pure registry policy test when PowerShell is available.
+- Registered Windows acceptance now also covers Start Menu junction/reparse
+  refusal on both install and uninstall, plus a deterministic late COM shortcut
+  failure after registry writes. The late failure rolls back the isolated ProgID
+  and copied installation while preserving the user-owned shortcut directory.
+  The complete acceptance passed again in a fresh GUID registry subtree.
+- Worker process cleanup uses a Windows Job Object and a dedicated POSIX
+  process group. POSIX descendants that deliberately call `setsid()` or create
+  a new process group can escape; no cgroup/subreaper containment is installed.
+  The bounded GUI shutdown deadline/hard-kill fallback remains necessary if
+  stdout is not drained. Bundled compiler/toolchain children do not intentionally
+  detach.
+- WSL DrvFS acceptance is explicitly weaker for adversarial parent-directory
+  rename races: relative operations through a pinned directory FD may fail
+  closed after the parent is renamed. Failed syscalls with `errno == 0` now
+  surface as `EIO`, never as a success error_code. The DrvFS variant of the
+  POSIX metadata test passes with explicit SKIPs for those unsupported
+  directory-FD/FIFO/exchange operations; it does not follow the replacement
+  symlink. The full suite passes on ext4, including pinned-directory rename and
+  atomic exchange.
+- The worker now drops bulk output after two seconds of stdout backpressure but
+  preserves ordered protocol control frames. If the parent resumes reading,
+  `Finished` then `bye` are delivered. The wx destructor drains stdout/stderr
+  during a five-second grace period and then uses `wxSIGKILL` with child cleanup;
+  restart has a bounded hard-kill fallback. Windows Rust worker tests passed
+  25/25; runtime shutdown/backpressure/stdin/EOF/smoke tests passed. The changed
+  C++ GUI lifecycle code still needs a fresh build and GUI acceptance.
+- Windows Save recovery cleanup is now performed by opened file identity rather
+  than re-resolving a mutable pathname. The new-content recovery link is deleted
+  before the old-content backup. `tests/test_windows_save_cleanup.ps1` passed
+  hard-link preservation and path-replacement-after-open cases; it is included
+  in Windows CTest and `python rbl.py test`.
+- DPI static checks passed 12/12. Project/output/problem image lists, toolbar
+  bundles and generated glyphs are rebuilt at DIP sizes; settings/console
+  spacing is DIP-scaled. Live 125–200% and multi-monitor visual acceptance is
+  still unavailable on the 96-DPI display.
+- The strengthened 7,200-second Windows soak remained active at 12:34:02 under
+  the 10:52:12 PID set. Its final CSV/verdict has not been written; do not touch
+  the process or its `build/wx-ui-win` directory.
+
+The release remains **UNRELEASED / RELEASE BLOCKED**. Final soak, fresh Windows
+and Linux builds, GUI acceptance, high-DPI visual test, source-offer/legal review
+and CVE-2026-90801 mitigation remain required.
+
+## wx RC verification follow-up — 2026-11-10, 16:33 local
+
+- Fresh Windows and Linux wx RC candidates are present in `build/wx-ui-win-rc` and `build/wx-ui-linux-rc`. Windows CTest passed 10/10 and Linux CTest passed 9/9 after the UI updates and cache cleanup.
+- Windows runtime smoke opened real `.rbl` files, connected the Rust worker and exited with code 0. Inactive-tab close glyphs are now always visible; an actual click on the inactive tab close glyph closed that tab. Dark, RBL Light and High Contrast were visually inspected. The new R icon loads without the previous ICO handler warning.
+- Windows manifest extraction confirms PerMonitorV2. Windows EXE/worker/bundled DLL closure has no unresolved imports. Linux GUI/worker `ldd` has no missing libraries. Scintilla license hashes match in source and both candidates.
+- Linux worker stdin/EOF and shutdown/backpressure tests pass; shutdown delivered 385 output events, `Finished` before `bye`, and exited 0. Linux Save dirfd security tests pass 16/16. Linux installer acceptance against `wx-ui-linux-rc` passes.
+- Approximately 1.65 GiB of generated Cargo/build/QA caches were removed. The `build/rustup-home` junction to the user's actual Rustup directory and source/security archives were preserved.
+- A 240-second diagnostic soak completed 24 manual task cycles and 11 edit/undo/redo cycles; peak process-tree working set/private bytes were 263.3/191.4 MiB and UI ping p95/p99/max was 0.1/0.2/0.5 ms. The first 7,200-second attempt stopped at 440 seconds because the benchmark dispatcher could overlap background auto-check. The benchmark now disables AutoCheck/AutoSave only in its isolated temporary profile; the app defaults are unchanged. A 480-second validation with the original 60-second interval is in progress, followed by the final 7,200-second run if it passes.
+- Windows registered-installer acceptance on the current candidate passed in an isolated HKCU root (install/uninstall, rollback and registry policy).\n- Real Windows GUI SaveDocument byte-roundtrip passed 27/27 on the current RC, including hard-link cancel/confirm, read-only retry, Save As, deletion/external-change conflicts, dirty tab/window close and invalid UTF-16 rejection. The test harness now chooses wxMSW dialog buttons by caption and explicitly marks simulated edits dirty. Live 125–200% multi-monitor DPI acceptance is unavailable in the current 96-DPI environment.
+
+The release remains **UNRELEASED / RELEASE BLOCKED**: source-material distribution/legal review is incomplete and CVE-2026-90801 remains unresolved. Do not change the release manifest to RELEASED.
+
+## wx RC late verification update — 2026-11-10, 17:30 local
+
+- The 480-second resource-soak validation passed on the exact Windows RC GUI
+  (`43AA805040991BE7AB489EA0BE07077EF9AB9067039D3E565D7F79DD0C36F988`) and
+  worker (`1B59B8619FB2F38F360F9241B56DEE4F025AA397EB8AB4F18E3B119D3AEA774B`).
+  It sampled 480.5 seconds / 486 samples, completed 8 Check/Build/Run/Tests task
+  cycles and 23 edit/undo/redo cycles. Peak process-tree Working Set / Private
+  Bytes were 261.3 / 191.1 MiB; peak handles 1186; GDI/USER 427/131; UI ping
+  p95/p99/max 0.2/0.3/1.0 ms. Duration, resource and responsiveness checks
+  passed; process exit code was 0. The CSV is
+  `build/wx-ui-win-rc/resource-acceptance/wx-resource-soak-20261110-165651.csv`.
+- The final 7,200-second soak has started against those same unchanged hashes.
+  Its current log is `build/verification/2026-11-10/wx-resource-soak-7200s.log`.
+  No final soak PASS is claimed while it is running.
+- Save dirfd / metadata acceptance was rerun on ext4 and actual DrvFS. ext4:
+  Python suite 16/16 and C++ metadata scenarios all PASS. DrvFS: Python suite
+  15 PASS / 1 SKIP; C++ metadata executable exits 0 with explicit SKIPs for
+  unsupported pinned-directory operations after rename, FIFO creation and
+  `RENAME_EXCHANGE`. DrvFS `openat` returned `ENXIO` after parent rename; the
+  replacement symlink target was verified unchanged. Evidence logs are
+  `build/verification/2026-11-10/save-security-ext4.log` and
+  `build/verification/2026-11-10/save-security-drvfs.log`.
+- The DrvFS-only test harness adjustment treats only documented unsupported
+  fail-closed errno values as SKIP and first verifies that the replacement
+  symlink target was not modified. Production SaveDocument behavior/defaults
+  and the RC binaries were not changed.
+- CVE status was rechecked against current package/security inventories:
+  MSYS2 lists its `mingw-w64-binutils 2.47-4` package with CVE-2026-90801;
+  Debian's OSV import includes 2.47-4 in affected versions; Red Hat's record
+  remains NEW and Ubuntu Noble remains Needs evaluation. This does not prove
+  normal RBL-workflow exploitability, but no fix or basis to close the finding
+  was found. See `toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md`.
+
+The release remains **UNRELEASED / RELEASE BLOCKED**. The 7,200-second RC soak
+is still pending; source-material distribution/legal review and CVE-2026-90801
+remain release blockers. Live multi-monitor DPI and interactive Linux GUI
+acceptance remain unverified.
+
+## POSIX Save hardening and source inventory follow-up — 2026-11-10
+
+- Independent SaveDocument review confirmed that the old POSIX `renameat`
+  fallback could replace an unrelated file racing into an existing destination
+  on filesystems without `RENAME_EXCHANGE` (including DrvFS). The fallback was
+  removed. Existing-target POSIX saves now fail closed with
+  `operation_not_supported`; the destination remains unchanged and the editor
+  remains dirty. First saves still use exclusive `linkat` creation.
+- Linux Release build completed successfully after this change. Linux CTest is
+  9/9 PASS. Current Linux GUI SHA-256 is
+  `dd503a0f46eb7aaac3dcb282aa27313cac1c0ef831cb5947b3ba2b99473822fd`; worker
+  SHA-256 remains
+  `c9be1f92ffeb39cc0294d39ca4971d52c8f9f1fc6afa8688712ed75752e3baf5`.
+- Linux installer acceptance was rerun against this updated RC and passed:
+  XDG migration, `--no-register`, symlink refusal and transactional rollback.
+- Linux CTest's POSIX metadata target now compiles the comprehensive root
+  `tests/posix_file_metadata.cpp` suite with `-Werror`, rather than the older
+  minimal duplicate under `native/wx-ui/tests`; all 19 ext4 scenarios pass.
+- The shared Save dirfd/static suite was also run on Windows: 14 PASS / 2 SKIP
+  (POSIX-only runtime cases); evidence is
+  `build/verification/2026-11-10/save-security-windows-static.log`. Live Windows
+  SaveDocument GUI acceptance remains 27/27 PASS.
+- ext4 verification: Python Save dirfd 16/16 PASS; C++ metadata 19/19 PASS.
+  Actual DrvFS `/mnt/q` verification: Python 15 PASS / 1 SKIP; C++ metadata
+  13 PASS / 5 SKIP. Unsupported `RENAME_EXCHANGE` tests verify both target and
+  temporary names retain their original identities and contents. Exclusive
+  first-save `linkat` creation and EEXIST no-replace behavior pass on both
+  filesystems. Evidence:
+  `build/verification/2026-11-10/save-security-ext4-failclosed.log` and
+  `build/verification/2026-11-10/save-security-drvfs-failclosed.log`, plus
+  `posix-metadata-ext4-final.log`, `posix-metadata-drvfs-final.log` and the
+  actual CTest binary's DrvFS run `posix-metadata-drvfs-ctest-binary.log`.
+- Interactive Linux SaveDocument GUI acceptance on DrvFS remains untested
+  because this WSL session has no X11/Wayland display. The helper-level and
+  source-level checks are not represented as GUI integration coverage.
+- A separate LOW Windows cleanup edge remains: if `GetFileInformationByHandle`
+  fails immediately after creating the exclusive temporary file, identity-based
+  cleanup may leave an orphan temp. No write redirection or user-data overwrite
+  was identified. It is documented as a non-blocking cleanup follow-up; the
+  Windows RC was not modified.
+- The wx build script and tracked notices now explicitly include the
+  `mingw-w64-ucrt-x86_64-libstdc++ 16.2.0-4` split package (covered by the GCC
+  16.2.0-4 source archive) and copy the `libwinpthread` license directory.
+  The generated notice also resolves the separate source-material archive's
+  relative path and SHA-256 dynamically. The path/hash calculation was checked
+  against the retained 330,067,308-byte archive. The current Windows RC package
+  has not been regenerated with these inventory updates while its soak is active.
+  A metadata dry run generated 22 inventory rows (21 MSYS2 package IDs plus
+  pinned zlib), copied all 19 license directories, and verified the
+  `libwinpthread/COPYING` and `libstdc++` `COPYING.RUNTIME`/`COPYING3` files.
+  Evidence is retained under
+  `build/verification/2026-11-10/wx-notice-dryrun/`.
+- The source-material archive remains SHA-256
+  `6bc84404a077bcc438bafd0b6add5436bb8d1058f339aa5d1ebd988529c7fa57`. Its tar
+  has 52 members; `SHA256SUMS.txt` contains 51 records and covers all 51 other
+  members exactly (no missing or extra paths). The prior audit's “54 payload
+  hashes” count was corrected in `SOURCE_ARCHIVE_AUDIT.md`.
+
+The second Windows 7,200-second soak attempt on the unchanged GUI/worker hashes
+ended early after task #45 (44 periodic dispatches after the initial Run Tests
+task). The harness exited with code 1 after an unhandled Python traceback. The
+original PowerShell Tee-Object pipeline did not retain the full traceback and
+no CSV was produced. Evidence:
+build/verification/2026-11-10/wx-resource-soak-7200s.log and
+build/verification/2026-11-10/wx-resource-soak-7200s-failure.txt. This attempt is
+FAIL / incomplete.
+
+The isolated profile was verified to use the repository workspace root,
+Editor/AutoCheck=0 and Editor/AutoSave=0; production defaults remain
+AutoCheck=true and AutoSave=false.
+benchmarks/wx_resource_acceptance.py now catches unexpected exceptions,
+prints complete tracebacks to stdout, preserves partial samples in CSV (or a
+header-only CSV when no samples exist), and reports process-tree disappearance
+explicitly. It also requests WM_CLOSE, requires GUI exit code 0 and verifies
+worker termination. These changes still require a fresh 480-second runtime
+validation with stdout/stderr redirected directly to a log before another
+7,200-second attempt.
+
+Release status remains UNRELEASED / RELEASE BLOCKED due to incomplete
+source-material distribution and legal review, unresolved CVE-2026-90801,
+unavailable live multi-monitor DPI acceptance, and the still-unpassed current-RC
+7,200-second soak.
+
+## Documentation and third-party licensing audit — 2026-11-10
+
+- Re-ran the documentation validator after the edits: 70 Markdown files, 489
+  relative links, 0 missing targets, 0 bad fragments. The paired English/Russian
+  reference, how-to and explanation trees remain 8/8, 6/6 and 9/9 with no
+  heading-level mismatches.
+- The source inventory is 53 example files plus 68 compiler-test RBL sources.
+  The uppercase tests/поиск_юникод.RBL file is an IDE text fixture and is
+  intentionally excluded from compiler-corpus counts: 121 compiler sources,
+  114 expected positives and 7 expected negatives. The latest corpus check
+  recorded at the earlier 2026-11-10 checkpoint reports 121 sources, 114 built,
+  7 expected rejects and 0 unexpected failures; this documentation audit did
+  not rerun compilation.
+- README, examples index, EN/RU roadmaps and release notes now use the 53/121/
+  114/7 inventory. Release notes identify C++20/wxWidgets + Scintilla and the
+  Rust worker as the primary IDE; the egui application is legacy fallback.
+- POSIX existing-target Save now fails closed if RENAME_EXCHANGE is unavailable;
+  the unconditional renameat fallback is removed. First-time saves still use
+  exclusive linkat. Windows retains a path-based ReplaceFileW leaf race and a
+  LOW orphan-temp cleanup edge; these are not described as solved.
+- The first-pass Rust inventory incorrectly counted optional legacy egui graph
+  dependencies as worker imports; this was corrected in the second-pass addendum
+  below. Active default-feature worker closure is 24 Windows / 26 Linux / 28 union.
+  Per-crate license/notice texts and
+  RUST_DEPENDENCY_NOTICES.md are included in the build payload by both platform
+  build scripts, and installers require the Rust notice. The closure includes
+  option-ext 0.2.0 (MPL-2.0) and unicode-ident (Unicode-3.0 in addition to
+  MIT/Apache terms). The corrected 8,099,357-byte source bundle contains worker/shared source, Cargo
+  manifests, repository LICENSE and all 28 active crate source archives. Its
+  SHA-256 is df5881aa72dc556d9fff6217fd436cec9ad9cb345ac899058a12d23bbdf40da5.
+  The updated build scripts copy it into build output, and both
+  installers now require, verify and retain it under source/. Existing RC output
+  directories predate this source-payload change and must be rebuilt. The separate
+  330,067,308-byte MSYS2 source bundle remains outside the runtime package.
+- Cleanup removed two byte-identical worker backup copies, the zero-byte ide_startup.log, and the unreferenced root diagnostics-worker-stub.obj. Fifteen non-identical worker snapshots and RBLStudio.cmd.before_hide were preserved as recovery material. Build/evidence directories and both source archives were not deleted or moved; an unrelated old acceptance process was left untouched.
+- The optional positional argument on rbl.py test was removed because dispatch ignored it; the documented command remains rbl.py test. No full compiler/build/test suite was run during this documentation/licensing audit.
+- Release status remains UNRELEASED / RELEASE BLOCKED: corresponding-source
+  delivery and legal review, CVE-2026-90801 disposition, live DPI/multi-monitor
+  acceptance, interactive Linux GUI acceptance and a successful current-RC
+  7,200-second soak remain open.
+
+
+## Second-pass external documentation and licensing audit - 2026-11-10 19:45
+
+- The first-pass Rust license audit contained a material scope error: it used
+  Cargo metadata edges from the root package and counted optional legacy egui
+  dependencies as if they were part of the worker. The root Cargo.toml now gates
+  eframe/rfd behind the opt-in legacy-egui feature, marks the old rbl-studio bin
+  as requiring that feature, and declares rbl-studio-worker explicitly. The
+  default-feature cargo tree now reports 24 Windows GNU crates and 26 Linux
+  x86-64 crates (28 unique), with no eframe/rfd graph in the worker closure.
+- The unused errno license directory was moved out of the worker license payload
+  into licenses/Legacy-Egui; the runtime worker license directory now corresponds
+  to the 28 active crate inventory. The legacy-egui feature is not distributed
+  by the wx installer and needs its own inventory if it is ever packaged.
+- The Rust corresponding-source bundle was rebuilt to include worker/shared
+  Rust source files, Cargo.toml, Cargo.lock, repository LICENSE, the 28 active
+  exact crate source archives and the inventory snapshot. Archive:
+  build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261110-1955.tar.zst
+  Size: 8,099,357 bytes. SHA-256: df5881aa72dc556d9fff6217fd436cec9ad9cb345ac899058a12d23bbdf40da5. The 28 crate archive checksums
+  are checked against Cargo.lock; the archive's complete SHA256SUMS manifest
+  covers all 36 files.
+- Both platform build scripts now fail if the Rust source archive is missing,
+  copy it into source/Rust-worker-source.tar.zst, and write a SHA-256 manifest.
+  Both installers require the archive, copy it into the installed tree, and
+  verify the digest. Windows verifies at input, staging and final install; Linux
+  verifies the staged copy before commit. Existing RC directories have not been
+  rebuilt and do not yet contain this payload.
+- Mozilla's MPL 2.0 Section 3.2 requires executable-form recipients to be
+  informed how to obtain the covered source form by reasonable means; Mozilla's
+  FAQ Q8 reiterates this for unchanged MPL code compiled into an executable. The
+  new package path now carries option-ext 0.2.0 source and its MPL notice, but
+  this audit is not a legal opinion. See the official [MPL 2.0 text](https://www.mozilla.org/en-US/MPL/2.0/)
+  and [Mozilla MPL FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/).
+- The wx worker shutdown ordering code was re-read and exercised against a fresh
+  Linux worker built from the current source. The coordinator drains accepted
+  events until pending_output is empty, then enqueues bye on the same FIFO output
+  channel. The burst/shutdown test passed with 385 output events, Finished before
+  bye and exit code 0. All 27 worker unit tests passed after the P2 control-reserve
+  fix. The earlier worker-20 P1 report described a stale source snapshot and is
+  not a current finding.
+- The Windows worker build attempt was not completed in this environment: the
+  MSVC toolchain lacks link.exe, while the installed GNU Rust toolchain failed
+  to link against its sysroot under the current user-profile path. This does not
+  invalidate the successful Linux build, but Windows worker build is not claimed.
+- Remaining release blockers are unchanged: CVE-2026-90801 remains unresolved;
+  the separate MSYS2 source bundle is not included in runtime payload; no legal
+  review/written offer is complete; current RCs need rebuilding; the strengthened
+  7,200-second soak, live DPI multi-monitor and interactive Linux GUI acceptance
+  remain incomplete.
+
+
+## Worker control-reserve audit — 2026-11-10 19:50
+
+- Independent review found that process-event intake paused at the output
+  high-water mark, but protocol-request intake remained active. A burst of
+  request acknowledgements/errors could consume the eight reserved control
+  slots and trigger output_broken, clearing already accepted pending events.
+- Fixed by applying the same high-water gate to request_rx. When pending output
+  reaches MAX_PENDING_OUTPUT_EVENTS - CONTROL_OUTPUT_RESERVE, the coordinator
+  stops accepting both new protocol requests and process events. The bounded
+  input-reader channel then backpressures stdin until output drains. Added a
+  worker unit regression for the request gate and a 10,000-frame integration
+  regression that stalls stdout, resumes reading and requires every
+  protocol_error response plus bye.
+- The previous source bundle had a stale errno 0.3.14 Linux row that was not in
+  the active Cargo graph and had no corresponding license directory. Removed
+  that row; the worker notice table, license directories and Cargo graph now
+  all match exactly at 28 crates.
+- Added tools/verify_rust_source_bundle.py. Both platform build scripts now
+  validate archive checksums, exact live Cargo dependency closure, source
+  snapshots, notice table and per-crate license directories before copying the
+  archive. This prevents selecting an older same-version source archive merely
+  because its modification time changed.
+- New complete source archive:
+  build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261110-1955.tar.zst
+  Size: 8,099,357 bytes; SHA-256: df5881aa72dc556d9fff6217fd436cec9ad9cb345ac899058a12d23bbdf40da5.
+- The Linux worker was rebuilt from the current source. The shutdown-order
+  integration test passed (385 output events, Finished before bye, exit 0).
+  The updated worker suite passed 27/27 after the control-reserve fix. The
+  10,000-frame integration regression passed with all responses retained, bye
+  last and exit code 0.
+- The earlier worker P1 report is stale: no normal-path FIFO Finished/bye
+  inversion was found. The actual issue was P2 bounded control-event loss under
+  a blocked stdout consumer. A permanently blocked stdout pipe can still cause
+  the documented 100ms/250ms bounded writer-abandonment path; this is a
+  transport-failure policy, not a FIFO ordering defect.
+
+## Verification checkpoint — 2026-11-10 (current working tree)
+
+- Full `python rbl.py test` completed with exit code 0 on both Windows Native and WSL/Linux. Each run passed 61/61 direct ASM regression cases and 63/63 compiler diagnostics, alongside the standard-library, build-cache/clean, Runtime alignment/ABI, GC/ownership, streaming, toolchain/manifest, launcher/security, worker lifecycle and DPI checks. Windows registry-policy and save-cleanup tests passed. Platform-gated C probes were skipped by the runtime-only Windows bundle as expected; WSL exercised them.
+- `python tests/test_stdlib.py` passed. `python tests/test_diagnostics.py` passed 63/63. Diagnostic differential passed 30/30.
+- Complete corpus passed on both targets: 121 sources, 114 positive sources compiled and assembled, 7 expected-negative fixtures rejected, 0 failures. This includes all 53 examples.
+- Program differential passed 83/83 selected cases: 61 successful-output comparisons, 11 expected-runtime-error comparisons, 7 expected-negative diagnostic comparisons and 4 build/exit-only comparisons. This supersedes the earlier 82-case inventory in the live README, Roadmap, testing guide and release notes; older dated snapshots above remain historical.
+- `python rbl.py bootstrap` passed for WSL/Linux and for Windows with `RBL_MINGW=C:\\msys64\\ucrt64\\bin` (full MSYS2 UCRT64 developer toolchain). The minimal distributable MinGW bundle intentionally lacks `cc1`/headers and is not a compiler bootstrap toolchain.
+- `python rbl.py version`, both `rblc-asm --version` binaries and the f-string execution smoke report/pass as RBL/compiler version `0.8.0`.
+- `python tests/check_documentation.py` passed: 70 Markdown files, 489 relative links, no missing links/fragments, RU/EN page inventories aligned. `git diff --check` passed (line-ending warnings only).
+- Current Linux Runtime alignment inventory is 158 textual `call` sites and 178 emitted call instructions; the earlier 157/177 values are retained only in the older dated verification snapshot.
+- Detailed command/result record: `build/verification/first-checkpoint-2026-11-10.md`.
+- No release publication or Git tag was created.
+
+## Post-caret-fix verification — 2026-11-10
+
+- Fixed the confirmed diagnostic excerpt presentation defect: `compiler/common.c` now approximates terminal-cell widths for common CJK/emoji wide glyphs and zero-width combining marks/ZWJ, while source coordinates remain Unicode-code-point based. `tests/test_diagnostics.py` uses Python `unicodedata` to verify caret-cell alignment for the existing CJK, supplementary emoji and combining-mark cases.
+- Rebuilt both native Windows and Linux/WSL compiler/Runtime toolchains. `python rbl.py bootstrap` passed for both targets (Windows used the full MSYS2 UCRT64 developer compiler, not the intentionally minimal bundled runtime-only GCC payload).
+- Repeated the complete CLI suite after the fix: Windows Native PASS; Windows host with WSL backend PASS; actual Ubuntu-24.04/WSL Linux `python3 rbl.py test` PASS. Each reports 61/61 direct regression cases and 63/63 diagnostics. Linux-native suite additionally exercised POSIX-only metadata checks; Windows-only registry/save tests ran on the Windows host.
+- Repeated both complete corpus checks after the fix: Windows PE and Linux ELF each report 121 sources, 114 positives compiled/assembled, 7 expected negatives rejected, 0 failures.
+- Repeated `python tests/differential.py --a wsl --b native`: 83/83 pass (61 successful-output, 11 runtime-error, 7 expected-negative, 4 build/exit-only). `python tests/differential_diagnostics.py`: 30/30 match.
+- Revalidated docs: 70 Markdown files, 489 relative links, 0 missing targets/fragments; EN/RU inventories match. `git diff --check` passes, with only existing mixed-line-ending warnings.
+- Raw logs are stored under `build/verification/`: `rbl-test-native-after-caret.log`, `rbl-test-wsl-after-caret.log`, `rbl-test-linux-native.log`, `corpus-windows-native-after-caret.log`, `corpus-linux-native-after-caret.log`, and `differential-after-caret.log`.
+- Remaining gap: there is no dedicated malformed-AST injection harness. The AST is compiler-internal and parser-produced; no malformed user-source path was demonstrated. The semantic pass validates loop control, duplicate parameters and required `main`, not arbitrary corrupted AST layouts. This is an internal robustness/test gap, not a demonstrated source-level failure.
+
+## Rust/Cargo source-bundle verification — 2026-11-10
+
+The independent read-only license audit found the active Rust worker dependency closure and copied crate license files internally consistent. Verification was executed directly on both Windows (with `C:\\msys64\\ucrt64\\bin\\zstd.exe`) and WSL/Linux: `tools/verify_rust_source_bundle.py` passed on both targets with 28 licensed crates and 36 archive/checksum checks. Cargo locked/offline metadata and target-specific trees resolve 24 Windows GNU and 26 Linux crates (28-crate union); the exact source archive is 8,099,357 bytes, SHA-256 `df5881aa72dc556d9fff6217fd436cec9ad9cb345ac899058a12d23bbdf40da5`.
+
+The verifier's remaining test/assurance gaps are recorded in `build/verification/rust-source-bundle-2026-11-10.md`: no automated mutation suite; no machine cross-check of crate SPDX metadata against notice expressions; extra unlisted files in a license directory are not rejected. These are verifier hardening recommendations, not current archive-integrity failures. The Rust worker archive is separate from the missing MSYS2 source bundle; legal/source-offer review and MSYS2 corresponding-source compliance remain open distribution blockers.
+
+## Final delta — 2026-11-10
+
+- Refined the Unicode terminal-width table (exclude U+303F from the wide CJK interval; treat U+200C as zero-width). Rebuilt native Windows and WSL compilers; final diagnostic suites pass 63/63 on both and diagnostic differential passes 30/30. Final differential log: `build/verification/differential-diagnostics-final.log`.
+- Final docs validator after CLI/README diagnostic-reference links: 70 Markdown files, 492 relative links, no missing targets/fragments; RU/EN inventories/heading levels aligned. `git diff --check` passes (mixed-EOL warnings only).
+- Rust source-bundle verifier passed directly on Windows with MSYS2 zstd and on WSL/Linux: 28 licensed crates, 36 checksums, both target triples. Detailed record: `build/verification/rust-source-bundle-2026-11-10.md`.
+
+## Roadmap v0.9.1 RFC and static analysis — 2026-11-10
+
+- Added bilingual IR v0.1 design proposal (`docs/eng/explanation/ir-rfc.md`, `docs/ru/explanation/ir-rfc.md`), linked from both explanation indexes and Roadmaps. Candidate model: immutable SSA-like temporaries with block arguments, explicit mutable function-local slots, tagged/dynamic type facts, semantic call/builtin operations, explicit effects/safepoints/source locations and a verifier contract. It is explicitly proposed/not frozen; review decisions are enumerated. No AST lowering or backend migration has started.
+- Documentation validator after the new RFC pair: 72 Markdown files, 496 relative links, no missing links/fragments; EN/RU explanation inventories 10/10.
+- Python syntax checks pass for the modified diagnostic/differential/verifier scripts.
+- WSL `bash tests/run_gcc_analyzer.sh` passes `-fanalyzer` and strict prototype checks for all seven compiler translation units and all three shared Runtime C modules.
+- The RFC requires independent semantics review before its model is frozen or verifier implementation begins.

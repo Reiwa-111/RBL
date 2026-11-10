@@ -1,0 +1,28 @@
+# RBL 0.8.0 f-string formatting reference example.
+# Width counts Unicode code points, not terminal display cells.
+
+func main() (
+    set language = "RBL"
+    set answer = 42
+    set pi = 3.141592653589793
+
+    print("F-STRING FORMATTING")
+    print(f"default:       {answer}")
+    print(f"decimal:       [{answer:>8d}]")
+    print(f"binary:        {answer:b}")
+    print(f"octal:         {answer:o}")
+    print(f"hex lowercase:{255:>8x}")
+    print(f"hex uppercase:{255:>8X}")
+    print(f"fixed:         {pi:.3f}")
+    print(f"scientific:    {pi:.2e}")
+    print(f"general:       {pi:.5g}")
+    print(f"left:          [{language:<8s}]")
+    print(f"right fill:    [{language:·>8s}]")
+    print(f"center fill:   [{language:*^10s}]")
+    print(f"zero fill:     [{answer:0>8d}]")
+
+    # A fill character may itself be an alignment symbol.
+    print(f"fill '<':      [{answer:<<6d}]")
+    print(f"fill '>':      [{answer:>>6d}]")
+    print(f"fill '^':      [{answer:^^7d}]")
+)

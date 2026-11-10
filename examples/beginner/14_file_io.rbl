@@ -2,7 +2,7 @@
 // Run this example from the repository root; the build directory is created by the CLI.
 func main() (
     set path = "build/beginner_course_notes.txt"
-    set text = "RBL 0.7.2\nFiles are text data.\n"
+    set text = "RBL 0.8.0\nFiles are text data.\n"
 
     write_file(path, text)
     print("File exists:", rbl.fs.exists(path))

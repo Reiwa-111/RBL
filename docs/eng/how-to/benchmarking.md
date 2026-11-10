@@ -1,8 +1,8 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | BENCHMARKING GUIDE
 
-## How-to: benchmarking performance
+## How-to: measure RBL performance
 
-The repository contains two distinct benchmark suites. Do not combine their results: they answer different questions and use different workloads.
+The repository contains two distinct benchmark suites. Keep their results separate because their workloads and timing models differ.
 
 ## Portable RBL-only benchmark
 
@@ -10,40 +10,54 @@ The repository contains two distinct benchmark suites. Do not combine their resu
 python3 rbl.py bench
 ```
 
-This runs through the active backend and reports build time, total process runtime, an estimated `net` value (run time minus the empty-program startup baseline), the runtime range and executable size. For small workloads, process startup may dominate the measurement.
+This suite uses the active backend and reports build time, total process runtime, an estimated `net` value (runtime minus the empty-program startup baseline), runtime range and executable size. Process startup can dominate short workloads.
 
 ## Five-implementation comparison
 
-On Linux or in WSL:
+Run on Linux or in WSL:
 
 ```bash
 python3 benchmarks/compare_all.py --warmups 2 --reps 10
 ```
 
-Through the CLI:
+The same suite is available through the CLI:
 
 ```bash
-python3 rbl.py bench3way --warmups 2 --reps 10
+python3 rbl.py bench5way --warmups 2 --reps 10
 ```
 
-Despite its historical name, `bench3way` currently compares **five** implementations: RBL, C `-O2`, C++ `-O2`, CPython and handwritten x86-64 assembly. GNU `as`, GNU `ld`, a C compiler and a C++ compiler are required. Native Windows execution is not supported because the assembly baseline uses Linux syscalls.
+It compares RBL, C `-O2`, C++ `-O2`, CPython and handwritten x86-64 assembly across three synthetic integer workloads. GNU `as`, GNU `ld`, a C compiler and a C++ compiler are required. The assembly baseline uses Linux syscalls, so this suite runs on Linux/WSL, not as a native Windows executable. The old command name `bench3way` remains available as a backwards-compatible alias.
+
+The runner times complete child-process execution, including startup, and reports RBL build time separately. It pins the benchmark process to one CPU when the OS exposes `sched_setaffinity`.
+
+## Compiler modularity and build measurements
+
+To compare one translation unit with the seven compiler modules, run in WSL/Linux:
+
+```bash
+python3 benchmarks/module_arch_perf.py --warmups 3 --reps 10 --build-warmups 2 --build-reps 12
+```
+
+To measure full, parallel, incremental and no-op Makefile builds:
+
+```bash
+python3 benchmarks/make_build_perf.py --jobs 1 6 12 --warmups 2 --reps 12
+```
+
+**Run the Makefile benchmark only in a disposable source copy/worktree.** It invokes `make -B`, rewrites compiler build outputs and touches the copied `compiler/lexer.c` timestamp. Do not run it in a working checkout whose generated binaries or object files must be preserved.
+
+Both commands measure compiler/build behavior, not generated-program runtime. Full methodology and recorded measurements are in [`benchmarks/PERFORMANCE_AUDIT.md`](../../../benchmarks/PERFORMANCE_AUDIT.md).
 
 ## Make measurements comparable
 
-1. Compare results on the same machine, in the same OS/environment, using the same toolchain versions.
-2. Do not change workloads or optimization flags between runs.
-3. Use more warmups and timed repetitions for published results; record all parameters.
-4. Record CPU, OS/kernel, Python, GCC/G++, binutils, backend, warmups/repetitions and raw samples.
-5. Repeat the measurements after changing benchmark code or the environment.
+1. Use the same machine, OS/environment and toolchain versions.
+2. Keep workloads and optimization flags unchanged between runs.
+3. Use enough warmups and timed repetitions; record all parameters.
+4. Record CPU, OS/kernel, Python, GCC/G++, binutils, backend and raw samples.
+5. Repeat after changing benchmark code, compiler sources or the environment.
 
-The runner includes child-process startup in the measured time; RBL build time is reported separately. The current five-way runner pins its own process to one CPU when the OS exposes `sched_setaffinity`.
+C and C++ are built with `-O2`; the compiler may transform loops while preserving results. Runtime iteration counts and `noinline` on the call workload prevent the native compiler from deleting the intended measured work entirely. This is a comparison of specific programs, not a universal language ranking.
 
-## Interpret the comparison
+## Recorded results
 
-C and C++ are built with `-O2`. The compiler is allowed to transform loops while preserving the result: for example, it can replace a conditional jump with `cmov` or simplify arithmetic. Iteration counts are passed to native programs at runtime so GCC/G++ cannot delete certain workloads entirely; the call workload marks `inc` as `noinline`.
-
-This is a comparison of specific workloads, not a universal ranking of programming languages. Different algorithms, data structures, type distributions, I/O, memory usage, optimization settings and startup overhead can change the relative results.
-
-## Recorded result
-
-The measurement snapshot from 6 November 2026, its methodology and raw sample values are documented in [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md). Interpretation and caveats are covered in the [performance explanation](../explanation/performance.md).
+The current five-implementation RBL 0.8.0 runtime measurements, environment and interpretation are in [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md). Compiler modularity, translation-unit overhead and build timings are in [`benchmarks/PERFORMANCE_AUDIT.md`](../../../benchmarks/PERFORMANCE_AUDIT.md).

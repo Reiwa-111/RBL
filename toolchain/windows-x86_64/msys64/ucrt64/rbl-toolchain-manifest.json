@@ -1,0 +1,260 @@
+{
+  "schema": 1,
+  "purpose": "RBL Windows x86_64 native user-program assembly and static linking",
+  "target": "x86_64-w64-mingw32",
+  "gcc_version": "16.2.0",
+  "assembler_version": "GNU assembler (GNU Binutils) 2.47.20260726",
+  "linker_version": "GNU ld (GNU Binutils) 2.47.20260726",
+  "source_distribution": "MSYS2 UCRT64 MinGW-w64",
+  "packages": [
+    {
+      "id": "mingw-w64-ucrt-x86_64-gcc",
+      "version": "16.2.0-4",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libgcc",
+      "version": "16.2.0-4",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-binutils",
+      "version": "2.47-4",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-binutils-2.47-4.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-crt",
+      "version": "14.0.0.r426.g4564ee4b5-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-crt-14.0.0.r426.g4564ee4b5-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-gettext-runtime",
+      "version": "1.0-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gettext-1.0-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libiconv",
+      "version": "1.19-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-libiconv-1.19-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libwinpthread",
+      "version": "14.0.0.r426.g4564ee4b5-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-winpthreads-14.0.0.r426.g4564ee4b5-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-winpthreads",
+      "version": "14.0.0.r426.g4564ee4b5-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-winpthreads-14.0.0.r426.g4564ee4b5-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-zlib",
+      "version": "1.4-2",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-zlib-1.4-2.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-zstd",
+      "version": "1.5.7-2",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-zstd-1.5.7-2.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-windows-default-manifest",
+      "version": "20260815-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-windows-default-manifest-20260815-1.src.tar.zst"
+    }
+  ],
+  "source_archives_bundled": false,
+  "runtime_scope": "gcc driver + collect2 + GNU ld + GNU as + required DLL closure + link inputs",
+  "excluded": [
+    "cc1.exe",
+    "cc1plus.exe",
+    "g++.exe",
+    "gdb.exe",
+    "make.exe",
+    "headers",
+    "MSYS2 shell",
+    "LTO plugin",
+    "lto-wrapper.exe"
+  ],
+  "linker_flags_required": [
+    "-static",
+    "-lm",
+    "-fno-use-linker-plugin"
+  ],
+  "files": {
+    "bin/as.exe": {
+      "sha256": "a608bd29d15d7cad470567070c7362191881f238d6e8525f4c3ab908cf36fcc5",
+      "size": 1968486
+    },
+    "bin/gcc.exe": {
+      "sha256": "f4120ffea38b73efaf4d770c1942905e220819ae97299c94bfeab3c396b686e2",
+      "size": 3297488
+    },
+    "bin/libgcc_s_seh-1.dll": {
+      "sha256": "68ca4574b331402879dec403ba4f14491c9b8fc4aa3f4a41432008714b9bc5df",
+      "size": 150537
+    },
+    "bin/libiconv-2.dll": {
+      "sha256": "94ec68fb8d342b6c91b6b48a8d95092819cdcd006a7166e0b68062f946afd08a",
+      "size": 1141951
+    },
+    "bin/libintl-8.dll": {
+      "sha256": "0e5a178731e6be6d115442a6ade3df7f03265cd1fc4338f8b6f86a8001cbf582",
+      "size": 298164
+    },
+    "bin/libwinpthread-1.dll": {
+      "sha256": "76cc52adfcdb8c800813b2ae8da42a908934eb1ee54ce8e9744fc8d703c76ee1",
+      "size": 64574
+    },
+    "bin/libzstd.dll": {
+      "sha256": "48368ab0ca622d0ec12f41ce85d91f22866bf5da92c77a69a06483564c93816c",
+      "size": 1217412
+    },
+    "bin/zlib1.dll": {
+      "sha256": "aa658771fb152b095eda1614d8bde798efb92324b6f4a0c99c743cd96b67ac90",
+      "size": 190835
+    },
+    "lib/crt2.o": {
+      "sha256": "a316c3798c7358e94628834c2b9b97e378f0006eaf026fe84b945fc63b4815ec",
+      "size": 7874
+    },
+    "lib/default-manifest.o": {
+      "sha256": "9af5e18f01a63a7d02ba11e097324e046f778de5c74cd093b52296f8613dbcc8",
+      "size": 892
+    },
+    "lib/gcc/x86_64-w64-mingw32/16.2.0/collect2.exe": {
+      "sha256": "4f048f574b9562e060e9c78ae7bfd89347d03ae9485dfebbb7876aeb1dcdad68",
+      "size": 2348334
+    },
+    "lib/gcc/x86_64-w64-mingw32/16.2.0/crtbegin.o": {
+      "sha256": "2648b587caaf44239702bdebd370d681fd888aeb58865f2d7ee0775d16adf0ff",
+      "size": 854
+    },
+    "lib/gcc/x86_64-w64-mingw32/16.2.0/crtend.o": {
+      "sha256": "64dc0853ce7664483f0b49f18822c86cf08e179bd25e6df81eb5783263ceed1e",
+      "size": 1037
+    },
+    "lib/gcc/x86_64-w64-mingw32/16.2.0/libgcc.a": {
+      "sha256": "8608eb73c587ca0ee8f048565edd425ca97756b543403d17fe34fea3fe703f07",
+      "size": 3030766
+    },
+    "lib/gcc/x86_64-w64-mingw32/16.2.0/libgcc_eh.a": {
+      "sha256": "c585632c880604ea06eb02f383441a28d1eb42b279425bc222237b81a1e636e5",
+      "size": 11726
+    },
+    "lib/libadvapi32.a": {
+      "sha256": "0b7d185a8041c052ffdf554df7636d40c950f37f5b38c852b59846badb980036",
+      "size": 694266
+    },
+    "lib/libkernel32.a": {
+      "sha256": "db620a4166a9774b293d56beb15aa2979aea4c49ac684e2f791044db7d5d7b89",
+      "size": 1391318
+    },
+    "lib/libm.a": {
+      "sha256": "7b0d205e05a1e5e3ce96a6ea94794d4806bf32b6435fa8292cebdb5280cff84e",
+      "size": 654
+    },
+    "lib/libmingw32.a": {
+      "sha256": "14f567e7f181903f7191bcf8fe35cfc7f1db97eb8b98b0474e152151c6a8e526",
+      "size": 50850
+    },
+    "lib/libmingwex.a": {
+      "sha256": "d6a9376c50b813b18823ca9243bc8aea733418df6fda152ba23437130c732b04",
+      "size": 555030
+    },
+    "lib/libmsvcrt.a": {
+      "sha256": "7a34bc8e1517bab3646d7e6c89a4dd47961a2df4c43423a40d518d1392479b23",
+      "size": 2095160
+    },
+    "lib/libpthread.a": {
+      "sha256": "4847aee76337c371075c39ed97b0c97c515c2b094d2f45168feaed84aeeb14f9",
+      "size": 97238
+    },
+    "lib/libshell32.a": {
+      "sha256": "47ab637e66c75fb5e9681c47d5b1205753da40750838ecaf38cbeb2d4d4a2cac",
+      "size": 306742
+    },
+    "lib/libuser32.a": {
+      "sha256": "9f3a8229b0e108546b8f998da7bbce5be0e355be24fced095b7bb68295988012",
+      "size": 756526
+    },
+    "share/licenses/binutils/COPYING": {
+      "sha256": "231f7edcc7352d7734a96eef0b8030f77982678c516876fcb81e25b32d68564c",
+      "size": 18002
+    },
+    "share/licenses/binutils/COPYING.LIB": {
+      "sha256": "56bdea73b6145ef6ac5259b3da390b981d840c24cb03b8e1cbc678de7ecfa18d",
+      "size": 25291
+    },
+    "share/licenses/binutils/COPYING3": {
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    "share/licenses/binutils/COPYING3.LIB": {
+      "sha256": "a853c2ffec17057872340eee242ae4d96cbf2b520ae27d903e1b2fef1a5f9d1c",
+      "size": 7639
+    },
+    "share/licenses/crt/COPYING": {
+      "sha256": "99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f",
+      "size": 2326
+    },
+    "share/licenses/crt/COPYING.MinGW-w64-runtime.txt": {
+      "sha256": "1db8da07b436c68833c0673ffee3d9fcb2526047f3820b81661865dfedc79a1f",
+      "size": 12155
+    },
+    "share/licenses/crt/COPYING.MinGW-w64.txt": {
+      "sha256": "f38e6194bd3bfa1b654f118e5acefe0aead437bbe669eee43957ccc65a7127f1",
+      "size": 5905
+    },
+    "share/licenses/gcc/COPYING.RUNTIME": {
+      "sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+      "size": 3324
+    },
+    "share/licenses/gcc/COPYING3": {
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    "share/licenses/gettext-runtime/COPYING": {
+      "sha256": "7ef2cdfe58e0c0460657b6598b49af29d4e03c1e41cbaf0e1da1eb8ad74b95d0",
+      "size": 495
+    },
+    "share/licenses/gettext-runtime/intl/COPYING.LIB": {
+      "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95",
+      "size": 26419
+    },
+    "share/licenses/libiconv/COPYING": {
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    "share/licenses/libiconv/COPYING.LIB": {
+      "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95",
+      "size": 26419
+    },
+    "share/licenses/libiconv/libcharset/COPYING.LIB": {
+      "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95",
+      "size": 26419
+    },
+    "share/licenses/libwinpthread/COPYING": {
+      "sha256": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177",
+      "size": 2883
+    },
+    "share/licenses/winpthreads/COPYING": {
+      "sha256": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177",
+      "size": 2883
+    },
+    "share/licenses/zlib/LICENSE": {
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "size": 1002
+    },
+    "share/licenses/zstd/LICENSE": {
+      "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8",
+      "size": 1549
+    },
+    "x86_64-w64-mingw32/bin/ld.exe": {
+      "sha256": "a279cc83f198a606f255a597b3a067b51f11a9bbf8fe46de2a0dc8bb71b47f4f",
+      "size": 1930154
+    }
+  },
+  "file_count": 43,
+  "total_bytes": 21877020
+}

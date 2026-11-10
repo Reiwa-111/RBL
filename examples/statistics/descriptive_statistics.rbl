@@ -1,0 +1,107 @@
+# Descriptive statistics for a small set of sensor measurements.
+# Variance is population variance: the sum of squared deviations divided by N.
+
+func mean_value(values list) float (
+    if (len(values) == 0) ( return 0.0 )
+    set total = 0.0
+    for (value in values) (
+        let total += float(value)
+    )
+    return total / float(len(values))
+)
+
+func minimum_value(values list) float (
+    if (len(values) == 0) ( return 0.0 )
+    set result = float(values[0])
+    for (value in values) (
+        if (float(value) < result) (
+            let result = float(value)
+        )
+    )
+    return result
+)
+
+func maximum_value(values list) float (
+    if (len(values) == 0) ( return 0.0 )
+    set result = float(values[0])
+    for (value in values) (
+        if (float(value) > result) (
+            let result = float(value)
+        )
+    )
+    return result
+)
+
+func population_variance(values list, average float) float (
+    if (len(values) == 0) ( return 0.0 )
+    set squared_deviations = 0.0
+    set difference = 0.0
+    for (value in values) (
+        let difference = float(value) - average
+        let squared_deviations += difference * difference
+    )
+    return squared_deviations / float(len(values))
+)
+
+func sample_variance(values list, average float) float (
+    if (len(values) < 2) ( return 0.0 )
+    set squared_deviations = 0.0
+    set difference = 0.0
+    for (value in values) (
+        let difference = float(value) - average
+        let squared_deviations += difference * difference
+    )
+    return squared_deviations / float(len(values) - 1)
+)
+
+func median_value(values list) float (
+    if (len(values) == 0) ( return 0.0 )
+    set sorted = []
+    set current = 0.0
+    set j = 0
+    for (value in values) (
+        let sorted = list_push(sorted, float(value))
+    )
+    # Insertion sort is simple and efficient for this small measurement set.
+    for (i in 1..len(sorted)) (
+        let current = sorted[i]
+        let j = i
+        for (j > 0) (
+            if (sorted[j - 1] <= current) ( break )
+            let sorted[j] = sorted[j - 1]
+            let j -= 1
+        )
+        let sorted[j] = current
+    )
+    set middle = len(sorted) / 2
+    if (len(sorted) % 2 == 1) (
+        return sorted[middle]
+    )
+    return (sorted[middle - 1] + sorted[middle]) / 2.0
+)
+
+func main() (
+    set measurements = [12.0, 13.5, 11.0, 14.0, 12.5, 13.0, 12.0, 14.5]
+    set count = len(measurements)
+    set average = mean_value(measurements)
+    set minimum = minimum_value(measurements)
+    set maximum = maximum_value(measurements)
+    set variance = population_variance(measurements, average)
+    set deviation = sqrt(variance)
+    set sample_var = sample_variance(measurements, average)
+    set median = median_value(measurements)
+
+    print("DESCRIPTIVE STATISTICS")
+    print("Measurements:", measurements)
+    print(f"Count:                 {count:>8d}")
+    print(f"Minimum:               {minimum:>8.3f}")
+    print(f"Maximum:               {maximum:>8.3f}")
+    print(f"Range:                 {maximum - minimum:>8.3f}")
+    print(f"Median:                {median:>8.3f}")
+    print(f"Mean:                  {average:>8.3f}")
+    print(f"Population variance:   {variance:>8.5f}")
+    print(f"Population std. dev.:  {deviation:>8.3f}")
+    print(f"Sample variance:       {sample_var:>8.5f}")
+    print("Empty input mean:", mean_value([]))
+    print("Empty input median:", median_value([]))
+)

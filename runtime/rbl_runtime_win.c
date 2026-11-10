@@ -33,7 +33,7 @@
  *     congruential generator with a 31-bit output range. Its sequence is not
  *     intended to match the Linux C library's rand().
  *
- * C99 + Win32 only; compatible with both the UCRT and the msvcrt based
+ * C11 + Win32 only; compatible with both the UCRT and the msvcrt based
  * mingw-w64 variants, and with Windows 7+.
  */
 
@@ -54,25 +54,23 @@
 #include <windows.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "rbl_abi.h"
 
 #define RBL_SYSV __attribute__((sysv_abi))
 
 enum {
-    TAG_UNIT  = 0,
-    TAG_INT   = 1,
-    TAG_FLOAT = 2,
-    TAG_STR   = 3,
-    TAG_BOOL  = 4,
-    TAG_LIST  = 5,
-    TAG_DICT  = 6,
-    TAG_TUPLE = 7,
-    TAG_NULL  = 8
+    TAG_UNIT  = RBL_TAG_UNIT,
+    TAG_INT   = RBL_TAG_INT,
+    TAG_FLOAT = RBL_TAG_FLOAT,
+    TAG_STR   = RBL_TAG_STRING,
+    TAG_BOOL  = RBL_TAG_BOOL,
+    TAG_LIST  = RBL_TAG_LIST,
+    TAG_DICT  = RBL_TAG_DICTIONARY,
+    TAG_TUPLE = RBL_TAG_TUPLE,
+    TAG_NULL  = RBL_TAG_NULL
 };
 
-typedef struct {
-    uint64_t tag;
-    uint64_t payload;
-} RBLValue;
+typedef RBLRuntimeValue RBLValue;
 
 static inline RBLValue rbl_value(uint64_t tag, uint64_t payload)
 {
@@ -160,13 +158,11 @@ static void rbl_oom(void)
     rbl_failf("RBL runtime error: %s\n", "out of memory while concatenating strings");
 }
 
-/* malloc for runtime strings: never freed (the process exit reclaims it). */
+/* Runtime-owned strings are reclaimed by the shared conservative collector. */
 static char *rbl_alloc(size_t n)
 {
-    char *p = (char *)malloc(n);
-    if (!p) {
-        rbl_oom();
-    }
+    char *p = rbl_string_alloc((uint64_t)n);
+    if (!p) rbl_oom();
     return p;
 }
 
@@ -711,6 +707,7 @@ RBL_SYSV void rbl_print_values(const uint64_t *values, uint64_t count)
         }
     }
     putchar('\n');
+    fflush(stdout);
 }
 
 RBL_SYSV void rbl_log_values(const uint64_t *values, uint64_t count, uint64_t level)
@@ -741,7 +738,7 @@ RBL_SYSV RBLValue rbl_len(uint64_t tag, uint64_t payload)
         return rbl_tuple_len(tag, payload);
     }
     if (tag != TAG_STR) {
-        rbl_fail("len() expects a string or a list");
+        rbl_fail("len() expects a string, list, dictionary or tuple");
     }
     s = (const unsigned char *)(uintptr_t)payload;
     while (*s) {
@@ -754,10 +751,10 @@ RBL_SYSV RBLValue rbl_len(uint64_t tag, uint64_t payload)
     return rbl_int_value(n);
 }
 
-/* EOF-terminated line reader. Mirrors the Linux runtime's getline() use:
- * on success *outline is a malloc'ed NUL-terminated line (the trailing LF/CRLF
- * is stripped in place) and NULL is returned when nothing could be read, which
- * the callers report as "input() failed to read stdin". */
+/* EOF-terminated line reader. fgets/realloc use a temporary malloc buffer;
+ * successful input is copied into a Runtime-owned string before returning.
+ * NULL is returned when nothing could be read, which the callers report as
+ * "input() failed to read stdin". */
 static char *rbl_read_line(FILE *fp, char **outline, size_t *cap, size_t *len)
 {
     char *buf = *outline;
@@ -766,7 +763,8 @@ static char *rbl_read_line(FILE *fp, char **outline, size_t *cap, size_t *len)
 
     if (!buf || limit == 0) {
         limit = 128;
-        buf = rbl_alloc(limit);
+        buf = (char *)malloc(limit);
+        if (!buf) rbl_oom();
     }
     for (;;) {
         if (used + 1 >= limit) {
@@ -779,7 +777,8 @@ static char *rbl_read_line(FILE *fp, char **outline, size_t *cap, size_t *len)
         }
         if (!fgets(buf + used, (int)(limit - used), fp)) {
             if (used == 0) {
-                *outline = buf;
+                free(buf);
+                *outline = NULL;
                 *cap = limit;
                 *len = 0;
                 return NULL;
@@ -795,10 +794,13 @@ static char *rbl_read_line(FILE *fp, char **outline, size_t *cap, size_t *len)
         }
     }
     buf[used] = '\0';
-    *outline = buf;
-    *cap = limit;
+    char *managed = rbl_string_alloc((uint64_t)(used + 1));
+    memcpy(managed, buf, used + 1);
+    free(buf);
+    *outline = NULL;
+    *cap = 0;
     *len = used;
-    return buf;
+    return managed;
 }
 
 /* The Linux runtime truncates a read line at the first LF or CR (see
@@ -881,7 +883,7 @@ RBL_SYSV RBLValue rbl_read_file(uint64_t tag, uint64_t payload)
     }
     buf = rbl_alloc((size_t)size + 1);
     if (size > 0 && fread(buf, 1, (size_t)size, fp) != (size_t)size) {
-        free(buf);
+        rbl_string_free(buf);
         fclose(fp);
         rbl_fail("read_file() failed while reading file");
     }
@@ -1035,7 +1037,7 @@ RBL_SYSV RBLValue rbl_max_values(const uint64_t *values, uint64_t count)
     return rbl_unit_value();
 }
 
-/* Formats into a fresh malloc'ed buffer. fmt is always "%.17g" or "%lld". */
+/* Formats into a fresh Runtime-owned buffer. fmt is always "%.17g" or "%lld". */
 static char *rbl_alloc_format(const char *fmt, uint64_t payload, int is_float)
 {
     char *buf;
@@ -1382,7 +1384,7 @@ RBL_SYSV RBLValue rbl_fs_cwd(void)
         if (_getcwd(buf, (int)cap) != NULL) {
             return rbl_str_value(buf);
         }
-        free(buf);
+        rbl_string_free(buf);
         if (errno != ERANGE || cap > (size_t)1 << 20) {
             rbl_fail("RBL runtime error: getcwd failed");
         }

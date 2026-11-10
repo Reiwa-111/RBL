@@ -1,6 +1,6 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | LANGUAGE CONTRACT RECHECK
 
-## Reference: RBL 0.7.2 standard library
+## Reference: RBL 0.8.0 standard library
 
 Built-in functions are implemented by the compiler/runtime. Namespace names can be used directly; no `import` statement is needed. This is not a user module system: source imports and third-party package loading are not available.
 
@@ -22,6 +22,8 @@ Built-in functions are implemented by the compiler/runtime. Namespace names can 
 | `random_int(a, b)` | Pseudorandom integer in the inclusive interval `[a, b]`. |
 | `random_float()` | Pseudorandom float in `[0, 1]`. |
 | `random_bool()` | Pseudorandom Boolean value. |
+
+Strings returned by `input()`, `read_file()` and conversions are Runtime-managed RBL values. RBL code must not free their payloads manually; their lifetime follows the [dynamic-string ownership model](../explanation/execution-model.md#dynamic-string-lifetime).
 
 Global aliases also exist for `log10`, `log2`, `trunc`, `fmod`, `hypot`, `degrees`, `radians`, `clamp`, `sign`, `is_nan` and `is_inf`.
 
@@ -53,7 +55,7 @@ Details:
 
 - The global `fmod(a, b)` function performs floating-point remainder using C `fmod` behavior: the result has the sign of the dividend.
 - The `%` operator is integer-only.
-- The global `clamp(x, low, high)` function requires compatible numeric types; `rbl.math.clamp` is not implemented in 0.7.2.
+- The global `clamp(x, low, high)` function requires compatible numeric types; `rbl.math.clamp` is not implemented in 0.8.0.
 - `hypot`, `degrees` and `radians` are available as global functions, but not as `rbl.math` methods.
 - `sign(NaN)` returns `0` in the current implementation.
 - `is_nan` and `is_inf` accept numeric values; integers are neither NaN nor infinity.

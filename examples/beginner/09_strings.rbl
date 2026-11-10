@@ -5,6 +5,9 @@ func main() (
 
     print(language + " makes " + topic + " easy to explore.")
     print(f"Welcome to {language}!")
+    print(f"Integer width: [{42:>8d}]")
+    print(f"Float precision: [{3.14159:.2f}]")
+    print(f"Custom fill: [{language:*^10s}]")
 
     set messy = "   learn RBL   "
     set clean = rbl.string.trim(messy)

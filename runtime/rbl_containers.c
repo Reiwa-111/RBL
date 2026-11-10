@@ -1,4 +1,4 @@
-/* Shared container runtime for RBL 0.7.2.
+/* Shared container runtime for Runtime ABI v1.
  *
  * Written once in C and linked into BOTH targets: the Linux ELF build links it
  * next to the hand-written asm runtime, the Windows PE build next to
@@ -9,17 +9,21 @@
  * Values are stored as (tag, payload) pairs, 16 bytes each, so a list can hold
  * anything the language has, including nested lists.
  *
- * Memory: container allocations are registered with the conservative
- * mark-and-sweep collector below. It reclaims list, tuple and dictionary
- * objects; runtime string allocations are managed separately and may live
- * until process exit.
+ * Memory: containers and dynamic strings are registered with the shared
+ * conservative mark-and-sweep collector below. Generated code enters it only
+ * at safe points, after live values have been stored in stack slots.
  */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "rbl_abi.h"
 
-enum { TAG_UNIT = 0, TAG_INT = 1, TAG_FLOAT = 2, TAG_STR = 3, TAG_BOOL = 4, TAG_LIST = 5, TAG_DICT = 6, TAG_TUPLE = 7 };
+enum {
+    TAG_UNIT = RBL_TAG_UNIT, TAG_INT = RBL_TAG_INT, TAG_FLOAT = RBL_TAG_FLOAT,
+    TAG_STR = RBL_TAG_STRING, TAG_BOOL = RBL_TAG_BOOL, TAG_LIST = RBL_TAG_LIST,
+    TAG_DICT = RBL_TAG_DICTIONARY, TAG_TUPLE = RBL_TAG_TUPLE
+};
 
 #if defined(_WIN32)
 #define RBL_SYSV __attribute__((sysv_abi))
@@ -27,14 +31,7 @@ enum { TAG_UNIT = 0, TAG_INT = 1, TAG_FLOAT = 2, TAG_STR = 3, TAG_BOOL = 4, TAG_
 #define RBL_SYSV
 #endif
 
-typedef struct {
-    uint64_t tag, payload;
-} RBLValue;
-
-/* Provided by the platform runtime (asm on Linux, C on Windows). */
-RBL_SYSV extern void rbl_fail(const char *msg);
-RBL_SYSV extern RBLValue rbl_str(uint64_t tag, uint64_t payload);
-RBL_SYSV extern RBLValue rbl_eq(uint64_t t1, uint64_t p1, uint64_t t2, uint64_t p2);
+typedef RBLRuntimeValue RBLValue;
 
 /* Every container starts with this header: the collector needs the tag to trace
    an object and a mark bit to keep it. */
@@ -52,12 +49,109 @@ typedef struct {
 static void rbl_gc_register(void *obj, uint64_t tag, size_t bytes);
 static void gc_collect(void);
 
+typedef struct {
+    uint64_t mark;
+    size_t size;
+} RBLStringHeader;
+
+static char **g_strings;
+static size_t g_strings_cap, g_strings_len, g_strings_tombs;
+static size_t g_string_bytes;
+static size_t g_bytes;
+
+#define GC_EMPTY ((void *)0)
+#define GC_TOMB  ((void *)1)
+
+#ifndef RBL_GC_TESTING
+enum {
+    RBL_GC_TEST_FAIL_STRING_PAYLOAD = 1,
+    RBL_GC_TEST_FAIL_STRING_REGISTRY = 2,
+    RBL_GC_TEST_FAIL_CONTAINER_REGISTRY = 3,
+    RBL_GC_TEST_FAIL_MARK_STACK = 4,
+    RBL_GC_TEST_FAIL_SURVIVORS = 5,
+    RBL_GC_TEST_FAIL_REBUILD_REGISTRY = 6
+};
+#endif
+
+#ifdef RBL_GC_TESTING
+static uint64_t g_test_fail_site;
+static uint64_t g_test_fail_hits;
+
+static int gc_test_should_fail_site(uint64_t site)
+{
+    if (g_test_fail_site == site) {
+        g_test_fail_site = 0;
+        g_test_fail_hits++;
+        return 1;
+    }
+    return 0;
+}
+#else
+static int gc_test_should_fail_site(uint64_t site)
+{
+    (void)site;
+    return 0;
+}
+#endif
+
+static void strings_rehash(size_t cap);
+static void strings_add(char *string);
+static int strings_remove(char *string);
+static int strings_has(const void *string);
+
+RBL_SYSV char *rbl_string_alloc(uint64_t size)
+{
+    if (size == 0 || size > SIZE_MAX - sizeof(RBLStringHeader)) {
+        rbl_fail("out of memory while allocating a string");
+    }
+    RBLStringHeader *header = gc_test_should_fail_site(RBL_GC_TEST_FAIL_STRING_PAYLOAD)
+        ? NULL : (RBLStringHeader *)malloc(sizeof(*header) + (size_t)size);
+    if (!header) {
+        rbl_fail("out of memory while allocating a string");
+    }
+    header->mark = 0;
+    header->size = (size_t)size;
+    char *string = (char *)(header + 1);
+    size_t allocation_bytes = sizeof(*header) + (size_t)size;
+    if (g_string_bytes > SIZE_MAX - allocation_bytes) {
+        free(header);
+        rbl_fail("string heap accounting overflow");
+        return NULL;
+    }
+    strings_add(string);
+    if (!strings_has(string)) {
+        free(header);
+        rbl_fail("out of memory while tracking a string");
+    }
+    g_string_bytes += allocation_bytes;
+    return string;
+}
+
+RBL_SYSV void rbl_string_free(char *string)
+{
+    if (!string || !strings_remove(string)) {
+        return;
+    }
+    RBLStringHeader *header = ((RBLStringHeader *)string) - 1;
+    size_t bytes = sizeof(*header) + header->size;
+    g_string_bytes = g_string_bytes >= bytes ? g_string_bytes - bytes : 0;
+    free(header);
+}
+
 static RBLValue value(uint64_t tag, uint64_t payload)
 {
     RBLValue v;
     v.tag = tag;
     v.payload = payload;
     return v;
+}
+
+static RBLValue string_value_from_buffer(char *buffer, size_t len)
+{
+    char *managed = rbl_string_alloc((uint64_t)(len + 1));
+    memcpy(managed, buffer, len + 1);
+    free(buffer);
+    return value(TAG_STR, (uint64_t)(uintptr_t)managed);
 }
 
 static RBLList *as_list(uint64_t payload)
@@ -93,12 +187,23 @@ RBL_SYSV RBLValue rbl_list_push(uint64_t tag, uint64_t payload, uint64_t vt, uin
     (void)tag;
     RBLList *l = as_list(payload);
     if (l->len == l->cap) {
-        l->cap *= 2;
-        uint64_t *grown = (uint64_t *)realloc(l->items, l->cap * 2 * sizeof(uint64_t));
+        if (l->cap > SIZE_MAX / (4 * sizeof(uint64_t))) {
+            list_oom();
+        }
+        size_t old_bytes = (size_t)l->cap * 2 * sizeof(uint64_t);
+        size_t new_cap = (size_t)l->cap * 2;
+        size_t new_bytes = new_cap * 2 * sizeof(uint64_t);
+        size_t delta = new_bytes - old_bytes;
+        if (g_bytes > SIZE_MAX - delta) {
+            rbl_fail("container heap accounting overflow");
+        }
+        uint64_t *grown = (uint64_t *)realloc(l->items, new_bytes);
         if (!grown) {
             list_oom();
         }
         l->items = grown;
+        l->cap = new_cap;
+        g_bytes += delta;
     }
     l->items[l->len * 2] = vt;
     l->items[l->len * 2 + 1] = vp;
@@ -111,7 +216,7 @@ static RBLList *as_list_checked(uint64_t tag, uint64_t payload)
     /* Tuples share the storage; mutation of a tuple is rejected in rbl_index_set,
        which is the only path the language can reach a store through. */
     if (tag != TAG_LIST && tag != TAG_TUPLE) {
-        rbl_fail("expected a list");
+        rbl_fail("expected a list or tuple");
     }
     return as_list(payload);
 }
@@ -140,7 +245,13 @@ RBL_SYSV RBLValue rbl_list_get(uint64_t tag, uint64_t payload, uint64_t idx)
 
 RBL_SYSV RBLValue rbl_list_set(uint64_t tag, uint64_t payload, uint64_t idx, uint64_t vt, uint64_t vp)
 {
-    RBLList *l = as_list_checked(tag, payload);
+    if (tag == TAG_TUPLE) {
+        rbl_fail("tuples cannot be modified");
+    }
+    if (tag != TAG_LIST) {
+        rbl_fail("list_set() expects a list");
+    }
+    RBLList *l = as_list(payload);
     check_index(l, idx);
     l->items[idx * 2] = vt;
     l->items[idx * 2 + 1] = vp;
@@ -187,13 +298,8 @@ RBL_SYSV RBLValue rbl_list_str(uint64_t tag, uint64_t payload)
     }
     out[n++] = ']';
     out[n] = '\0';
-    return value(TAG_STR, (uint64_t)(uintptr_t)out);
+    return string_value_from_buffer(out, n);
 }
-
-/* Deep equality: nested lists compare element-wise, everything else through the
-   ordinary ==, so floats and strings behave exactly as they do outside lists. */
-RBL_SYSV RBLValue rbl_list_eq(uint64_t t1, uint64_t p1, uint64_t t2, uint64_t p2);
-RBL_SYSV RBLValue rbl_tuple_eq(uint64_t t1, uint64_t p1, uint64_t t2, uint64_t p2);
 
 /* Deep equality: nested containers compare element-wise, everything else through
    the ordinary ==, so floats and strings behave exactly as outside containers. */
@@ -357,6 +463,15 @@ static void dict_grow(RBLDict *d)
 {
     RBLDictEntry *old = d->entries;
     uint64_t old_cap = d->cap;
+    if (old_cap > SIZE_MAX / (2 * sizeof(RBLDictEntry))) {
+        rbl_fail("out of memory while growing a dictionary");
+    }
+    size_t old_bytes = (size_t)old_cap * sizeof(RBLDictEntry);
+    size_t new_bytes = old_bytes * 2;
+    size_t delta = new_bytes - old_bytes;
+    if (g_bytes > SIZE_MAX - delta) {
+        rbl_fail("container heap accounting overflow");
+    }
     RBLDict fresh;
     dict_alloc(&fresh, old_cap * 2);
     for (uint64_t i = 0; i < old_cap; i++) {
@@ -374,6 +489,7 @@ static void dict_grow(RBLDict *d)
     d->entries = fresh.entries;
     d->cap = fresh.cap;
     d->len = fresh.len;
+    g_bytes += delta;
 }
 
 static RBLDictEntry *dict_slot(RBLDict *d, uint64_t kt, uint64_t kp, int create)
@@ -496,7 +612,7 @@ RBL_SYSV RBLValue rbl_dict_str(uint64_t tag, uint64_t payload)
     }
     out[n++] = '}';
     out[n] = '\0';
-    return value(TAG_STR, (uint64_t)(uintptr_t)out);
+    return string_value_from_buffer(out, n);
 }
 
 /* Order-insensitive deep equality. */
@@ -583,24 +699,21 @@ RBL_SYSV RBLValue rbl_contains(uint64_t tag, uint64_t payload, uint64_t kt, uint
 /* ------------------------------------------------------------------ */
 /* conservative mark-and-sweep collector                               */
 /*                                                                     */
-/* Roots are the machine stack (from the current frame up to the        */
-/* address captured by rbl_gc_init in main) plus everything reachable   */
-/* from it. Any word that equals a live container pointer counts as a   */
-/* root, so temporary values held only in registers or on the stack are */
-/* safe and the code generator needs no ownership analysis at all.       */
+/* Roots are pointer-shaped words in scanned stack memory (including     */
+/* payload words in tagged slots, up to the frame captured in main),    */
+/* plus values reachable through containers. Generated code calls the   */
+/* collector only at safe points after live locals reach stack slots.    */
 /* ------------------------------------------------------------------ */
 
 static void **g_objs;          /* registry of live objects, open addressing */
 static size_t g_objs_cap, g_objs_len, g_objs_tombs;
 static char *g_stack_base;
-static size_t g_bytes, g_threshold = 1u << 20;
+static size_t g_threshold = 1u << 20;
 static void **g_mark_stack;
 static size_t g_mark_cap, g_mark_len;
 static void **g_survivors;
 static size_t g_survivors_cap;
-
-#define GC_EMPTY ((void *)0)
-#define GC_TOMB  ((void *)1)
+static int g_mark_failed;
 
 static uint64_t ptr_hash(const void *p)
 {
@@ -615,7 +728,8 @@ static void objs_add(void *p);
 
 static void objs_rehash(size_t cap)
 {
-    void **slots = (void **)calloc(cap, sizeof(void *));
+    void **slots = gc_test_should_fail_site(RBL_GC_TEST_FAIL_CONTAINER_REGISTRY)
+        ? NULL : (void **)calloc(cap, sizeof(void *));
     if (!slots) {
         return;
     }
@@ -636,20 +750,32 @@ static void objs_rehash(size_t cap)
 static void objs_add(void *p)
 {
     if (g_objs_cap == 0 || (g_objs_len + g_objs_tombs + 1) * 4 >= g_objs_cap * 3) {
+        if (g_objs_cap > SIZE_MAX / 2 / sizeof(void *)) {
+            rbl_fail("container registry capacity overflow");
+            return;
+        }
         objs_rehash(g_objs_cap ? g_objs_cap * 2 : 1024);
     }
+    if (!g_objs_cap) {
+        rbl_fail("out of memory while tracking a container");
+        return;
+    }
     size_t j = ptr_hash(p) % g_objs_cap;
-    while (g_objs[j] && g_objs[j] != GC_TOMB) {
+    for (size_t probes = 0; probes < g_objs_cap; probes++) {
+        if (!g_objs[j] || g_objs[j] == GC_TOMB) {
+            if (g_objs[j] == GC_TOMB) {
+                g_objs_tombs--;
+            }
+            g_objs[j] = p;
+            g_objs_len++;
+            return;
+        }
         if (g_objs[j] == p) {
             return;
         }
         j = (j + 1) % g_objs_cap;
     }
-    if (g_objs[j] == GC_TOMB) {
-        g_objs_tombs--;
-    }
-    g_objs[j] = p;
-    g_objs_len++;
+    rbl_fail("container registry is full");
 }
 
 static int objs_has(const void *p)
@@ -658,7 +784,7 @@ static int objs_has(const void *p)
         return 0;
     }
     size_t j = ptr_hash(p) % g_objs_cap;
-    for (;;) {
+    for (size_t probes = 0; probes < g_objs_cap; probes++) {
         void *s = g_objs[j];
         if (!s) {
             return 0;
@@ -668,14 +794,115 @@ static int objs_has(const void *p)
         }
         j = (j + 1) % g_objs_cap;
     }
+    return 0;
+}
+
+static void strings_rehash(size_t cap)
+{
+    char **slots = gc_test_should_fail_site(RBL_GC_TEST_FAIL_STRING_REGISTRY)
+        ? NULL : (char **)calloc(cap, sizeof(char *));
+    if (!slots) {
+        return;
+    }
+    char **old = g_strings;
+    size_t old_cap = g_strings_cap;
+    g_strings = slots;
+    g_strings_cap = cap;
+    g_strings_len = 0;
+    g_strings_tombs = 0;
+    for (size_t i = 0; i < old_cap; i++) {
+        if (old[i] && old[i] != (char *)GC_TOMB) {
+            strings_add(old[i]);
+        }
+    }
+    free(old);
+}
+
+static void strings_add(char *string)
+{
+    if (g_strings_cap == 0 ||
+        (g_strings_len + g_strings_tombs + 1) * 4 >= g_strings_cap * 3) {
+        if (g_strings_cap > SIZE_MAX / 2 / sizeof(char *)) {
+            rbl_fail("string registry capacity overflow");
+            return;
+        }
+        strings_rehash(g_strings_cap ? g_strings_cap * 2 : 1024);
+    }
+    if (!g_strings_cap) {
+        rbl_fail("out of memory while tracking a string");
+        return;
+    }
+    size_t j = ptr_hash(string) % g_strings_cap;
+    for (size_t probes = 0; probes < g_strings_cap; probes++) {
+        if (!g_strings[j] || g_strings[j] == (char *)GC_TOMB) {
+            if (g_strings[j] == (char *)GC_TOMB) {
+                g_strings_tombs--;
+            }
+            g_strings[j] = string;
+            g_strings_len++;
+            return;
+        }
+        if (g_strings[j] == string) {
+            return;
+        }
+        j = (j + 1) % g_strings_cap;
+    }
+    rbl_fail("string registry is full");
+}
+
+static int strings_has(const void *string)
+{
+    if (!g_strings_cap || !string || string == GC_TOMB) {
+        return 0;
+    }
+    size_t j = ptr_hash(string) % g_strings_cap;
+    for (size_t probes = 0; probes < g_strings_cap; probes++) {
+        char *slot = g_strings[j];
+        if (!slot) {
+            return 0;
+        }
+        if (slot == string) {
+            return 1;
+        }
+        j = (j + 1) % g_strings_cap;
+    }
+    return 0;
+}
+
+static int strings_remove(char *string)
+{
+    if (!g_strings_cap || !string) {
+        return 0;
+    }
+    size_t j = ptr_hash(string) % g_strings_cap;
+    for (size_t probes = 0; probes < g_strings_cap; probes++) {
+        char *slot = g_strings[j];
+        if (!slot) {
+            return 0;
+        }
+        if (slot == string) {
+            g_strings[j] = (char *)GC_TOMB;
+            g_strings_len--;
+            g_strings_tombs++;
+            return 1;
+        }
+        j = (j + 1) % g_strings_cap;
+    }
+    return 0;
 }
 
 static void gc_push(void *o)
 {
     if (g_mark_len == g_mark_cap) {
+        if (g_mark_cap > SIZE_MAX / 2 / sizeof(void *)) {
+            g_mark_failed = 1;
+            return;
+        }
         size_t cap = g_mark_cap ? g_mark_cap * 2 : 256;
-        void **grown = (void **)realloc(g_mark_stack, cap * sizeof(void *));
+        void **grown = gc_test_should_fail_site(RBL_GC_TEST_FAIL_MARK_STACK)
+            ? NULL : (void **)realloc(g_mark_stack, cap * sizeof(void *));
         if (!grown) {
+            g_mark_failed = 1;
             return;
         }
         g_mark_stack = grown;
@@ -686,6 +913,14 @@ static void gc_push(void *o)
 
 static void gc_push_if_container(uint64_t tag, uint64_t payload)
 {
+    if (tag == TAG_STR) {
+        char *string = (char *)(uintptr_t)payload;
+        if (strings_has(string)) {
+            RBLStringHeader *header = ((RBLStringHeader *)string) - 1;
+            header->mark = 1;
+        }
+        return;
+    }
     if (tag != TAG_LIST && tag != TAG_TUPLE && tag != TAG_DICT) {
         return;
     }
@@ -723,19 +958,25 @@ static void gc_mark_roots(void)
     if (!g_stack_base) {
         return;
     }
-    char *lo = (char *)&lo;
-    char *hi = g_stack_base;
+    uintptr_t lo = (uintptr_t)&lo;
+    uintptr_t hi = (uintptr_t)g_stack_base;
     if (lo > hi) {
-        char *t = lo;
+        uintptr_t t = lo;
         lo = hi;
         hi = t;
     }
-    for (char *p = lo; p + (long)sizeof(void *) <= hi; p += sizeof(void *)) {
+    /* Generated locals are pointer-aligned stack slots. Start at the preceding
+       aligned word so the address of this C local cannot skew the scan stride. */
+    lo &= ~((uintptr_t)sizeof(void *) - 1u);
+    for (uintptr_t p = lo; p <= hi && hi - p >= sizeof(void *); p += sizeof(void *)) {
         void *cand;
-        memcpy(&cand, p, sizeof(void *));
+        memcpy(&cand, (const void *)p, sizeof(void *));
         if (objs_has(cand) && !((RBLObj *)cand)->mark) {
             ((RBLObj *)cand)->mark = 1;
             gc_push(cand);
+        } else if (strings_has(cand)) {
+            RBLStringHeader *header = ((RBLStringHeader *)cand) - 1;
+            header->mark = 1;
         }
     }
 }
@@ -767,10 +1008,75 @@ static void gc_free_obj(void *obj)
 static void gc_collect(void)
 {
     g_mark_len = 0;
+    g_mark_failed = 0;
     gc_mark_roots();
     while (g_mark_len) {
         gc_scan_children(g_mark_stack[--g_mark_len]);
     }
+    if (g_mark_failed) {
+        for (size_t i = 0; i < g_objs_cap; i++) {
+            if (g_objs[i] && g_objs[i] != GC_TOMB) {
+                ((RBLObj *)g_objs[i])->mark = 0;
+            }
+        }
+        for (size_t i = 0; i < g_strings_cap; i++) {
+            if (g_strings[i] && g_strings[i] != (char *)GC_TOMB) {
+                (((RBLStringHeader *)g_strings[i]) - 1)->mark = 0;
+            }
+        }
+        return;
+    }
+
+    if (g_objs_len > g_survivors_cap) {
+        void **grown = gc_test_should_fail_site(RBL_GC_TEST_FAIL_SURVIVORS)
+            ? NULL : (void **)realloc(g_survivors, g_objs_len * sizeof(void *));
+        if (!grown) {
+            for (size_t i = 0; i < g_objs_cap; i++) {
+                if (g_objs[i] && g_objs[i] != GC_TOMB) {
+                    ((RBLObj *)g_objs[i])->mark = 0;
+                }
+            }
+            for (size_t i = 0; i < g_strings_cap; i++) {
+                if (g_strings[i] && g_strings[i] != (char *)GC_TOMB) {
+                    (((RBLStringHeader *)g_strings[i]) - 1)->mark = 0;
+                }
+            }
+            return;
+        }
+        g_survivors = grown;
+        g_survivors_cap = g_objs_len;
+    }
+    /* Prepare the replacement registry before freeing anything. Rebuilding it
+       after the sweep had started would make registry OOM fatal after a partial
+       collection. The sweep/rebuild phase below is allocation-free. */
+    size_t new_objs_cap = 0;
+    void **new_objs = NULL;
+    if (g_objs_len) {
+        new_objs_cap = 1024;
+        while (g_objs_len >= new_objs_cap - new_objs_cap / 4) {
+            if (new_objs_cap > SIZE_MAX / 2 / sizeof(void *)) {
+                rbl_fail("container registry capacity overflow");
+                return;
+            }
+            new_objs_cap *= 2;
+        }
+        new_objs = gc_test_should_fail_site(RBL_GC_TEST_FAIL_REBUILD_REGISTRY)
+            ? NULL : (void **)calloc(new_objs_cap, sizeof(void *));
+        if (!new_objs) {
+            for (size_t i = 0; i < g_objs_cap; i++) {
+                if (g_objs[i] && g_objs[i] != GC_TOMB) {
+                    ((RBLObj *)g_objs[i])->mark = 0;
+                }
+            }
+            for (size_t i = 0; i < g_strings_cap; i++) {
+                if (g_strings[i] && g_strings[i] != (char *)GC_TOMB) {
+                    (((RBLStringHeader *)g_strings[i]) - 1)->mark = 0;
+                }
+            }
+            return;
+        }
+    }
+
     size_t live = 0;
     for (size_t i = 0; i < g_objs_cap; i++) {
         void *p = g_objs[i];
@@ -778,32 +1084,54 @@ static void gc_collect(void)
             continue;
         }
         if (((RBLObj *)p)->mark) {
-            if (live == g_survivors_cap) {
-                size_t cap = g_survivors_cap ? g_survivors_cap * 2 : 256;
-                void **grown = (void **)realloc(g_survivors, cap * sizeof(void *));
-                if (!grown) {
-                    break;
-                }
-                g_survivors = grown;
-                g_survivors_cap = cap;
-            }
             g_survivors[live++] = p;
             ((RBLObj *)p)->mark = 0;
         } else {
             gc_free_obj(p);
         }
     }
-    /* Rebuild the registry from the survivors: rebuilding (instead of deleting
-       in place) keeps the probe sequences valid. */
     free(g_objs);
-    g_objs = NULL;
-    g_objs_cap = g_objs_len = g_objs_tombs = 0;
+    g_objs = new_objs;
+    g_objs_cap = new_objs_cap;
+    g_objs_len = 0;
+    g_objs_tombs = 0;
     g_bytes = 0;
     for (size_t i = 0; i < live; i++) {
-        g_bytes += gc_live_bytes(g_survivors[i]);
-        objs_add(g_survivors[i]);
+        void *p = g_survivors[i];
+        size_t j = ptr_hash(p) % g_objs_cap;
+        while (g_objs[j]) {
+            j = (j + 1) % g_objs_cap;
+        }
+        g_objs[j] = p;
+        g_objs_len++;
+        g_bytes += gc_live_bytes(p);
     }
-    g_threshold = g_bytes * 2 + (1u << 20);
+
+    size_t string_live_bytes = 0;
+    for (size_t i = 0; i < g_strings_cap; i++) {
+        char *string = g_strings[i];
+        if (!string || string == (char *)GC_TOMB) {
+            continue;
+        }
+        RBLStringHeader *header = ((RBLStringHeader *)string) - 1;
+        if (header->mark) {
+            header->mark = 0;
+            string_live_bytes += sizeof(*header) + header->size;
+        } else {
+            free(header);
+            g_strings[i] = (char *)GC_TOMB;
+            g_strings_len--;
+            g_strings_tombs++;
+        }
+    }
+    g_string_bytes = string_live_bytes;
+    if (g_strings_tombs) {
+        strings_rehash(g_strings_cap ? g_strings_cap : 1024);
+    }
+    size_t total_bytes = g_bytes > SIZE_MAX - g_string_bytes
+        ? SIZE_MAX : g_bytes + g_string_bytes;
+    g_threshold = total_bytes > (SIZE_MAX - (1u << 20)) / 2
+        ? SIZE_MAX : total_bytes * 2 + (1u << 20);
 }
 
 static void rbl_gc_register(void *obj, uint64_t tag, size_t bytes)
@@ -811,18 +1139,19 @@ static void rbl_gc_register(void *obj, uint64_t tag, size_t bytes)
     ((RBLObj *)obj)->tag = tag;
     ((RBLObj *)obj)->mark = 0;
     objs_add(obj);
-    g_bytes += bytes;
-    if (g_stack_base && g_bytes > g_threshold) {
-        gc_collect();
+    if (g_bytes > SIZE_MAX - bytes) {
+        rbl_fail("container heap accounting overflow");
+        return;
     }
+    g_bytes += bytes;
 }
 
-/* Called from the prologue of every generated function; only the first call (from
-   main) matters, and it must run before any allocation. */
-RBL_SYSV void rbl_gc_init(void)
+/* Called from every generated function with its frame pointer. The first call is
+ * from main, so this records the upper boundary of the generated RBL stack. */
+RBL_SYSV void rbl_gc_init(uint64_t stack_base)
 {
     if (!g_stack_base) {
-        g_stack_base = (char *)__builtin_frame_address(0);
+        g_stack_base = (char *)(uintptr_t)stack_base;
     }
 }
 
@@ -833,6 +1162,49 @@ RBL_SYSV void rbl_gc_run(void)
         gc_collect();
     }
 }
+
+/* Called by generated code between statements, when all live RBL locals are in
+ * their stack slots and no expression temporary is held only in a register. */
+RBL_SYSV void rbl_gc_safepoint(void)
+{
+    if (g_stack_base &&
+        (g_bytes > g_threshold || g_string_bytes > g_threshold - g_bytes)) {
+        gc_collect();
+    }
+}
+
+#ifdef RBL_GC_TESTING
+RBL_SYSV uint64_t rbl_gc_test_string_bytes(void)
+{
+    return (uint64_t)g_string_bytes;
+}
+
+RBL_SYSV uint64_t rbl_gc_test_container_bytes(void)
+{
+    return (uint64_t)g_bytes;
+}
+
+RBL_SYSV void rbl_gc_test_fail_site(uint64_t site)
+{
+    g_test_fail_site = site;
+    g_test_fail_hits = 0;
+}
+
+RBL_SYSV uint64_t rbl_gc_test_fail_hits(void)
+{
+    return g_test_fail_hits;
+}
+
+RBL_SYSV uint64_t rbl_gc_test_container_count(void)
+{
+    return (uint64_t)g_objs_len;
+}
+
+RBL_SYSV uint64_t rbl_gc_test_string_count(void)
+{
+    return (uint64_t)g_strings_len;
+}
+#endif
 
 RBL_SYSV RBLValue rbl_index_get(uint64_t tag, uint64_t payload, uint64_t kt, uint64_t kp)
 {

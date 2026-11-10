@@ -1,5 +1,0 @@
-func main() (
-    set u = print("unit")
-    print(u, 1)
-    warn.log()
-)

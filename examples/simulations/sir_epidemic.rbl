@@ -1,0 +1,67 @@
+# Educational SIR compartment model integrated with classical RK4.
+# S = susceptible, I = infectious, R = recovered; population is conserved.
+# This is a deterministic toy model, not a forecast or medical guidance.
+
+func sir_derivative(susceptible float, infectious float, recovered float, beta float, gamma float, population float) (
+    set new_infections = beta * susceptible * infectious / population
+    set recoveries = gamma * infectious
+    return (-new_infections, new_infections - recoveries, recoveries)
+)
+
+func sir_rk4_step(state tuple, beta float, gamma float, population float, dt float) (
+    set k1 = sir_derivative(state[0], state[1], state[2], beta, gamma, population)
+    set k2 = sir_derivative(
+        state[0] + 0.5 * dt * k1[0],
+        state[1] + 0.5 * dt * k1[1],
+        state[2] + 0.5 * dt * k1[2], beta, gamma, population
+    )
+    set k3 = sir_derivative(
+        state[0] + 0.5 * dt * k2[0],
+        state[1] + 0.5 * dt * k2[1],
+        state[2] + 0.5 * dt * k2[2], beta, gamma, population
+    )
+    set k4 = sir_derivative(
+        state[0] + dt * k3[0],
+        state[1] + dt * k3[1],
+        state[2] + dt * k3[2], beta, gamma, population
+    )
+    set next_s = state[0] + (dt / 6.0) * (k1[0] + 2.0 * k2[0] + 2.0 * k3[0] + k4[0])
+    set next_i = state[1] + (dt / 6.0) * (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1])
+    set next_r = state[2] + (dt / 6.0) * (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2])
+    return (next_s, next_i, next_r)
+)
+
+func main() (
+    set population = 10000.0
+    set beta = 0.32
+    set gamma = 0.10
+    set dt = 0.25
+    set steps_per_day = 4
+    set days = 160
+    set state = (9990.0, 10.0, 0.0)
+    set peak_infectious = state[1]
+    set peak_day = 0.0
+    set total_steps = days * steps_per_day
+    set day = 0.0
+    set total = 0.0
+
+    print("SIR EPIDEMIC MODEL — EDUCATIONAL RK4 SIMULATION")
+    print(f"population={int(population)} beta={beta:.3f} gamma={gamma:.3f}")
+    print("day,susceptible,infectious,recovered,total")
+    for (step in 0..=total_steps) (
+        if (step % steps_per_day == 0) (
+            let day = float(step) / float(steps_per_day)
+            let total = state[0] + state[1] + state[2]
+            print(f"{day:.0f},{state[0]:.3f},{state[1]:.3f},{state[2]:.3f},{total:.3f}")
+        )
+        if (state[1] > peak_infectious) (
+            let peak_infectious = state[1]
+            let peak_day = float(step) * dt
+        )
+        if (step < total_steps) (
+            let state = sir_rk4_step(state, beta, gamma, population, dt)
+        )
+    )
+    print(f"peak infectious: {peak_infectious:.1f} at day {peak_day:.2f}")
+    print(f"final population total: {state[0] + state[1] + state[2]:.3f}")
+)

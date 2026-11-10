@@ -1,3 +1,0 @@
-func who() ( print("first") )
-func who() ( print("second") )
-func main() ( who() )

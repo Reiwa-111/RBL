@@ -1,0 +1,45 @@
+// RBL 0.8.0 compiler lookup example.
+// This ordinary RBL program exercises repeated variable, function and string
+// references. The hash indexes are an internal compiler optimization: there
+// is no special syntax or user-visible API for them.
+
+func category_name(code int) string (
+    if (code == 1) (
+        return "shared category"
+    )
+    if (code == 2) (
+        return "shared category"
+    )
+    if (code == 3) (
+        return "secondary category"
+    )
+    return "unknown category"
+)
+
+func calculate_total(first int, second int, third int) int (
+    return first + second + third
+)
+
+func format_record(record_id int, category string, total int) string (
+    return "record=" + str(record_id) + "; category=" + category + "; total=" + str(total)
+)
+
+func main() (
+    set account_alpha = 12
+    set account_beta = 24
+    set account_gamma = 36
+    set account_delta = 48
+
+    set category_alpha = category_name(1)
+    set category_beta = category_name(2)
+    set category_gamma = category_name(3)
+    set category_delta = category_name(99)
+
+    set total_first = calculate_total(account_alpha, account_beta, account_gamma)
+    set total_second = calculate_total(account_beta, account_gamma, account_delta)
+
+    print(format_record(1, category_alpha, total_first))
+    print(format_record(2, category_beta, total_second))
+    print(format_record(3, category_gamma, account_delta))
+    print(format_record(4, category_delta, account_alpha))
+)

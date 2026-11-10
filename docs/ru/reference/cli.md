@@ -1,4 +1,4 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.10 | CLI AND TEST SUITE DOCUMENTATION
 
 ## Reference: CLI RBL
 
@@ -18,13 +18,13 @@
 | `rbl.py build [FILE]` | Компилирует, ассемблирует и линкует executable. |
 | `rbl.py run [FILE]` | Собирает и запускает программу. |
 | `rbl.py asm [FILE]` | Запускает assembly preview и показывает сгенерированный ASM. |
-| `rbl.py test` | Запускает repository regression suite и stdlib smoke test. |
+| `rbl.py test` | Запускает compiler/Runtime regression и diagnostics, а также build-cache/cleanup, GC, toolchain, launcher, filesystem-security, worker-lifecycle и DPI checks; в Windows добавляются registry/save-cleanup tests. |
 | `rbl.py bench` | Запускает переносимый RBL-only benchmark. |
-| `rbl.py bench3way [--reps N] [--warmups N]` | Запускает сравнение пяти реализаций на Linux/WSL. Имя команды оставлено для совместимости. |
+| `rbl.py bench5way [--reps N] [--warmups N]` | Запускает сравнение пяти реализаций на Linux/WSL; `bench3way` оставлена как legacy alias. |
 | `rbl.py diff [--a MODE] [--b MODE] [PATH ...]` | Сравнивает два backend. По умолчанию `wsl` и `native`. |
 | `rbl.py fmt [FILE] [--check]` | Форматирует файл либо проверяет, что форматирование уже применено. |
 | `rbl.py doc [FILE] [-o FILE]` | Генерирует простую таблицу объявлений функций. |
-| `rbl.py clean` | Удаляет каталог `build/` в текущем каталоге. |
+| `rbl.py clean` | Безопасно удаляет только compiler cache `build/sources/`, сохраняя остальные build evidence и пользовательские данные. |
 
 Файл `FILE` для `check`, `build`, `run`, `asm`, `fmt` и `doc` необязателен: если он не передан, CLI берёт `package.entry` из манифеста, иначе `src/main.rbl` по умолчанию. Если этого пути нет и в корне текущего проекта существует `main.rbl`, используется он.
 
@@ -52,15 +52,16 @@ python rbl.py run examples\test.rbl
 
 `check` не является только parser check: он выполняет обработку исходника, анализ и генерацию assembly во временный поток. Но он не вызывает assembler/linker, не создаёт исполняемый файл и не сохраняет обычный assembly output.
 
-## `bench` и `bench3way`
+## `bench` и `bench5way`
 
 Эти команды запускают разные scripts:
 
 - `bench` → `benchmarks/run_benchmarks.py`, RBL-only измерения, доступные через выбранный backend.
-- `bench3way` → `benchmarks/compare_all.py`, пять реализаций, Linux syscall ASM baseline, только Linux/WSL.
+- `bench5way` → `benchmarks/compare_all.py`, пять реализаций, Linux syscall ASM baseline, только Linux/WSL.
+- `bench3way` остаётся alias для обратной совместимости.
 
-`bench` в текущем CLI не принимает `--reps` и `--warmups`; эти параметры относятся к `bench3way`. См. [how-to benchmark](../how-to/benchmarking.md).
+`bench` в текущем CLI не принимает `--reps` и `--warmups`; эти параметры относятся к `bench5way`. См. [how-to benchmark](../how-to/benchmarking.md).
 
 ## Низкоуровневый driver
 
-Для диагностики и скриптов существует `tools/rbltool.py`. Он предоставляет команды `doctor`, `check`, `build`, `run`, `asm`; операции создания проектов, benchmark, форматирования, API listing и очистки добавляет верхнеуровневый `rbl.py`.
+Для диагностики и скриптов существует `tools/rbltool.py`. Он предоставляет команды `doctor`, `check`, `build`, `run`, `asm`; операции создания проектов, benchmark, форматирования, API listing и очистки добавляет верхнеуровневый `rbl.py`. Этапы компиляции, исходные координаты и покрытие тестами описаны в [справочнике диагностики](diagnostics.md).

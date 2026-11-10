@@ -1,8 +1,8 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | VERSION SCOPE RECHECK
 
 ## Explanation: принципы дизайна и будущие направления
 
-Этот документ фиксирует проектные решения и отделяет их от текущего language contract. Любая функция ниже, помеченная как идея или roadmap, не считается доступной в RBL 0.7.2.
+Этот документ фиксирует проектные решения и отделяет их от текущего language contract. Любая функция ниже, помеченная как идея или roadmap, не считается доступной в RBL 0.8.0.
 
 ## Принципы
 
@@ -14,7 +14,7 @@
 
 ## Возможные расширения языка
 
-В обсуждении находятся source modules/import, multi-file compilation, globals/constants, exceptions, `defer`, nullable/container type expressions, slices, negative indexing, named struct construction, lambda/closures, default/variadic/named args, overloads, async/await и format specs f-strings. Точный синтаксис и семантика могут измениться; это не спецификация доступной версии.
+В обсуждении находятся source modules/import, multi-file compilation, globals/constants, exceptions, `defer`, nullable/container type expressions, slices, negative indexing, named struct construction, lambda/closures, default/variadic/named args, overloads и async/await. Точный синтаксис и семантика могут измениться; это не спецификация доступной версии.
 
 ## Граница модулей и плагинов
 

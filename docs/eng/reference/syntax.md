@@ -1,8 +1,8 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | LANGUAGE CONTRACT RECHECK
 
-## Reference: RBL 0.7.2 syntax
+## Reference: RBL 0.8.0 syntax
 
-This page describes the syntax implemented by the current frontend. Examples target RBL 0.7.2 and its regression tests; proposals for future versions are not part of this specification.
+This page describes the syntax implemented by the RBL 0.8.0 frontend. Bounded f-string format specifications are part of the language contract. Proposals for future versions are not part of this specification.
 
 ## Programs and functions
 
@@ -21,7 +21,7 @@ func main() (
 
 A function declaration has the form `func name(parameters) ReturnType (` followed by its body and a closing `)`. The return-type annotation is optional; without one, a function that returns no value produces `Unit`. Parameter types follow parameter names. Parameter values are checked against the declared types when the function is called.
 
-Recursive calls are supported. Functions are not overloaded by signature; when a function name is declared more than once, the last definition is used (covered by `duplicate_functions.rbl`). Return-type annotations are parsed but are not enforced by the runtime in 0.7.2; do not treat them as a statically verified return contract.
+Recursive calls are supported. Functions are not overloaded by signature; when a function name is declared more than once, the last definition is used (covered by `duplicate_functions.rbl`). Return-type annotations are parsed but are not enforced by the runtime in 0.8.0; do not treat them as a statically verified return contract.
 
 ## Declaring and updating variables
 
@@ -77,7 +77,7 @@ set empty = null
 set text = "RBL"
 ```
 
-A leading zero does not imply octal: `017` is decimal seventeen. Octal requires the `0o` prefix. Numeric literals support underscore separators. The historical `f` suffix form is also accepted for float literals.
+A leading zero does not imply octal: `017` is decimal seventeen. Octal requires the `0o` prefix. Numeric literals support underscore separators. The `f` suffix is also accepted for float literals.
 
 ## Comments and strings
 
@@ -90,16 +90,29 @@ Both comment forms are single-line comments:
 
 Strings support `\\n`, `\\t`, `\\r`, `\\\\`, `\\"`, `\\xNN`, `\\uXXXX` and `\\UXXXXXXXX` escape sequences. Triple-quoted strings can span multiple lines.
 
-F-strings support basic interpolation and escaped braces:
+F-strings support expression interpolation, escaped braces and a deliberately small format specification:
 
 ```rbl
 set name = "RBL"
 set value = 42
 print(f"{name}: {value}")
 print(f"braces: {{ and }}")
+print(f"hex={255:x}, pi={3.14159:.2f}")
+print(f"name={name:*>8}")
 ```
 
-Format specifications such as `f"{value:.2f}"` are not implemented. The `\\0` escape is rejected because runtime strings are NUL-terminated.
+The format grammar is `[[fill]align][width][.precision][type]`:
+
+- `align` is `<` (left), `>` (right) or `^` (center). An optional `fill` is exactly one UTF-8 code point immediately before the alignment character; `{` and `}` are reserved and cannot be used as fill. A fill-plus-alignment pair takes precedence even when the fill itself is `<`, `>` or `^` (for example, `<<6` or `^^7`). The default fill is a space. Without an explicit alignment, numeric conversions are right-aligned and string/default conversions are left-aligned. For centered output, an odd extra padding code point is placed on the right.
+- `width` is a decimal minimum width from 0 through 1,000,000. Width counts Unicode code points, not UTF-8 bytes or terminal display cells.
+- `.precision` is an integer from 0 through 17. It is supported for floats; integer precision and precision combined with `s` are runtime format errors. With no explicit float type, a precision selects `g` formatting. For `f`/`F` and `e`/`E`, precision counts digits after the decimal point; for `g`/`G`, it counts significant digits.
+- Integer types are `d` (decimal), `b` (binary), `o` (octal), `x` (lowercase hexadecimal) and `X` (uppercase hexadecimal). Base conversions do not add `0b`, `0o` or `0x` prefixes.
+- Float types are `f`, `F`, `e`, `E`, `g` and `G`, following the corresponding C floating-point conversion styles.
+- `s` converts any supported RBL value using `str()`.
+
+Without a type, values use the same conversion as ordinary interpolation through `str()`. An omitted specification and an empty specification (`{value:}`) therefore behave identically. Width and alignment are applied after conversion. A type that does not match the runtime value, integer precision, or another runtime-incompatible combination raises a clear runtime error. Malformed syntax, unsupported type letters, missing precision digits and values beyond the width/precision limits are compile-time parser errors.
+
+The format is parsed as RBL syntax. A leading `0` is a width digit, not a zero-padding flag; use an explicit fill/alignment pair such as `0>8` for zero fill. When a nonzero width is requested, string output must be valid UTF-8 so its code-point width can be measured; without width, string bytes are preserved. Dynamic/nested specifications, sign flags, grouping, locale controls and arbitrary printf strings are not supported. The Linux and Windows backends implement the same conversion and code-point width rules. The `\\0` escape is rejected because runtime strings are NUL-terminated.
 
 ## Operators
 
@@ -123,7 +136,7 @@ Logical operators: `and`, `or`, `not`; `!` is an alternative spelling of `not`.
 
 `and` and `or` are **not short-circuiting**: both operands are evaluated. The right-hand expression can therefore fail or produce side effects even when the left-hand value already determines the Boolean result.
 
-`is` checks identity, while `==` checks equality. Two distinct containers with equal contents can compare equal with `==` but not be identical under `is`.
+`is` checks value/object identity, while `==` checks equality. Lists, tuples and dictionaries compare their contents recursively; dictionary key order does not affect equality. Two distinct containers with equal contents can compare equal with `==` but not be identical under `is`.
 
 ### Conditional expression
 
@@ -171,7 +184,7 @@ for (running) (
 
 `break` exits the innermost loop; `continue` advances to its next iteration. Both are compile-time errors outside a loop. `for (condition)` repeats its body while the condition is true.
 
-Nested loops are supported. `for (x in ...)` accepts a range or a list. A range-loop variable remains bound after a loop if at least one iteration ran; no binding is introduced when the loop executes zero times. General dictionary iteration and tuple destructuring in loop headers are not implemented.
+Nested loops are supported. `for (x in ...)` accepts a range, list or tuple. A range/list/tuple loop variable remains bound after a loop if at least one iteration ran; no binding is introduced when the loop executes zero times. List/tuple length is checked on each iteration, so mutations in the body can affect loop termination. General dictionary iteration and tuple destructuring in loop headers are not implemented.
 
 ## `switch`
 
@@ -260,4 +273,4 @@ Global built-ins and namespace functions are available without `import`. See the
 
 ## Not implemented
 
-See the [complete limitations list](limitations.md): imports, multi-file compilation, globals/constants, exceptions, `defer`, lambdas/closures, named/default/variadic arguments, overloads, async/await, destructuring, slices, negative indexing and f-string format specifications.
+See the [complete limitations list](limitations.md): imports, multi-file compilation, globals/constants, exceptions, `defer`, lambdas/closures, named/default/variadic arguments, overloads, async/await, destructuring, slices and negative indexing.

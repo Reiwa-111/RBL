@@ -1,79 +1,75 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | FINAL FIVE-WAY BENCHMARK
 
-## RBL performance benchmark results
+## RBL 0.8.0 performance benchmark results
 
-This file contains a measured snapshot, not a permanent ranking of programming languages. Re-run the benchmark when hardware, compiler versions, runtime sources or benchmark code change. The methodology is documented in [`README_3WAY.md`](README_3WAY.md); RBL-only measurements use a separate script.
+This report records the current RBL 0.8.0 five-implementation benchmark. It is a workload-specific measurement, not a permanent ranking of programming languages. Re-run it when hardware, compiler versions, runtime sources or benchmark code change. The methodology is documented in [`README_5WAY.md`](README_5WAY.md); RBL-only measurements use a separate script.
 
-## Five-implementation run — 2026-11-06
+## Five-implementation runtime benchmark
 
-<small>Corrected run, 1 warmup and 5 measured executions per workload. Values below are medians.</small>
+**Measurement scope:** RBL 0.8.0 with Runtime ABI 1.2.0 startup checks, the current SysV stack-alignment implementation and the non-allocating fast-loop safe-point optimization. Two warmups and ten measured executions per implementation/workload; runner and child processes restricted to CPU 11. Values are medians.
 
-| Workload | RBL | C `-O2` | C++ `-O2` | CPython | Hand ASM |
+| Workload | RBL 0.8.0 | C `-O2` | C++ `-O2` | CPython | Handwritten ASM |
 |---|---:|---:|---:|---:|---:|
-| `sum` | **72.388 ms** | 26.389 ms | 26.500 ms | 6,897.844 ms | 28.789 ms |
-| `calls` | **25.240 ms** | 14.318 ms | 13.394 ms | 911.629 ms | 14.078 ms |
-| `branches` | **107.853 ms** | 52.381 ms | 54.095 ms | 8,189.178 ms | 62.340 ms |
+| `sum` | **47.885 ms** | 25.258 ms | 25.183 ms | 6,483.543 ms | 24.465 ms |
+| `calls` | **21.303 ms** | 13.499 ms | 13.306 ms | 852.290 ms | 13.526 ms |
+| `branches` | **103.205 ms** | 53.116 ms | 54.099 ms | 6,772.371 ms | 53.408 ms |
 
 ### Ratios from these medians
 
-| Workload | Python / RBL | RBL / C | RBL / C++ | RBL / hand ASM |
+| Workload | Python / RBL | RBL / C | RBL / C++ | RBL / ASM |
 |---|---:|---:|---:|---:|
-| `sum` | 95.290× | 2.744× | 2.732× | 2.514× |
-| `calls` | 36.118× | 1.763× | 1.884× | 1.793× |
-| `branches` | 75.929× | 2.059× | 1.994× | 1.730× |
+| `sum` | 135.398× | 1.896× | 1.901× | 1.957× |
+| `calls` | 40.008× | 1.578× | 1.601× | 1.575× |
+| `branches` | 65.621× | 1.943× | 1.908× | 1.932× |
 
-For the last three columns, a ratio above 1 means RBL took that many times as long as the comparison implementation. For `Python / RBL`, a ratio above 1 means Python took that many times as long as RBL.
+For the native/ASM columns, a ratio above 1 means RBL took that many times as long. For `Python / RBL`, a ratio above 1 means CPython took that many times as long.
 
-### Environment
+### Environment and caveats
 
-- Host execution path: WSL2, Ubuntu 24.04 userland.
-- Kernel: `Linux 6.6.87.2-microsoft-standard-WSL2`, x86-64; glibc 2.39.
-- CPU model reported by `lscpu` inside WSL: `AMD Ryzen 5 5600 6-Core Processor` (6 cores / 12 threads reported).
-- Python: 3.12.3.
-- GCC and G++: 13.3.0.
-- GNU binutils: assembler/linker 2.42.
-- One warmup, five timed repetitions. Runner pins its process to the lowest allowed CPU affinity when supported.
-- Timer: Python `perf_counter_ns()` surrounding the complete child-process execution.
-- RBL compilation phase: **88.359 ms total for the three RBL benchmark programs**, reported separately from run time.
+- Host: WSL2, Ubuntu 24.04, Linux 6.6.87.2, x86-64; AMD Ryzen 5 5600 (6 cores / 12 threads).
+- Python 3.12.3; GCC/G++ 13.3.0; GNU binutils 2.42.
+- Two warmups and ten timed repetitions; the benchmark process and its children were pinned to CPU 11.
+- A separate RENA training process was active in WSL. The benchmark was CPU-pinned and repeatable at ten samples, but the host was not globally isolated; treat this as a controlled, contended host measurement rather than an idle-machine reference.
+- RBL build phase: **2,198.276 ms total for the three RBL benchmark programs**, reported separately.
+- The timer includes complete child-process startup. All programs returned success and validate their computed result through exit status.
 
-The CPU name above is the identifier exposed inside this WSL environment, not an independent hardware inventory. Results should be reproduced on the target machine before being used to compare other systems.
+The complete terminal output and individual samples were retained in the working build log when this measurement was recorded. Raw logs are not part of the source distribution.
 
-### Workloads
+## Workloads
 
 | Workload | Iterations | Operation |
 |---|---:|---|
-| `sum` | 100,000,001 | Integer accumulation for `i` from 0 through 100,000,000 inclusive. |
-| `calls` | 10,000,000 | Calls to a one-line integer `inc` function. Native C/C++ functions are `noinline`. |
-| `branches` | 100,000,000 | Integer update selected by the `i < 50,000,000` condition. |
+| `sum` | 100,000,001 | Sum integers from 0 through 100,000,000 inclusive. |
+| `calls` | 10,000,000 | Calls to a one-line integer `inc` function; C/C++ use `noinline`. |
+| `branches` | 100,000,000 | Update an integer according to the condition `i < 50,000,000`. |
 
-Each program checks its result using its exit status. C and C++ workloads receive the iteration count as a runtime command-line argument so GCC/G++ cannot simply remove the entire fixed-bound sum/call loops at compile time.
+Each program validates its result through its exit status. C/C++ iteration counts are passed at runtime so GCC/G++ cannot delete the complete measured workload as a constant result.
 
-### Interpretation and caveats
+## Interpretation and limitations
 
-- RBL was about **36–95× faster than CPython** in these three synthetic loop workloads.
-- The optimized C and C++ versions were about **1.76–2.74× faster than RBL**. The hand-written ASM baselines were about **1.73–2.51× faster than RBL**.
-- These values do not imply that every RBL program has these ratios. The suite covers three narrow integer workloads, not I/O, memory-intensive workloads, strings, containers or application-sized programs.
-- C/C++ were built with `-O2`. Disassembly showed that the call loop retains the `inc` call after the `noinline` change. The compiler may still legally strength-reduce arithmetic loops, and the branch workload may lower to conditional moves (`cmov`) rather than an actual conditional jump. This is a comparison of optimized implementations, not an instruction-for-instruction equivalence test.
-- The full process startup is included in each timed sample; RBL build time is reported separately. Startup overhead is especially relevant to small workloads.
-- Handwritten ASM is specialized code for these exact algorithms and uses Linux syscalls. The five-way runner therefore requires Linux or WSL and is not a native Windows benchmark.
-- Medians are shown here; the raw log also includes each sample, means, minima, maxima and standard deviations.
+- In these three synthetic integer-loop workloads, RBL was approximately **40–135× faster than CPython**.
+- Optimized C/C++ were approximately **1.58–1.94× faster than RBL**; the specialized handwritten assembly was approximately **1.58–1.96× faster**.
+- These results do not generalize to every RBL program: the suite does not cover I/O-heavy, memory-intensive, string/container-heavy or application-sized workloads.
+- C/C++ were built with `-O2`. The compiler can transform loops and replace conditional branches with conditional moves while preserving results. This compares optimized programs, not identical instruction sequences.
+- Process startup is included in every measurement; RBL build time is reported separately. This matters especially for short programs.
+- Handwritten assembly is specialized for these algorithms and uses Linux syscalls; the five-way suite runs on Linux/WSL, not as a native Windows benchmark.
 
-### Reproducibility
+## Reproduce
 
 Run from the repository root on Linux/WSL:
 
 ```bash
-python3 benchmarks/compare_all.py --warmups 1 --reps 5
+python3 benchmarks/compare_all.py --warmups 2 --reps 10
 ```
 
-The corrected raw output for this snapshot is stored in `build/benchmark_five_way_corrected_2026-11-06.log` in the working checkout. An earlier run was discarded because GCC/G++ optimized away the fixed-bound C/C++ sum and call workloads; the benchmark sources were corrected to use runtime iteration counts and `noinline` for the call function before the results above were recorded.
+The benchmark reports medians and individual sample statistics. See [`README_5WAY.md`](README_5WAY.md) for the timing model, native workload safeguards and interpretation notes.
 
-## Portable RBL-only benchmark
+## Separate RBL-only benchmark
 
-The other suite is `benchmarks/run_benchmarks.py`, invoked with:
+The RBL-only suite is invoked with:
 
 ```bash
 python3 rbl.py bench
 ```
 
-It measures build time, whole-process run time, startup-baseline-adjusted `net`, and executable size for three RBL workloads. Its values are deliberately not combined with the five-implementation table: the programs and timing methodology are different.
+It measures build time, whole-process run time, startup-baseline-adjusted `net` time and executable size for RBL workloads. Its values are not interchangeable with the five-implementation comparison above.

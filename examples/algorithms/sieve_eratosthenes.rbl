@@ -1,20 +1,22 @@
-# Sieve of Eratosthenes: generate all primes up to a configurable limit.
+# Sieve of Eratosthenes: generate all primes up to a supplied limit.
 
-func main() (
-    set limit = 200
+func sieve(limit int) list (
     set prime_flags = []
-    set prime_count = 0
-    set p = 0
     set multiple = 0
-
     for (i in 0..=limit) (
         let prime_flags = list_push(prime_flags, true)
     )
-    let prime_flags[0] = false
-    let prime_flags[1] = false
+    if (limit >= 0) (
+        let prime_flags[0] = false
+    )
+    if (limit >= 1) (
+        let prime_flags[1] = false
+    )
+    if (limit < 2) ( return prime_flags )
 
     for (p in 2..=limit) (
-        if (prime_flags[p] and p * p <= limit) (
+        # Division avoids overflow in p*p when limit is near int64 max.
+        if (prime_flags[p] and p <= limit / p) (
             let multiple = p * p
             for (multiple <= limit) (
                 let prime_flags[multiple] = false
@@ -22,15 +24,27 @@ func main() (
             )
         )
     )
+    return prime_flags
+)
+
+func main() (
+    set limit = 200
+    set prime_flags = sieve(limit)
+    set prime_count = 0
 
     print("SIEVE OF ERATOSTHENES")
     print("limit:", limit)
     print("primes:")
-    for (p in 2..=limit) (
-        if (prime_flags[p]) (
-            print(p)
-            let prime_count += 1
+    if (limit >= 2) (
+        for (p in 2..=limit) (
+            if (prime_flags[p]) (
+                print(p)
+                let prime_count += 1
+            )
         )
     )
     print("prime count:", prime_count)
+    print("edge cases:")
+    print("limit 0 ->", len(sieve(0)), "flag entries")
+    print("limit 1 ->", len(sieve(1)), "flag entries")
 )

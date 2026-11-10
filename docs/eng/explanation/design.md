@@ -1,8 +1,8 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | VERSION SCOPE RECHECK
 
 ## Explanation: design principles and future directions
 
-This document records design decisions and separates them from the current language contract. Any capability marked as a proposal or roadmap item below is not considered available in RBL 0.7.2.
+This document records design decisions and separates them from the current language contract. Any capability marked as a proposal or roadmap item below is not considered available in RBL 0.8.0.
 
 ## Principles
 
@@ -14,7 +14,7 @@ This document records design decisions and separates them from the current langu
 
 ## Possible language extensions
 
-Ideas under discussion include source modules/imports, multi-file compilation, globals/constants, exceptions, `defer`, nullable/container type expressions, slices, negative indexing, named struct construction, lambdas/closures, default/variadic/named arguments, overloads, async/await and f-string format specifications. Exact syntax and semantics may change; these ideas are not a specification of available features.
+Ideas under discussion include source modules/imports, multi-file compilation, globals/constants, exceptions, `defer`, nullable/container type expressions, slices, negative indexing, named struct construction, lambdas/closures, default/variadic/named arguments, overloads and async/await. Exact syntax and semantics may change; these ideas are not a specification of available features.
 
 ## Module and plugin boundaries
 

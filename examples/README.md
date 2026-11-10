@@ -1,6 +1,10 @@
-# RBL 0.7.2 — example programs
+# last verified: v0.8.0 | 2026.11.10 | EXAMPLES RECHECK
 
-This directory contains 44 RBL programs: twenty beginner-course lessons, eight existing introductory/compatibility examples and sixteen larger algorithmic, numerical, statistical, simulation and image-generation workloads. The simulations and pixel calculations are performed by RBL; Python is optional and is used only by the separate visualization pipeline.
+# RBL 0.8.0 — example programs
+
+This directory contains 53 RBL programs: twenty beginner-course lessons, eight introductory/compatibility examples, one compiler-lookup demonstration, one f-string formatting example and twenty-three larger utility, algorithmic, numerical, statistical, simulation and image-generation workloads. The simulations and pixel calculations are performed by RBL. Python is required to run the repository CLI (`rbl.py`); the additional visualization dependencies are optional.
+
+RBL 0.8.0 provides bounded f-string format specifications, managed dynamic strings, a versioned Runtime ABI and a modular compiler with indexed lookups. The examples are ordinary single-source RBL programs; they do not import compiler modules or access private compiler data structures.
 
 ## Start here: Beginner Course
 
@@ -15,11 +19,42 @@ These compact programs cover the language surface, standard library, input and f
 | [`blocks_demo.rbl`](blocks_demo.rbl) | Functions, conditionals and inclusive range loops. | Branch result and loop values. |
 | [`test.rbl`](test.rbl) | Variables, reassignment, functions, conditionals, loops and logging. | Short language smoke-test output. |
 | [`input_demo.rbl`](input_demo.rbl) | Reading one line from standard input. | Greets the supplied name. |
-| [`stdlib.rbl`](stdlib.rbl) | Global utility functions and basic file I/O. | Prints utility results; writes and reads `/tmp/rbl_example.txt`. |
+| [`stdlib.rbl`](stdlib.rbl) | Global utility functions and basic file I/O. | Prints utility results; writes, reads and deletes `rbl_example.txt` in the current working directory. |
 | [`stdlib_demo.rbl`](stdlib_demo.rbl) | Namespaced math, string, filesystem, time and random APIs. | Prints representative standard-library results. |
 | [`game_of_life.rbl`](game_of_life.rbl) | A compact 48×24 Conway simulation using dictionaries, nested loops and strings. | ASCII snapshots every five generations; writes `life_report.txt` in the working directory. |
 | [`mega_test.rbl`](mega_test.rbl) | Broad language smoke test: numeric types, functions, branching, ranges, Unicode and logging. | Sectioned console output. |
 | [`mega_test_v07.rbl`](mega_test_v07.rbl) | RBL 0.7-era syntax and standard-library smoke test. | Console output covering core and namespaced APIs. |
+
+## Strings and formatting
+
+[`strings/fstring_formatting.rbl`](strings/fstring_formatting.rbl) is a focused RBL 0.8.0 demonstration of the bounded f-string format grammar: alignment, custom and Unicode fill, width, float precision, and integer bases. It also covers the valid fill/alignment pairs `<<`, `>>` and `^^`.
+
+## Small CLI utilities
+
+[`utilities/unit_converter.rbl`](utilities/unit_converter.rbl) is an interactive terminal program that converts kilometres to miles, Celsius to Fahrenheit, or kilograms to pounds. It demonstrates input, numeric conversion, `switch`, typed floating-point calculations and formatted output. Run it with `python rbl.py run examples/utilities/unit_converter.rbl` and follow the prompts.
+
+Enter a menu choice from 1 to 3 and a value that can be parsed as a number. Invalid numeric text is reported by the runtime conversion; the program handles an out-of-range numeric menu choice but does not implement a separate text-validation loop.
+
+For a non-interactive demonstration, provide the menu choice and value on standard input:
+
+```bash
+printf '2\n100\n' | python3 rbl.py run examples/utilities/unit_converter.rbl
+```
+
+Expected result: `100.000 C = 212.000 F`.
+
+Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force build | Out-Null
+Set-Content -Path build\unit-converter-input.txt -Value @('2', '100') -Encoding ascii
+cmd /c "python rbl.py run examples\utilities\unit_converter.rbl < build\unit-converter-input.txt"
+Remove-Item build\unit-converter-input.txt
+```
+
+## Compiler implementation example
+
+[`compiler/lookup_demo.rbl`](compiler/lookup_demo.rbl) is a normal RBL program that repeatedly resolves local variables and function names and reuses string values. It is a small source-level workload for exploring the compiler lookup changes in 0.8.0. The variable, function and string-pool hash indexes are private implementation details; this example does not expose or benchmark their internal collision behavior. See the [compiler example notes](compiler/README.md) for expected output and implementation context.
 
 ## Run an example
 
@@ -45,9 +80,9 @@ cmd /c "python rbl.py run examples\fractals\mandelbrot_256.rbl > mandelbrot_256.
 
 The PGM examples use the plain-text `P2` variant of Netpbm. It is intentionally easy to inspect, parse and open in image tools that support PGM. CSV files include column headers and use decimal values with a dot separator.
 
-## Visualize all examples
+## Visualize supported scientific examples
 
-The RBL programs perform the calculations; the optional Python pipeline only runs them and converts their PGM/CSV output into viewable images, plots and animations. From the repository root, install the visualization dependencies and run:
+The RBL programs perform the calculations; the optional Python visualization pipeline runs a supported subset of scientific workloads and converts their PGM/CSV output into viewable images, plots and animations. It does not visualize all 53 examples. From the repository root, install the visualization dependencies and run:
 
 ```bash
 python -m pip install -r requirements-visualize.txt
@@ -132,10 +167,11 @@ These examples calculate and print their results directly from RBL. They do not 
 | Program | What it demonstrates | Output |
 |---|---|---|
 | [`sorting_search.rbl`](algorithms/sorting_search.rbl) | Merge sort, heap sort, quicksort and binary search. | Sorted arrays, validation flags and search indices. |
+| [`a_star_grid.rbl`](algorithms/a_star_grid.rbl) | A* search with Manhattan distance, a closed set, parent reconstruction and a flat grid representation. | ASCII map with the shortest path, 18 steps for the included obstacle layout. |
 | [`sieve_eratosthenes.rbl`](algorithms/sieve_eratosthenes.rbl) | Sieve of Eratosthenes. | All primes up to 200 and their count. |
-| [`prime_generation_factorization.rbl`](algorithms/prime_generation_factorization.rbl) | Trial-division prime generation and prime factorization. | Primes up to 100 and the factorization of 360360. |
+| [`prime_generation_factorization.rbl`](algorithms/prime_generation_factorization.rbl) | Trial-division prime generation and a reusable factorization function returning `(prime, exponent)` tuples. | Primes up to 100 and the factorization of 360360; 0 and 1 produce an empty factor list. |
 
-The binary-search routine expects its input to be sorted. The quicksort implementation uses the final element as its pivot, so already sorted or duplicate-heavy inputs can trigger its quadratic worst case and deep recursion; the example is intended for demonstration-sized arrays.
+The binary-search routine expects its input to be sorted. Quicksort uses a median-of-three pivot and a three-way partition, so duplicate-heavy inputs are handled as one equal range; it recursively sorts the smaller partition first and iterates over the larger one to bound call-stack depth. Median-of-three is a heuristic, not a worst-case time guarantee: adversarial inputs can still produce quadratic work. The A* example uses a linear scan of its open set to keep the algorithm visible; it is not intended as a high-performance priority queue.
 
 ## Numerical methods
 
@@ -144,12 +180,17 @@ The binary-search routine expects its input to be sorted. The quicksort implemen
 | [`root_finding.rbl`](numerical/root_finding.rbl) | Newton's method and bisection for `x³ − 2x − 5`. | Root estimates, residuals and iteration counts. |
 | [`gaussian_elimination.rbl`](numerical/gaussian_elimination.rbl) | Gauss–Jordan elimination with partial pivoting on a 3×3 system. | Solution vector and equation residuals. |
 | [`ode_solvers.rbl`](numerical/ode_solvers.rbl) | Fourth-order Runge–Kutta integration for a harmonic oscillator and logistic growth. | Time-series values and oscillator energy. |
+| [`monte_carlo_pi.rbl`](numerical/monte_carlo_pi.rbl) | Monte Carlo integration over the unit square with Bernoulli standard-error estimation. | Running π estimates and approximate standard errors every 5,000 samples. |
+| [`linear_regression.rbl`](numerical/linear_regression.rbl) | Ordinary least-squares fit for paired sensor/reference readings. | Slope, intercept, R², RMSE, residual table and a constant-input rejection check. |
 
 ## Statistics
 
 | Program | What it demonstrates | Output |
 |---|---|---|
 | [`shuffle_lab.rbl`](statistics/shuffle_lab.rbl) | Overhand, riffle, cut and Fisher–Yates card shuffles; permutation metrics over 30 repeated trials per point. | Mean and approximate 95% confidence intervals for seven metrics, normalized position entropy and sampled cross-run similarity for 0, 1, 2, 3, 5, 7, 10, 15 and 20 passes. |
+| [`descriptive_statistics.rbl`](statistics/descriptive_statistics.rbl) | Calculates count, min/max, range, median, mean, population/sample variance and standard deviation. | Aligned terminal report using f-string width and precision; median sorts a copy and leaves the input unchanged. |
+
+The descriptive-statistics helpers return `0.0` for empty input as a demonstration sentinel; callers that need to distinguish an empty sample from a real zero should check `len(values)` before using the result.
 
 The SHUFFLE_LAB port uses RBL's built-in pseudorandom generator. Its sequences are not expected to match the original Python implementation or to be identical across operating systems. It validates every generated deck as a 52-card permutation and runs identity/reverse-permutation metric self-tests. The port does not yet reproduce the original command-line options, arbitrary sweep configuration, packet-count metric, per-experiment CSV export or exact Python PRNG stream. Its reported 95% confidence intervals use a normal approximation (`1.96 × standard error`) with 30 experiments; this is an approximate descriptive interval, not a small-sample Student-t interval. For bounded metrics, the approximation can extend beyond the metric's valid range.
 
@@ -158,16 +199,21 @@ The SHUFFLE_LAB port uses RBL's built-in pseudorandom generator. Its sequences a
 | Program | What it demonstrates | Output |
 |---|---|---|
 | [`magnetism_sandbox.rbl`](simulations/magnetism_sandbox.rbl) | Superposition of 2D point-dipole fields from two permanent magnets and an equivalent coil, with a smooth local material multiplier. | ASCII field-direction map, probe field, dipole energy, finite-difference force and torque. |
+| [`sir_epidemic.rbl`](simulations/sir_epidemic.rbl) | Deterministic SIR compartment model integrated with fourth-order Runge–Kutta; state is returned as a tuple. | Daily CSV for susceptible/infectious/recovered populations, peak infectious count and population-conservation check. |
 
 The magnetism example is an educational approximation, not a full Maxwell, FEM or MHD solver. Sources are point dipoles with a softened near-field distance. The material is represented by a smooth local field multiplier rather than a solved magnetic constitutive boundary problem. The example is a pure RBL CLI program: it does not use Tkinter, OpenCL, Python calculations or an image backend.
 
+The SIR example is a deterministic compartment model, not an epidemiological forecast or medical guidance. It omits age structure, spatial spread, stochastic contacts, interventions and time-varying parameters; its coefficients are illustrative.
+
 ## Check and run the standalone programs
 
-From the repository root, each program can be checked and executed directly:
+From the repository root, the following selected programs can be checked and executed directly:
 
 ```bash
 python3 rbl.py check examples/algorithms/sorting_search.rbl
 python3 rbl.py run examples/algorithms/sorting_search.rbl
+python3 rbl.py check examples/algorithms/a_star_grid.rbl
+python3 rbl.py run examples/algorithms/a_star_grid.rbl
 python3 rbl.py check examples/algorithms/sieve_eratosthenes.rbl
 python3 rbl.py run examples/algorithms/sieve_eratosthenes.rbl
 python3 rbl.py check examples/algorithms/prime_generation_factorization.rbl
@@ -180,10 +226,31 @@ python3 rbl.py check examples/numerical/gaussian_elimination.rbl
 python3 rbl.py run examples/numerical/gaussian_elimination.rbl
 python3 rbl.py check examples/numerical/ode_solvers.rbl
 python3 rbl.py run examples/numerical/ode_solvers.rbl
+python3 rbl.py check examples/numerical/monte_carlo_pi.rbl
+python3 rbl.py run examples/numerical/monte_carlo_pi.rbl
+python3 rbl.py check examples/numerical/linear_regression.rbl
+python3 rbl.py run examples/numerical/linear_regression.rbl
+python3 rbl.py check examples/simulations/sir_epidemic.rbl
+python3 rbl.py run examples/simulations/sir_epidemic.rbl
 python3 rbl.py check examples/statistics/shuffle_lab.rbl
 python3 rbl.py run examples/statistics/shuffle_lab.rbl
+python3 rbl.py check examples/strings/fstring_formatting.rbl
+python3 rbl.py run examples/strings/fstring_formatting.rbl
+python3 rbl.py check examples/statistics/descriptive_statistics.rbl
+python3 rbl.py run examples/statistics/descriptive_statistics.rbl
+python3 rbl.py check examples/utilities/unit_converter.rbl
+printf '2\n100\n' | python3 rbl.py run examples/utilities/unit_converter.rbl
 python3 rbl.py check examples/simulations/magnetism_sandbox.rbl
 python3 rbl.py run examples/simulations/magnetism_sandbox.rbl
+```
+
+In Windows PowerShell, use `python` instead of `python3`. For the interactive unit converter, write the input lines as ASCII and redirect standard input:
+
+```powershell
+New-Item -ItemType Directory -Force build | Out-Null
+Set-Content -Path build\unit-converter-input.txt -Value @('2', '100') -Encoding ascii
+cmd /c "python rbl.py run examples\utilities\unit_converter.rbl < build\unit-converter-input.txt"
+Remove-Item build\unit-converter-input.txt
 ```
 
 To check every RBL source in this directory on Linux/macOS:
@@ -205,7 +272,7 @@ Get-ChildItem examples -Recurse -Filter *.rbl | ForEach-Object {
 
 ## Implementation details worth reading
 
-- **Streaming output:** image pixels and simulation records are printed incrementally. The examples do not build one enormous string and then write it at the end. This avoids unnecessary string copies and is a better fit for the current RBL runtime's string-lifetime limitations.
+- **Streaming output:** image pixels and simulation records are printed incrementally. The examples do not build one enormous string and then write it at the end, avoiding unnecessary intermediate string copies and large temporary allocations.
 - **Tuples as small result records:** the pendulum derivative, orbital initial state and Newton-fractal sample return several related values in a tuple.
 - **Lists passed to functions:** the N-body acceleration routine accepts typed list parameters and updates the arrays in place.
 - **Bounded loops and explicit state:** loop temporaries are declared before their loops and updated with `let`, following the current function-level variable model.
@@ -213,11 +280,11 @@ Get-ChildItem examples -Recurse -Filter *.rbl | ForEach-Object {
 
 ## Scope and validation
 
-These programs target RBL 0.7.2 and its implemented language/runtime behavior. They are illustrative numerical workloads, not production-grade physical models or performance benchmarks. The 24 pre-existing RBL files passed `check` and `run` during the documentation review; the 4K visualization path was also exercised by rendering and assembling all 30 tiles. The ten Beginner Course programs were checked and run separately; see the course README for their scope.
+These programs target RBL 0.8.0 and its implemented language/runtime behavior. Programs are compiled one source file at a time; source imports and multi-file compilation are not implemented. The examples are illustrative workloads, not production-grade physical models or performance benchmarks. All 53 example sources pass `check` on Windows native and WSL. The full compiler-validation matrix is documented in the repository README and testing guide.
 
-The nine standalone programs listed under Algorithms, Generators, Numerical methods, Statistics and Physics also received a focused source/result review and fresh individual `check`/`run` passes. Additional edge-case runs covered sorting empty, singleton, sorted, reverse-sorted and all-equal arrays; a sieve limit of 1; and Gaussian elimination after uniformly scaling the augmented system by `10^-15`. These checks passed. This is targeted example validation, not exhaustive proof for arbitrary inputs.
+The command block above is a curated check/run set spanning algorithms, generators, numerical methods, statistics, physics, formatting and interactive utilities. It supplements the twenty-lesson beginner course but is not exhaustive proof for arbitrary inputs. The algorithm demonstrations include empty, singleton, sorted, reverse-sorted and all-equal arrays, sieve limits 0 and 1, factorization of 0 and 1, and constant-reference regression input. These examples do not claim exhaustive validation for arbitrary inputs.
 
-Known scope limits include the quicksort worst case noted above, the approximate SHUFFLE_LAB intervals, and the educational point-dipole approximation in the magnetism example. The numerical examples use fixed demonstration inputs; they do not expose general-purpose input validation or claim production-grade numerical stability. Their source files can be checked individually:
+Known scope limits include the A* linear open-set scan, the approximate SHUFFLE_LAB intervals, the educational point-dipole approximation in the magnetism example and the simplified deterministic SIR assumptions. The numerical examples use fixed demonstration inputs; they do not expose general-purpose input validation or claim production-grade numerical stability. Their source files can be checked individually:
 
 ```bash
 python3 rbl.py check examples/simulations/conway_life.rbl

@@ -25,7 +25,7 @@ CASES=[
 ("tests/cases/return_in_loop.rbl",0,"7\n-1\n",""),
 ("tests/cases/recursion.rbl",0,"55\n",""),
 ("tests/cases/regalloc_loop.rbl",0,"500500\n1000\n","") ,
-("tests/cases/stdlib.rbl",0,"=== STDLIB ===\n6\n42\n25\n9\n4\n9\n129\n12\n123\ntrue\n321\n3.25\nRBL stdlib works\n", ""),
+ ("tests/cases/stdlib_regression.rbl",0,"=== STDLIB ===\n6\n42\n25\n9\n4\n9\n129\n12\n123\ntrue\n321\n3.25\nRBL stdlib works\n", ""),
 ("tests/cases/parentheses_blocks.rbl",0,"ready\n0\n1\n2\n", ""),
 ("tests/cases/param_type_error.rbl",1,"","parameter 'x' of 'take': expected int, got bool"),
 ("tests/cases/string_concat.rbl",0,"hello RBL\ntrue\n",""),
@@ -39,14 +39,14 @@ CASES=[
 ("tests/cases/selfrec_int_analysis.rbl",0,"analysis ok\n",""),
 ("tests/cases/loop_inc_overflow.rbl",1,"","integer overflow"),
 ("tests/cases/range_outside_for.rbl",1,"","range is only valid in for"),
-("tests/cases/for_non_range.rbl",1,"","for (x in ...) expects a range or a list"),
+("tests/cases/for_non_range.rbl",1,"","for (x in ...) expects a range, list or tuple"),
 ("tests/cases/modulo.rbl",0,"1\n-1\n1\n-1\n0\n2\n10\n",""),
 ("tests/cases/modulo_by_zero.rbl",1,"","integer division by zero"),
 ("tests/cases/modulo_float.rbl",1,"","invalid operands for %"),
 ("tests/cases/literals.rbl",0,"255\n255\n10\n493\n17\n1000000\n65535\n1000\n0.0015\n200\n1.5\n10\n1000\n10.5\n10000000000\n",""),
 ("tests/cases/comment_hash.rbl",0,"before\n1\n",""),
 ("tests/cases/strings_escapes.rbl",0,"tab[\t]nl\nquote[\"]slash[\\]\nhex[A]u[\u2713]U[\U0001F600]\nline one\nline two\n6\nab\n",""),
-("tests/cases/fstrings.rbl",0,"hello, Reiwa!\n42 + 1 = 43\nlen=5\nbraces {} and 42\nfloat 1.5 bool true\ntab\t42\nnext\nReiwaReiwa\n0\nno parts here\n",""),
+("tests/cases/fstrings.rbl",0,"hello, Reiwa!\n42 + 1 = 43\nlen=5\nbraces {} and 42\nfloat 1.5 bool true\ntab\t42\nnext\nReiwaReiwa\n0\nno parts here\nempty spec [Reiwa] and default [Reiwa]\nbases 255 11111111 377 ff FF\nfloats 3.14 3.14 3.14e+00 3.14E+00 3.142 3.142 3.142 3\nfloat precision 17 3.1415926535897931\nwidth [    42] [42    ] [  42  ]\ndefault alignment [    42] [cat   ]\nfill [***cat] [..cat..]\nfill variants [000cat] [###cat] [.cat..]\nalignment fills [cat<<<] [>>>cat] [^^cat^^]\ninteger signs -255 -ff zero 00ff\nminimum integer -8000000000000000\nunicode [  é猫] [界界cat界界]\nstring conversion [42] [3.1415926535897931] [Reiwa] [true] [[1, 2]] [{key: 7}] [(1, 2)] [()] [null]\n1000000\n",""),
 ("tests/cases/compound_assign.rbl",0,"2\nab\n3\n",""),
 ("tests/cases/break_continue.rbl",0,"12\n2\n0 0\n1 0\n2 0\n",""),
 ("tests/cases/math_ext.rbl",0,"3\n3\n3\n-3\n2\n10\n9\n2\n",""),
@@ -64,8 +64,10 @@ CASES=[
 ("tests/cases/dicts.rbl",0,"{b: 2, a: 1}\n2\n1\n2\n\n3\n3\n0\n{2.5: half, 1: one}\ntrue\nfalse\ntrue\nfalse\ntrue\nfalse\ntrue\n100\n3\ntrue\nfalse\n",""),
 ("tests/cases/dict_param_type.rbl",0,"3\ntrue\n",""),
 ("tests/cases/tuples_structs.rbl",0,"(1, 2, 3)\n3\n1\n3\n(1, (2, 3))\n3\ntrue\nfalse\n0\n1\n2\n3\n{x: 3, y: 4}\n3\n4\n30\n2\ntrue\ntrue\nfalse\n35\n10\n{x: 35, y: 10}\n",""),
-("tests/cases/game_of_life.rbl",0,"PASS: generation 1\nPASS: generation 2 returns to start\n",""),
+ ("tests/cases/game_of_life_regression.rbl",0,"PASS: generation 1\nPASS: generation 2 returns to start\n",""),
 ("tests/cases/gc_pressure.rbl",0,"50000\n",""),
+("tests/cases/gc_strings.rbl",0,"120\nvalue-     0\nvalue-119000\nvalue-119000-stored\nvalue-119000-nested\nvalue-     0\ntrue\nstatic-after-gc\n",""),
+("tests/cases/gc_fast_loop.rbl",0,"gc-root\n500000500000\n",""),
 ("tests/cases/null_value.rbl",0,"null\ntrue\nfalse\ntrue\ntrue\nvalue\nnull\n\nnull\n2\nfalse\n[null, 1]\ntrue\n",""),
 ]
 
@@ -80,6 +82,17 @@ def main():
         print(f'[{status}] {rel}')
         if not ok:
             failures.append((rel,rc,out,err))
+    asm_path = rbltool.build_output_dir(ROOT / "tests" / "cases" / "gc_fast_loop.rbl", {}) / "gc_fast_loop.s"
+    try:
+        generated = asm_path.read_text(encoding="utf-8")
+        loop_start = generated.index(".L_fast_for_")
+        loop_end = generated.index(".L_fast_for_end_", loop_start)
+        if "call rbl_gc_safepoint" in generated[loop_start:loop_end]:
+            raise ValueError("fast integer loop contains a per-iteration GC safe point")
+        print("[PASS] fast integer loop omits redundant per-iteration GC safe points")
+    except (OSError, ValueError) as exc:
+        print(f"[FAIL] fast integer loop GC safe-point placement: {exc}")
+        failures.append(("fast integer loop GC safe-point placement", -1, "", str(exc)))
     if failures:
         print('\nFailures:')
         for rel,rc,out,err in failures:

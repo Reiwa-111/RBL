@@ -1,6 +1,6 @@
-# last verified: v0.7.2 | 2026.11.06 | DOCS UPDATE
+# last verified: v0.8.0 | 2026.11.09 | LANGUAGE CONTRACT RECHECK
 
-## Reference: RBL 0.7.2 limitations
+## Reference: RBL 0.8.0 limitations
 
 This list deliberately distinguishes implemented language behavior from proposed features. An omitted construct is not necessarily a design rejection; it means the current compiler/runtime does not promise support for it.
 
@@ -18,7 +18,6 @@ This list deliberately distinguishes implemented language behavior from proposed
 - No tuple destructuring, list slices or negative indexing.
 - No general dictionary iteration in loops.
 - No list concatenation with `+`.
-- No f-string format specifications.
 - Logical `and` and `or` do not short-circuit.
 - No full source-level debugger or complete Windows source-line mapping table.
 
@@ -28,7 +27,9 @@ This list deliberately distinguishes implemented language behavior from proposed
 - The pseudorandom generator is not cryptographically secure; Linux and Windows sequences differ.
 - `rbl.time.now_ms()` uses different clock sources on Linux and Windows.
 - `rbl.fs.cwd()` returns a platform-dependent path.
-- The container collector does not reclaim every string: strings allocated by current runtime paths are not individually freed before process exit.
+- The conservative collector may retain unreachable objects when stale pointer-shaped values remain in scanned stack memory; collection timing is not deterministic.
+- The native Runtime ABI has no string pinning/root-registration API. Only pointer-shaped words in the scanned current-thread stack range and values reachable through containers are roots; native heap/global storage and other threads are not scanned.
+- Runtime state is process-global and unsynchronized. Only the thread that entered generated RBL `main` may call Runtime helpers; concurrent native calls from other threads are unsupported.
 - No general-purpose user FFI/plugin ABI exists.
 
 ## Projects and tooling

@@ -22,18 +22,25 @@ A host C compiler is only ever needed to build the bootstrap compiler itself and
 the Windows runtime object.
 """
 from __future__ import annotations
-import argparse, json, os, platform, shlex, shutil, subprocess, sys, time
+import argparse, codecs, hashlib, json, os, platform, re, shlex, shutil, subprocess, sys, threading, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 IDE_CONFIG = Path(os.environ.get("APPDATA", Path.home() / ".config")) / "RBLStudio" / "settings.json" if os.name == "nt" else Path.home()/".config"/"RBLStudio"/"settings.json"
 LINUX_BIN_DIR = ROOT / "bin" / "linux-x86_64"
 WIN_BIN_DIR = ROOT / "bin" / "win-x86_64"
-COMPILER_SRC = ROOT / "compiler" / "rblc_asm.c"
+COMPILER_SOURCES = [ROOT / "compiler" / name for name in (
+    "common.c", "lexer.c", "ast.c", "parser.c", "sema.c", "codegen.c", "driver.c"
+)]
+RUNTIME_ABI_HEADER = ROOT / "runtime" / "rbl_abi.h"
+COMPILER_HEADERS = [ROOT / "compiler" / "rblc_internal.h", RUNTIME_ABI_HEADER]
+COMPILER_DEPENDENCIES = [*COMPILER_SOURCES, *COMPILER_HEADERS, ROOT / "VERSION"]
 RUNTIME_SRC = ROOT / "runtime" / "rbl_runtime.s"
 RUNTIME_WIN_SRC = ROOT / "runtime" / "rbl_runtime_win.c"
 # Containers are written once in C and linked into both targets.
 CONTAINERS_SRC = ROOT / "runtime" / "rbl_containers.c"
+RUNTIME_ABI_SRC = ROOT / "runtime" / "rbl_abi.c"
+RUNTIME_FORMAT_SRC = ROOT / "runtime" / "rbl_format.c"
 BUILD_DIR = ROOT / "build"
 
 # Backwards-compatible names: the Linux backend is the historical default.
@@ -41,14 +48,19 @@ BIN_DIR = LINUX_BIN_DIR
 COMPILER_BIN = LINUX_BIN_DIR / "rblc-asm"
 RUNTIME_OBJ = LINUX_BIN_DIR / "rbl_runtime.o"
 CONTAINERS_OBJ = LINUX_BIN_DIR / "rbl_containers.o"
+RUNTIME_ABI_OBJ = LINUX_BIN_DIR / "rbl_abi.o"
+RUNTIME_FORMAT_OBJ = LINUX_BIN_DIR / "rbl_format.o"
 WIN_COMPILER_BIN = WIN_BIN_DIR / "rblc-asm.exe"
 WIN_RUNTIME_OBJ = WIN_BIN_DIR / "rbl_runtime_win.o"
 WIN_CONTAINERS_OBJ = WIN_BIN_DIR / "rbl_containers_win.o"
+WIN_RUNTIME_ABI_OBJ = WIN_BIN_DIR / "rbl_abi_win.o"
+WIN_RUNTIME_FORMAT_OBJ = WIN_BIN_DIR / "rbl_format_win.o"
 
 # A generated program that regresses into an endless loop must fail the suite
 # instead of blocking it forever. 124 matches the shell's timeout exit status.
 PROGRAM_TIMEOUT = float(os.environ.get("RBL_TIMEOUT", "180"))
 TIMEOUT_RC = 124
+STREAM_CAPTURE_LIMIT_BYTES = 1024 * 1024
 
 DEFAULT_WSL_DISTRO = "Ubuntu-24.04"
 
@@ -99,9 +111,16 @@ def have(cmd: str) -> bool:
 
 def _mingw_candidates():
     cands = []
+    # An explicit developer override is useful for `python rbl.py bootstrap`,
+    # because the portable runtime bundle intentionally omits GCC's C frontend.
     env = os.environ.get("RBL_MINGW")
     if env:
         cands.append(Path(env))
+    # A release bundle keeps the Windows compiler toolchain beside the IDE.
+    # This is deliberately checked before machine-wide installations so a
+    # portable RBL copy remains deterministic on developer machines too.
+    bundled = ROOT / "toolchain" / "windows-x86_64" / "msys64" / "ucrt64" / "bin"
+    cands.append(bundled)
     roots = [Path("C:/msys64"), Path("C:/msys2"), Path("C:/tools/msys64"),
              Path("C:/mingw64"), Path("C:/MinGW"), Path("C:/ProgramData/mingw64")]
     for r in roots:
@@ -122,14 +141,39 @@ def find_native_toolchain():
             continue
         gcc, asm = d / "gcc.exe", d / "as.exe"
         if gcc.is_file() and asm.is_file():
+            bundled = d == (ROOT / "toolchain" / "windows-x86_64" / "msys64" / "ucrt64" / "bin")
+            if bundled:
+                manifest_path = d.parent / "rbl-toolchain-manifest.json"
+                try:
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    files = manifest["files"]
+                    if manifest.get("schema") != 1 or not files:
+                        continue
+                    gcc_version = manifest.get("gcc_version")
+                    required = {
+                        "bin/gcc.exe", "bin/as.exe", "x86_64-w64-mingw32/bin/ld.exe",
+                        "lib/crt2.o", "lib/default-manifest.o",
+                        f"lib/gcc/x86_64-w64-mingw32/{gcc_version}/collect2.exe",
+                    }
+                    if not required.issubset(files):
+                        continue
+                    if any(
+                        not (d.parent / relative).is_file()
+                        or (d.parent / relative).stat().st_size != info.get("size")
+                        for relative, info in files.items()
+                    ):
+                        continue
+                except (OSError, ValueError, KeyError, TypeError):
+                    continue
             return {"bin": d, "gcc": gcc, "as": asm,
                     "nm": d / "nm.exe" if (d / "nm.exe").is_file() else None,
-                    "name": f"{d.parent.name}/{d.name}"}
+                    "name": "RBL bundled MinGW-w64" if bundled else f"{d.parent.name}/{d.name}",
+                    "kind": "bundled" if bundled else "external"}
     gcc, asm = shutil.which("gcc"), shutil.which("as")
     if gcc and asm:
         return {"bin": Path(gcc).parent, "gcc": Path(gcc), "as": Path(asm),
                 "nm": Path(shutil.which("nm")) if shutil.which("nm") else None,
-                "name": "PATH"}
+                "name": "PATH", "kind": "external"}
     return None
 
 
@@ -176,7 +220,7 @@ def wsl_available(settings=None) -> bool:
     if key in _WSL_AVAILABLE_CACHE:
         return _WSL_AVAILABLE_CACHE[key]
     try:
-        p = subprocess.run(["wsl.exe", "--distribution", distro, "--exec", "true"], text=True, capture_output=True, encoding="utf-8", errors="replace",
+        p = subprocess.run(["wsl.exe", "--distribution", distro, "--exec", "true"], text=True, capture_output=True, encoding="utf-8", errors="replace", timeout=8,
                            **_hidden_subprocess_kwargs())
         ok = p.returncode == 0
     except OSError:
@@ -207,6 +251,7 @@ def wsl_path(path: Path, settings=None) -> str:
     proc = subprocess.run(
         ["wsl.exe", "-d", distro, "--", "wslpath", "-a", "--", host_path],
         text=True, capture_output=True, encoding="utf-8", errors="replace",
+        timeout=10,
         **_hidden_subprocess_kwargs()
     )
     if proc.returncode != 0:
@@ -270,8 +315,122 @@ def toolchain_env(tc):
     return env
 
 
+def _streaming_subprocess(cmd, cwd, input_text, env):
+    """Forward child stdout/stderr as they arrive while retaining bounded diagnostics."""
+    process = subprocess.Popen(
+        cmd,
+        cwd=str(cwd),
+        stdin=subprocess.PIPE if input_text is not None else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        bufsize=-1,
+        **_hidden_subprocess_kwargs(),
+    )
+    captured = {"stdout": [], "stderr": []}
+
+    def pump(stream, target, key):
+        decoder = codecs.getincrementaldecoder("utf-8")("replace")
+        captured_bytes = 0
+        while True:
+            chunk = stream.read1(8192)
+            if not chunk:
+                break
+            text = decoder.decode(chunk)
+            if not text:
+                continue
+            try:
+                target.write(text)
+                target.flush()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
+            if captured_bytes < STREAM_CAPTURE_LIMIT_BYTES:
+                encoded = text.encode("utf-8")
+                retained = encoded[: STREAM_CAPTURE_LIMIT_BYTES - captured_bytes].decode(
+                    "utf-8", "ignore"
+                )
+                if retained:
+                    captured[key].append(retained)
+                    captured_bytes += len(retained.encode("utf-8"))
+        final_text = decoder.decode(b"", final=True)
+        if final_text:
+            try:
+                target.write(final_text)
+                target.flush()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
+            if captured_bytes < STREAM_CAPTURE_LIMIT_BYTES:
+                retained = final_text.encode("utf-8")[: STREAM_CAPTURE_LIMIT_BYTES - captured_bytes].decode(
+                    "utf-8", "ignore"
+                )
+                if retained:
+                    captured[key].append(retained)
+
+    stdout_thread = threading.Thread(
+        target=pump, args=(process.stdout, sys.stdout, "stdout"), daemon=True
+    )
+    stderr_thread = threading.Thread(
+        target=pump, args=(process.stderr, sys.stderr, "stderr"), daemon=True
+    )
+    stdout_thread.start()
+    stderr_thread.start()
+    input_errors = []
+    input_thread = None
+    if input_text is not None and process.stdin is not None:
+        def write_input():
+            try:
+                for offset in range(0, len(input_text), 8192):
+                    process.stdin.write(input_text[offset : offset + 8192].encode("utf-8"))
+            except (BrokenPipeError, OSError) as error:
+                input_errors.append(error)
+            finally:
+                try:
+                    process.stdin.close()
+                except OSError:
+                    pass
+
+        input_thread = threading.Thread(target=write_input, daemon=True)
+        input_thread.start()
+
+    timed_out = False
+    try:
+        return_code = process.wait(timeout=PROGRAM_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        try:
+            process.kill()
+        except OSError:
+            pass
+        return_code = process.wait()
+    drain_deadline = time.monotonic() + 2.0
+    for reader in (input_thread, stdout_thread, stderr_thread):
+        if reader is not None:
+            reader.join(timeout=max(0.0, drain_deadline - time.monotonic()))
+    stdout = "".join(captured["stdout"])
+    stderr = "".join(captured["stderr"])
+    if (input_thread is not None and input_thread.is_alive()) or stdout_thread.is_alive() or stderr_thread.is_alive():
+        warning = (
+            "RBL: child process retained an inherited standard stream; "
+            "remaining output was detached so the IDE can finish process-tree cleanup.\n"
+        )
+        try:
+            sys.stderr.write(warning)
+            sys.stderr.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            pass
+        stderr += warning
+    if input_errors:
+        stderr += f"RBL: failed to forward subprocess stdin: {input_errors[0]}\n"
+    if timed_out:
+        stderr += f"RBL: command timed out after {PROGRAM_TIMEOUT:.0f}s: {cmd}"
+        return TIMEOUT_RC, stdout, stderr
+    return return_code, stdout, stderr
+
+
 def run_native(cmd, cwd=ROOT, capture=True, input_text=None, env=None):
     try:
+        if capture and os.environ.get("RBL_STREAM_OUTPUT") == "1":
+            return _streaming_subprocess(cmd, cwd, input_text, env)
         p = subprocess.run(cmd, cwd=str(cwd), text=True, capture_output=capture,
                            input=input_text, env=env,
                            encoding="utf-8", errors="replace", timeout=PROGRAM_TIMEOUT,
@@ -283,12 +442,20 @@ def run_native(cmd, cwd=ROOT, capture=True, input_text=None, env=None):
     return p.returncode, "", ""
 
 
-def run_wsl(cmd, settings=None, capture=True, input_text=None):
+def run_wsl(cmd, settings=None, capture=True, input_text=None, cwd=None):
     settings = settings or load_settings()
     distro = wsl_distro(settings)
-    root = wsl_path(ROOT, settings)
+    working_dir = Path(cwd) if cwd is not None else ROOT
+    root = wsl_path(working_dir, settings)
     shell = f"cd {shlex.quote(root)} && {cmd}"
     try:
+        if capture and os.environ.get("RBL_STREAM_OUTPUT") == "1":
+            return _streaming_subprocess(
+                ["wsl.exe", "--distribution", distro, "--exec", "bash", "-lc", shell],
+                working_dir,
+                input_text,
+                None,
+            )
         p = subprocess.run(
             ["wsl.exe", "--distribution", distro, "--exec", "bash", "-lc", shell],
             text=True, capture_output=capture, input=input_text,
@@ -303,7 +470,7 @@ def run_wsl(cmd, settings=None, capture=True, input_text=None):
     return p.returncode, "", ""
 
 
-def run_built(exe, stdin_text=None, settings=None):
+def run_built(exe, stdin_text=None, settings=None, cwd=None):
     """Run an already built program through the active backend.
 
     The executable is a Linux ELF under WSL/native Linux and a PE image under
@@ -311,9 +478,11 @@ def run_built(exe, stdin_text=None, settings=None):
     """
     settings = settings or load_settings()
     exe = Path(exe)
+    working_dir = Path(cwd) if cwd is not None else ROOT
     if use_wsl(settings):
-        return run_wsl(shlex.quote(wsl_path(exe, settings)), settings, input_text=stdin_text)
-    return run_native([str(exe)], input_text=stdin_text)
+        return run_wsl(shlex.quote(wsl_path(exe, settings)), settings,
+                       input_text=stdin_text, cwd=working_dir)
+    return run_native([str(exe)], cwd=working_dir, input_text=stdin_text)
 
 
 def run_tool(cmd, settings=None):
@@ -327,8 +496,56 @@ def ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
 
+def build_output_dir(source: Path, settings=None) -> Path:
+    """Return a stable, collision-resistant output directory for one source path."""
+    resolved = Path(source).resolve()
+    identity = hashlib.sha256(os.path.normcase(str(resolved)).encode("utf-8")).hexdigest()[:12]
+    backend = "windows" if use_native_windows(settings or load_settings()) else "linux"
+    return BUILD_DIR / "sources" / backend / f"{resolved.stem}-{identity}"
+
+
 def _force_bootstrap() -> bool:
     return os.environ.get("RBL_REBUILD_COMPILER", "").lower() in {"1", "true", "yes", "on"}
+
+
+def compiler_version() -> str:
+    """Read the canonical repository/compiler version."""
+    try:
+        return (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return "0.0.0"
+
+
+def runtime_abi_version() -> str:
+    """Read the separately versioned Runtime ABI from its canonical header."""
+    try:
+        source = RUNTIME_ABI_HEADER.read_text(encoding="utf-8")
+        values = {}
+        for part in ("MAJOR", "MINOR", "PATCH"):
+            match = re.search(rf"^#define RBL_RUNTIME_ABI_{part} (\d+)u$", source, re.MULTILINE)
+            if not match:
+                raise ValueError(f"missing ABI {part}")
+            values[part] = int(match.group(1))
+        return f"{values['MAJOR']}.{values['MINOR']}.{values['PATCH']}"
+    except (OSError, ValueError):
+        return "unknown"
+
+
+def runtime_abi_check_symbol() -> str:
+    try:
+        source = RUNTIME_ABI_HEADER.read_text(encoding="utf-8")
+        match = re.search(r"^#define RBL_RUNTIME_ABI_CHECK_SYMBOL (\w+)$", source, re.MULTILINE)
+        return match.group(1) if match else "rbl_runtime_abi_check_unknown"
+    except OSError:
+        return "rbl_runtime_abi_check_unknown"
+
+
+def compiler_sources_for_host() -> list[str]:
+    return [str(p) for p in COMPILER_SOURCES]
+
+
+def compiler_version_define() -> str:
+    return f'-DRBL_VERSION="{compiler_version()}"'
 
 
 def _stale(target: Path, *sources: Path) -> bool:
@@ -346,22 +563,45 @@ def ensure_toolchain(settings):
     force_bootstrap = _force_bootstrap()
     if use_wsl(settings):
         ensure_dir(LINUX_BIN_DIR)
-        compiler_s = shlex.quote(wsl_path(COMPILER_SRC, settings))
+        compiler_sources = " ".join(shlex.quote(wsl_path(p, settings)) for p in COMPILER_SOURCES)
         compiler_b = shlex.quote(wsl_path(COMPILER_BIN, settings))
         runtime_s = shlex.quote(wsl_path(RUNTIME_SRC, settings))
         runtime_o = shlex.quote(wsl_path(RUNTIME_OBJ, settings))
         # Release builds ship the native compiler/runtime already. Do not make
         # normal Windows F5 depend on a host C compiler or source mtimes.
-        if force_bootstrap or _stale(COMPILER_BIN, COMPILER_SRC):
-            code, out, err = run_wsl(f"cc -std=c11 -O2 -Wall -Wextra -Wpedantic {compiler_s} -o {compiler_b}", settings)
+        if force_bootstrap or _stale(COMPILER_BIN, *COMPILER_DEPENDENCIES):
+            version_define = shlex.quote(compiler_version_define())
+            code, out, err = run_wsl(f"cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -Wredundant-decls -Werror=missing-prototypes -Werror=redundant-decls -Werror=implicit-function-declaration {version_define} {compiler_sources} -o {compiler_b}", settings)
             if code: raise RuntimeError(err or out)
         if force_bootstrap or _stale(RUNTIME_OBJ, RUNTIME_SRC):
             code, out, err = run_wsl(f"as --64 {runtime_s} -o {runtime_o}", settings)
             if code: raise RuntimeError(err or out)
         containers_c = shlex.quote(wsl_path(CONTAINERS_SRC, settings))
         containers_o = shlex.quote(wsl_path(CONTAINERS_OBJ, settings))
-        if force_bootstrap or _stale(CONTAINERS_OBJ, CONTAINERS_SRC):
-            code, out, err = run_wsl(f"cc -std=c11 -O2 -Wall -Wextra {containers_c} -c -o {containers_o}", settings)
+        if force_bootstrap or _stale(CONTAINERS_OBJ, CONTAINERS_SRC, RUNTIME_ABI_HEADER):
+            code, out, err = run_wsl(
+                f"cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Wmissing-prototypes "
+                f"-Wstrict-prototypes -Wredundant-decls -Werror=missing-prototypes "
+                f"-Werror=redundant-decls -Werror=implicit-function-declaration "
+                f"{containers_c} -c -o {containers_o}", settings)
+            if code: raise RuntimeError(err or out)
+        abi_c = shlex.quote(wsl_path(RUNTIME_ABI_SRC, settings))
+        abi_o = shlex.quote(wsl_path(RUNTIME_ABI_OBJ, settings))
+        if force_bootstrap or _stale(RUNTIME_ABI_OBJ, RUNTIME_ABI_SRC, RUNTIME_ABI_HEADER):
+            code, out, err = run_wsl(
+                f"cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Wmissing-prototypes "
+                f"-Wstrict-prototypes -Wredundant-decls -Werror=missing-prototypes "
+                f"-Werror=redundant-decls -Werror=implicit-function-declaration "
+                f"{abi_c} -c -o {abi_o}", settings)
+            if code: raise RuntimeError(err or out)
+        format_c = shlex.quote(wsl_path(RUNTIME_FORMAT_SRC, settings))
+        format_o = shlex.quote(wsl_path(RUNTIME_FORMAT_OBJ, settings))
+        if force_bootstrap or _stale(RUNTIME_FORMAT_OBJ, RUNTIME_FORMAT_SRC, RUNTIME_ABI_HEADER):
+            code, out, err = run_wsl(
+                f"cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Wmissing-prototypes "
+                f"-Wstrict-prototypes -Wredundant-decls -Werror=missing-prototypes "
+                f"-Werror=redundant-decls -Werror=implicit-function-declaration "
+                f"{format_c} -c -o {format_o}", settings)
             if code: raise RuntimeError(err or out)
         return
 
@@ -376,39 +616,81 @@ def ensure_toolchain(settings):
                 "  prebuilt Windows binaries are required.")
         ensure_dir(WIN_BIN_DIR)
         tenv = toolchain_env(tc)
-        if force_bootstrap or _stale(WIN_COMPILER_BIN, COMPILER_SRC):
-            cmd = [str(tc["gcc"]), "-std=c11", "-O2", "-Wall", "-Wextra",
-                   "-D__USE_MINGW_ANSI_STDIO=1", str(COMPILER_SRC), "-o", str(WIN_COMPILER_BIN)]
+        # The distributable Windows bundle intentionally contains only the
+        # linker/assembler runtime closure, not GCC's C frontend (cc1) or
+        # development headers. Never infer that a user's installed compiler
+        # must be rebuilt from checkout mtimes: source archives commonly reset
+        # those timestamps. Rebuilding is an explicit developer operation
+        # (`python rbl.py bootstrap`) or a recovery from a missing artifact.
+        if force_bootstrap or not WIN_COMPILER_BIN.is_file():
+            cmd = [str(tc["gcc"]), "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
+                   "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
+                   "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
+                   "-D__USE_MINGW_ANSI_STDIO=1", compiler_version_define(), *compiler_sources_for_host(), "-o", str(WIN_COMPILER_BIN)]
             code, out, err = run_native(cmd, env=tenv)
             if code: raise RuntimeError(f"failed to build {WIN_COMPILER_BIN.name}:\n{out}{err}")
-        if force_bootstrap or _stale(WIN_RUNTIME_OBJ, RUNTIME_WIN_SRC):
+        if force_bootstrap or not WIN_RUNTIME_OBJ.is_file():
             cmd = [str(tc["gcc"]), "-std=c11", "-O2", "-Wall", "-Wextra",
                    "-D__USE_MINGW_ANSI_STDIO=1", "-c", str(RUNTIME_WIN_SRC), "-o", str(WIN_RUNTIME_OBJ)]
             code, out, err = run_native(cmd, env=tenv)
             if code: raise RuntimeError(f"failed to build {WIN_RUNTIME_OBJ.name}:\n{out}{err}")
-        if force_bootstrap or _stale(WIN_CONTAINERS_OBJ, CONTAINERS_SRC):
+        if force_bootstrap or not WIN_CONTAINERS_OBJ.is_file():
             cmd = [str(tc["gcc"]), "-std=c11", "-O2", "-Wall", "-Wextra",
+                   "-Wpedantic", "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
+                   "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
                    "-D__USE_MINGW_ANSI_STDIO=1", "-c", str(CONTAINERS_SRC), "-o", str(WIN_CONTAINERS_OBJ)]
             code, out, err = run_native(cmd, env=tenv)
             if code: raise RuntimeError(f"failed to build {WIN_CONTAINERS_OBJ.name}:\n{out}{err}")
+        if force_bootstrap or not WIN_RUNTIME_ABI_OBJ.is_file():
+            cmd = [str(tc["gcc"]), "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
+                   "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
+                   "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
+                   "-D__USE_MINGW_ANSI_STDIO=1", "-c", str(RUNTIME_ABI_SRC), "-o", str(WIN_RUNTIME_ABI_OBJ)]
+            code, out, err = run_native(cmd, env=tenv)
+            if code: raise RuntimeError(f"failed to build {WIN_RUNTIME_ABI_OBJ.name}:\n{out}{err}")
+        if force_bootstrap or not WIN_RUNTIME_FORMAT_OBJ.is_file():
+            cmd = [str(tc["gcc"]), "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
+                   "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
+                   "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
+                   "-D__USE_MINGW_ANSI_STDIO=1", "-c", str(RUNTIME_FORMAT_SRC), "-o", str(WIN_RUNTIME_FORMAT_OBJ)]
+            code, out, err = run_native(cmd, env=tenv)
+            if code: raise RuntimeError(f"failed to build {WIN_RUNTIME_FORMAT_OBJ.name}:\n{out}{err}")
         return
 
     # Native Linux
     ensure_dir(LINUX_BIN_DIR)
-    if force_bootstrap or _stale(COMPILER_BIN, COMPILER_SRC):
+    if force_bootstrap or _stale(COMPILER_BIN, *COMPILER_DEPENDENCIES):
         if not have("cc"):
             raise RuntimeError("C compiler 'cc' is needed only to bootstrap rblc-asm itself.")
-        code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic", str(COMPILER_SRC), "-o", str(COMPILER_BIN)])
+        code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
+                                     "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
+                                     "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
+                                     compiler_version_define(), *compiler_sources_for_host(), "-o", str(COMPILER_BIN)])
         if code: raise RuntimeError(err or out)
     if force_bootstrap or _stale(RUNTIME_OBJ, RUNTIME_SRC):
         if not have("as"):
             raise RuntimeError("GNU assembler 'as' not found.")
         code, out, err = run_native(["as", "--64", str(RUNTIME_SRC), "-o", str(RUNTIME_OBJ)])
         if code: raise RuntimeError(err or out)
-    if force_bootstrap or _stale(CONTAINERS_OBJ, CONTAINERS_SRC):
+    if force_bootstrap or _stale(CONTAINERS_OBJ, CONTAINERS_SRC, RUNTIME_ABI_HEADER):
         if not have("cc"):
             raise RuntimeError("C compiler 'cc' is needed to build the container runtime.")
-        code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-c", str(CONTAINERS_SRC), "-o", str(CONTAINERS_OBJ)])
+        code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
+                                     "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
+                                     "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
+                                     "-c", str(CONTAINERS_SRC), "-o", str(CONTAINERS_OBJ)])
+        if code: raise RuntimeError(err or out)
+    if force_bootstrap or _stale(RUNTIME_ABI_OBJ, RUNTIME_ABI_SRC, RUNTIME_ABI_HEADER):
+        code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
+                                     "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
+                                     "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
+                                     "-c", str(RUNTIME_ABI_SRC), "-o", str(RUNTIME_ABI_OBJ)])
+        if code: raise RuntimeError(err or out)
+    if force_bootstrap or _stale(RUNTIME_FORMAT_OBJ, RUNTIME_FORMAT_SRC, RUNTIME_ABI_HEADER):
+        code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
+                                     "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
+                                     "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
+                                     "-c", str(RUNTIME_FORMAT_SRC), "-o", str(RUNTIME_FORMAT_OBJ)])
         if code: raise RuntimeError(err or out)
 
 
@@ -430,26 +712,52 @@ def check(source: Path, settings):
     return run_native([str(COMPILER_BIN), str(source), "--check"])
 
 
-def _build_cache_valid(exe: Path, source: Path, dependencies: list[Path]) -> bool:
+def _build_cache_valid(
+    exe: Path,
+    source: Path,
+    dependencies: list[Path],
+    required_artifacts: tuple[Path, ...] = (),
+) -> bool:
     if os.environ.get("RBL_NO_BUILD_CACHE") == "1":
         return False
     try:
-        exe_mtime = exe.stat().st_mtime_ns
-        if exe_mtime < source.stat().st_mtime_ns:
+        artifacts = (exe, *required_artifacts)
+        if any(not artifact.is_file() for artifact in artifacts):
             return False
-        return all(exe_mtime >= dep.stat().st_mtime_ns for dep in dependencies if dep.exists())
+        newest = max(
+            path.stat().st_mtime_ns
+            for path in (source, *dependencies)
+            if path.exists()
+        )
+        return all(artifact.stat().st_mtime_ns >= newest for artifact in artifacts)
     except OSError:
         return False
 
 
+def _link_failure(code: int, output: str, stage: str):
+    """Add an actionable hint when a prebuilt Runtime lacks the ABI entry point."""
+    symbol = runtime_abi_check_symbol()
+    major = runtime_abi_version().split(".", 1)[0]
+    if code and symbol in output and (
+        "undefined reference" in output.lower()
+        or "undefined symbol" in output.lower()
+    ):
+        output += (
+            f"\nRBL Runtime ABI mismatch: this executable requires Runtime ABI major {major}, "
+            f"but the linked Runtime does not provide {symbol}. "
+            "Rebuild the compiler and Runtime with `python rbl.py bootstrap`.\n"
+        )
+    return code, output, stage
+
+
 def _build_wsl(source: Path, settings):
-    out_dir = BUILD_DIR / source.stem
+    out_dir = build_output_dir(source, settings)
     ensure_dir(out_dir)
     asm = out_dir / (source.stem + ".s")
     obj = out_dir / (source.stem + ".o")
     exe = out_dir / source.stem
-    deps = [COMPILER_BIN, RUNTIME_OBJ, CONTAINERS_OBJ]
-    if _build_cache_valid(exe, source, deps):
+    deps = [COMPILER_BIN, RUNTIME_OBJ, CONTAINERS_OBJ, RUNTIME_ABI_OBJ, RUNTIME_FORMAT_OBJ]
+    if _build_cache_valid(exe, source, deps, (asm, obj)):
         return 0, "build cache: up to date\n", str(exe)
     cs = shlex.quote(wsl_path(COMPILER_BIN, settings))
     ss = shlex.quote(wsl_path(source, settings))
@@ -457,31 +765,39 @@ def _build_wsl(source: Path, settings):
     objp = shlex.quote(wsl_path(obj, settings))
     rt = shlex.quote(wsl_path(RUNTIME_OBJ, settings))
     ct = shlex.quote(wsl_path(CONTAINERS_OBJ, settings))
+    at = shlex.quote(wsl_path(RUNTIME_ABI_OBJ, settings))
+    ft = shlex.quote(wsl_path(RUNTIME_FORMAT_OBJ, settings))
     exep = shlex.quote(wsl_path(exe, settings))
     command = (
         f"{cs} {ss} -S {asmp} && "
         f"as --64 {asmp} -o {objp} && "
-        f"ld {objp} {rt} {ct} -o {exep} "
+        f"ld {objp} {rt} {ct} {at} {ft} -o {exep} "
         f"-dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lm"
     )
     code, out, err = run_wsl(command, settings)
     if code:
-        return code, out + err, "build failed"
+        return _link_failure(code, out + err, "build failed")
     return 0, out + err, str(exe)
 
 def _build_native_linux(source: Path, settings):
-    out_dir = BUILD_DIR / source.stem
+    out_dir = build_output_dir(source, settings)
     ensure_dir(out_dir)
     asm = out_dir / (source.stem + ".s")
     obj = out_dir / (source.stem + ".o")
     exe = out_dir / source.stem
-    if _build_cache_valid(exe, source, [COMPILER_BIN, RUNTIME_OBJ, CONTAINERS_OBJ]):
+    if _build_cache_valid(
+        exe, source,
+        [COMPILER_BIN, RUNTIME_OBJ, CONTAINERS_OBJ, RUNTIME_ABI_OBJ, RUNTIME_FORMAT_OBJ],
+        (asm, obj),
+    ):
         return 0, "build cache: up to date\n", str(exe)
     c1=run_native([str(COMPILER_BIN),str(source),"-S",str(asm)])
     if c1[0]:return c1
     c2=run_native(["as","--64",str(asm),"-o",str(obj)])
     if c2[0]:return c2
-    c3=run_native(["ld",str(obj),str(RUNTIME_OBJ),str(CONTAINERS_OBJ),"-o",str(exe),"-dynamic-linker","/lib64/ld-linux-x86-64.so.2","-lc","-lm"])
+    c3=run_native(["ld",str(obj),str(RUNTIME_OBJ),str(CONTAINERS_OBJ),str(RUNTIME_ABI_OBJ),str(RUNTIME_FORMAT_OBJ),"-o",str(exe),"-dynamic-linker","/lib64/ld-linux-x86-64.so.2","-lc","-lm"])
+    if c3[0]:
+        return _link_failure(c3[0], c1[1]+c1[2]+c2[1]+c2[2]+c3[1]+c3[2], "link failed")
     return c3[0], c1[1]+c1[2]+c2[1]+c2[2]+c3[1]+c3[2], str(exe)
 
 
@@ -489,17 +805,24 @@ def _build_native_windows(source: Path, settings):
     tc = find_native_toolchain()
     if tc is None:
         raise RuntimeError("No native Windows GNU toolchain was found (see 'rbl doctor').")
-    out_dir = BUILD_DIR / source.stem
+    out_dir = build_output_dir(source, settings)
     ensure_dir(out_dir)
     asm = out_dir / (source.stem + ".s")
     obj = out_dir / (source.stem + ".o")
     exe = out_dir / (source.stem + ".exe")
-    if _build_cache_valid(exe, source, [WIN_COMPILER_BIN, WIN_RUNTIME_OBJ, WIN_CONTAINERS_OBJ]):
+    if _build_cache_valid(
+        exe, source,
+        [WIN_COMPILER_BIN, WIN_RUNTIME_OBJ, WIN_CONTAINERS_OBJ, WIN_RUNTIME_ABI_OBJ, WIN_RUNTIME_FORMAT_OBJ],
+        (asm, obj),
+    ):
         return 0, "build cache: up to date\n", str(exe)
     steps = [
         ([str(WIN_COMPILER_BIN), str(source), "-S", str(asm), "--target", "win"], "compile"),
         ([str(tc["as"]), "--64", str(asm), "-o", str(obj)], "assemble"),
-        ([str(tc["gcc"]), str(obj), str(WIN_RUNTIME_OBJ), str(WIN_CONTAINERS_OBJ), "-o", str(exe), "-static", "-lm"], "link"),
+        # RBL emits plain native objects and never produces GCC LTO objects.
+        # Disabling the linker plugin avoids shipping GCC's LTO plugin/wrapper
+        # (and its compression dependencies) in the minimal user toolchain.
+        ([str(tc["gcc"]), str(obj), str(WIN_RUNTIME_OBJ), str(WIN_CONTAINERS_OBJ), str(WIN_RUNTIME_ABI_OBJ), str(WIN_RUNTIME_FORMAT_OBJ), "-o", str(exe), "-static", "-lm", "-fno-use-linker-plugin"], "link"),
     ]
     allout = []
     tenv = toolchain_env(tc)
@@ -507,6 +830,8 @@ def _build_native_windows(source: Path, settings):
         code, out, err = run_native(cmd, env=tenv)
         allout.append(out + err)
         if code:
+            if what == "link":
+                return _link_failure(code, "".join(allout), "link failed")
             return code, "".join(allout), f"{what} failed"
     return 0, "".join(allout), str(exe)
 
@@ -526,10 +851,10 @@ def run_program(source: Path, settings):
     code, out, info = build(source, settings)
     if code: return code, out, ""
     if use_wsl(settings):
-        exe = BUILD_DIR / source.stem / source.stem
+        exe = build_output_dir(source, settings) / source.stem
         code, stdout, stderr = run_wsl(shlex.quote(wsl_path(exe, settings)), settings)
     else:
-        exe = Path(info) if info and info != "build failed" else BUILD_DIR / source.stem / source.stem
+        exe = Path(info) if info and info != "build failed" else build_output_dir(source, settings) / source.stem
         if is_windows() and not use_wsl(settings):
             exe = exe.with_suffix(".exe") if exe.suffix != ".exe" else exe
         code, stdout, stderr = run_native([str(exe)])
@@ -538,7 +863,7 @@ def run_program(source: Path, settings):
 
 def assemble_preview(source: Path, settings):
     ensure_toolchain(settings)
-    out = BUILD_DIR / source.stem / (source.stem + ".s")
+    out = build_output_dir(source, settings) / (source.stem + ".s")
     ensure_dir(out.parent)
     if use_wsl(settings):
         c=f"{shlex.quote(wsl_path(COMPILER_BIN, settings))} {shlex.quote(wsl_path(source, settings))} -S {shlex.quote(wsl_path(out, settings))}"
@@ -569,8 +894,11 @@ def doctor(settings):
         tc = find_native_toolchain()
         rows.append(("Win toolchain", f"{tc['name']} ({tc['gcc']})" if tc else "not found"))
         if tc:
+            rows.append(("Win toolchain source", tc.get("kind", "external")))
             rows.append(("gcc", native_toolchain_version(tc)))
             rows.append(("assembler", str(tc["as"])))
+            if tc.get("kind") == "bundled":
+                rows.append(("Bootstrap C frontend", "not bundled; full MinGW-w64 required for developer rebuilds"))
         rows.append(("WSL", "available" if wsl_available(settings) else "not detected"))
         if wsl_available(settings):
             distro = wsl_distro(settings)
@@ -591,6 +919,9 @@ def doctor(settings):
             rows.append((t, "OK" if have(t) else "missing"))
     rows.append(("rblc-asm", "present" if COMPILER_BIN.exists() else "will bootstrap"))
     rows.append(("runtime.o", "present" if RUNTIME_OBJ.exists() else "will assemble"))
+    abi_obj = WIN_RUNTIME_ABI_OBJ if use_native_windows(settings) else RUNTIME_ABI_OBJ
+    abi_state = "present" if abi_obj.exists() else "will build"
+    rows.append(("runtime ABI", f"{runtime_abi_version()} ({abi_state})"))
     return rows
 
 
@@ -600,6 +931,7 @@ def main():
     ap.add_argument("source",nargs="?")
     args=ap.parse_args()
     settings=load_settings()
+    stream_output = os.environ.get("RBL_STREAM_OUTPUT") == "1"
     try:
         if args.command=="doctor":
             print("RBL Studio toolchain doctor")
@@ -608,13 +940,27 @@ def main():
         if not args.source: ap.error("source is required")
         source=Path(args.source)
         if args.command=="check":
-            code,out,err=check(source,settings); print(out,end=""); print(err,end="",file=sys.stderr); return code
+            code,out,err=check(source,settings)
+            if not stream_output:
+                print(out,end=""); print(err,end="",file=sys.stderr)
+            return code
         if args.command=="build":
-            code,out,info=build(source,settings); print(out,end=""); print(info,end="",file=sys.stderr); return code
+            code,out,info=build(source,settings)
+            if not stream_output or out.startswith("build cache:"):
+                print(out,end="")
+            print(info,end="",file=sys.stderr)
+            return code
         if args.command=="run":
-            code,out,err=run_program(source,settings); print(out,end=""); print(err,end="",file=sys.stderr); return code
+            code,out,err=run_program(source,settings)
+            if not stream_output:
+                print(out,end=""); print(err,end="",file=sys.stderr)
+            return code
         if args.command=="asm":
-            code,out,err,path=assemble_preview(source,settings); print(out,end=""); print(path); print(err,end="",file=sys.stderr); return code
+            code,out,err,path=assemble_preview(source,settings)
+            if not stream_output:
+                print(out,end=""); print(err,end="",file=sys.stderr)
+            print(path)
+            return code
     except Exception as e:
         print(f"RBL Studio toolchain error: {e}",file=sys.stderr); return 1
     return 0

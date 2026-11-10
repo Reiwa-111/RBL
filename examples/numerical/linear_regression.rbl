@@ -1,0 +1,74 @@
+# Ordinary least-squares calibration for paired sensor readings.
+# Fits measured = intercept + slope * reference and reports residual quality.
+
+func average(values list) float (
+    if (len(values) == 0) ( return 0.0 )
+    set total = 0.0
+    for (value in values) (
+        let total += value
+    )
+    return total / float(len(values))
+)
+
+func fit_line(reference list, measured list) (
+    if (len(reference) != len(measured) or len(reference) < 2) (
+        return (false, 0.0, 0.0, 0.0, 0.0)
+    )
+    set x_mean = average(reference)
+    set y_mean = average(measured)
+    set covariance_sum = 0.0
+    set variance_sum = 0.0
+    set dx = 0.0
+    for (i in 0..len(reference)) (
+        let dx = reference[i] - x_mean
+        let covariance_sum += dx * (measured[i] - y_mean)
+        let variance_sum += dx * dx
+    )
+    if (variance_sum <= 0.000000000001) (
+        return (false, 0.0, 0.0, 0.0, 0.0)
+    )
+    set slope = covariance_sum / variance_sum
+    set intercept = y_mean - slope * x_mean
+    set residual_sum = 0.0
+    set total_sum = 0.0
+    set predicted = 0.0
+    set residual = 0.0
+    set centered = 0.0
+    for (i in 0..len(reference)) (
+        let predicted = intercept + slope * reference[i]
+        let residual = measured[i] - predicted
+        let residual_sum += residual * residual
+        let centered = measured[i] - y_mean
+        let total_sum += centered * centered
+    )
+    set r_squared = 1.0
+    if (total_sum > 0.000000000001) (
+        let r_squared = 1.0 - residual_sum / total_sum
+    )
+    set rmse = sqrt(residual_sum / float(len(reference)))
+    return (true, slope, intercept, r_squared, rmse)
+)
+
+func main() (
+    set reference = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    set measured = [0.18, 1.24, 2.19, 3.31, 4.27, 5.42, 6.36, 7.51]
+    set result = fit_line(reference, measured)
+    set predicted = 0.0
+    set residual = 0.0
+    print("LEAST-SQUARES SENSOR CALIBRATION")
+    if (result[0]) (
+        print(f"model: measured = {result[2]:.4f} + {result[1]:.4f} * reference")
+        print(f"R squared: {result[3]:.6f}")
+        print(f"RMSE: {result[4]:.6f}")
+        print("reference,measured,predicted,residual")
+        for (i in 0..len(reference)) (
+            let predicted = result[2] + result[1] * reference[i]
+            let residual = measured[i] - predicted
+            print(f"{reference[i]:.2f},{measured[i]:.3f},{predicted:.3f},{residual:.3f}")
+        )
+    ) else (
+        print("ERROR: regression requires paired data and non-constant reference values")
+    )
+    set invalid_fit = fit_line([1.0, 1.0, 1.0], [2.0, 2.1, 1.9])
+    print("constant-reference input rejected:", not invalid_fit[0])
+)

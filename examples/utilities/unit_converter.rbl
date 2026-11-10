@@ -1,0 +1,40 @@
+# Interactive unit converter for three common measurements.
+# Input is intentionally simple: choose a menu item, then enter one number.
+
+func main() (
+    print("RBL UNIT CONVERTER")
+    print("1. Kilometres -> miles")
+    print("2. Celsius -> Fahrenheit")
+    print("3. Kilograms -> pounds")
+
+    set choice = int(input("Choose 1, 2 or 3: "))
+    if (choice < 1 or choice > 3) (
+        print("Unknown conversion.")
+        return
+    )
+
+    set value = float(input("Value to convert: "))
+    set result = 0.0
+    set source_unit = ""
+    set target_unit = ""
+
+    switch (choice) (
+        case 1 (
+            let result = value * 0.6213711922
+            let source_unit = "km"
+            let target_unit = "mi"
+        )
+        case 2 (
+            let result = value * 9.0 / 5.0 + 32.0
+            let source_unit = "C"
+            let target_unit = "F"
+        )
+        case 3 (
+            let result = value * 2.2046226218
+            let source_unit = "kg"
+            let target_unit = "lb"
+        )
+    )
+
+    print(f"{value:.3f} {source_unit} = {result:.3f} {target_unit}")
+)

@@ -1,0 +1,9 @@
+func main() (
+    set retained = "gc-root"
+    set sum = 0
+    for (i in 0..=1000000) (
+        let sum = sum + i
+    )
+    print(retained)
+    print(sum)
+)

@@ -1,5 +1,6 @@
 .intel_syntax noprefix
 
+# Runtime tag values are the RBLRuntimeTag contract in runtime/rbl_abi.h.
 .equ TAG_UNIT, 0
 .equ TAG_INT, 1
 .equ TAG_FLOAT, 2
@@ -63,7 +64,7 @@
 .Llog_warn_prefix:  .asciz "[WARN] "
 .Llog_error_prefix: .asciz "[ERROR] "
 
-.Lmsg_len_type:      .asciz "len() expects a string"
+.Lmsg_len_type:      .asciz "len() expects a string, list, dictionary or tuple"
 .Lmsg_input_type:    .asciz "input() prompt must be a string"
 .Lmsg_read_type:     .asciz "read_file() path must be a string"
 .Lmsg_write_type:    .asciz "write_file() expects string path and string content"
@@ -93,6 +94,9 @@
 .extern fprintf
 .extern exit
 .extern malloc
+.extern rbl_string_alloc
+.extern rbl_string_free
+.extern rbl_gc_safepoint
 .extern strlen
 .extern memcpy
 .extern strcmp
@@ -137,6 +141,7 @@
 .globl rbl_process_exit
 .type rbl_process_exit,@function
 rbl_process_exit:
+    sub rsp, 8
     call exit
     ud2
 
@@ -206,6 +211,7 @@ rbl_require_unbound:
     jne .Lset_twice
     ret
 .Lset_twice:
+    sub rsp, 8
     mov r8, rsi
     mov rdi, QWORD PTR [rip+stderr]
     lea rsi, [rip+.Lfmt_set]
@@ -224,6 +230,7 @@ rbl_get_slot:
     mov rdx, QWORD PTR [rdi+16]
     ret
 .Lget_unbound:
+    sub rsp, 8
     mov r8, rsi
     mov rdi, QWORD PTR [rip+stderr]
     lea rsi, [rip+.Lfmt_unbound]
@@ -243,6 +250,7 @@ rbl_require_rebind:
     jne .Llet_type
     ret
 .Llet_missing:
+    sub rsp, 8
     mov r8, rdx
     mov rdi, QWORD PTR [rip+stderr]
     lea rsi, [rip+.Lfmt_let_missing]
@@ -253,6 +261,7 @@ rbl_require_rebind:
     call exit
     ud2
 .Llet_type:
+    sub rsp, 8
     mov r8, rdx
     mov rdi, QWORD PTR [rip+stderr]
     lea rsi, [rip+.Lfmt_let_type]
@@ -269,6 +278,7 @@ rbl_check_arity:
     jne .Larity_bad
     ret
 .Larity_bad:
+    sub rsp, 8
     mov r8, rdi
     mov r9d, esi
     mov r10d, edx
@@ -370,7 +380,7 @@ rbl_expect_bool:
 .Lexpect_bool_bad:
     push rbp
     mov rbp, rsp
-    sub rsp, 8
+    sub rsp, 16
     mov [rbp-8], rdi
     mov rdi, [rbp-8]
     call rbl_type_name
@@ -392,7 +402,7 @@ rbl_expect_int:
 .Lexpect_int_bad:
     push rbp
     mov rbp, rsp
-    sub rsp, 8
+    sub rsp, 16
     mov [rbp-8], rdi
     mov rdi, [rbp-8]
     call rbl_type_name
@@ -407,6 +417,7 @@ rbl_expect_int:
 
 .globl rbl_unknown_function
 rbl_unknown_function:
+    sub rsp, 8
     mov r8, rdi
     mov rdi, QWORD PTR [rip+stderr]
     lea rsi, [rip+.Lfmt_function]
@@ -419,6 +430,7 @@ rbl_unknown_function:
 
 .globl rbl_unknown_method
 rbl_unknown_method:
+    sub rsp, 8
     mov r8, rdi
     mov r9, rsi
     mov rdi, QWORD PTR [rip+stderr]
@@ -435,7 +447,7 @@ rbl_unknown_method:
 rbl_bad_binary:
     push rbp
     mov rbp, rsp
-    sub rsp, 40
+    sub rsp, 48
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -478,7 +490,7 @@ rbl_bad_unary:
 
 .globl rbl_int_overflow
 rbl_int_overflow:
-    jmp .Loverflow
+    jmp .Loverflow_unaligned
 .globl rbl_int_divzero
 rbl_int_divzero:
     jmp .Ldiv_zero
@@ -490,13 +502,13 @@ rbl_int_div_overflow:
 rbl_inc_i64:
     mov rax, rdi
     add rax, 1
-    jo .Loverflow
+    jo .Loverflow_unaligned
     ret
 .globl rbl_dec_i64
 rbl_dec_i64:
     mov rax, rdi
     sub rax, 1
-    jo .Loverflow
+    jo .Loverflow_unaligned
     ret
 .Loverflow:
     mov rdi, QWORD PTR [rip+stderr]
@@ -506,6 +518,9 @@ rbl_dec_i64:
     mov edi, 1
     call exit
     ud2
+.Loverflow_unaligned:
+    sub rsp, 8
+    jmp .Loverflow
 
 .globl rbl_neg
 rbl_neg:
@@ -524,7 +539,7 @@ rbl_neg:
 .Lneg_int:
     mov rax, 0x8000000000000000
     cmp rdx, rax
-    je .Loverflow
+    je .Loverflow_unaligned
     neg rdx
     mov eax, TAG_INT
     ret
@@ -563,7 +578,7 @@ rbl_add:
     jne .Ladd_bad
     mov rax, rsi
     add rax, rcx
-    jo .Loverflow
+    jo .Loverflow_unaligned
     mov rdx, rax
     mov eax, TAG_INT
     ret
@@ -579,9 +594,11 @@ rbl_add:
 .Ladd_str:
     cmp rdx, TAG_STR
     jne .Ladd_bad
+    sub rsp, 8
     mov rdi, rsi
     mov rsi, rcx
     call rbl_str_concat
+    add rsp, 8
     mov rdx, rax
     mov eax, TAG_STR
     ret
@@ -606,7 +623,7 @@ rbl_sub:
     jne .Lsub_bad
     mov rax, rsi
     sub rax, rcx
-    jo .Loverflow
+    jo .Loverflow_unaligned
     mov rdx, rax
     mov eax, TAG_INT
     ret
@@ -639,7 +656,7 @@ rbl_mul:
     jne .Lmul_bad
     mov rax, rsi
     imul rax, rcx
-    jo .Loverflow
+    jo .Loverflow_unaligned
     mov rdx, rax
     mov eax, TAG_INT
     ret
@@ -701,6 +718,7 @@ rbl_div:
     mov rdx, r9
     jmp rbl_bad_binary
 .Ldiv_zero:
+    sub rsp, 8
     mov rdi, QWORD PTR [rip+stderr]
     lea rsi, [rip+.Lfmt_divzero]
     xor eax, eax
@@ -709,6 +727,7 @@ rbl_div:
     call exit
     ud2
 .Ldiv_overflow:
+    sub rsp, 8
     mov rdi, QWORD PTR [rip+stderr]
     lea rsi, [rip+.Lfmt_divov]
     xor eax, eax
@@ -813,7 +832,9 @@ rbl_eq:
 
 .globl rbl_ne
 rbl_ne:
+    sub rsp, 8
     call rbl_eq
+    add rsp, 8
     xor edx, 1
     ret
 
@@ -1010,7 +1031,7 @@ rbl_str_concat:
     jo .Loverflow
     add rdi, 1
     jc .Loverflow
-    call malloc
+    call rbl_string_alloc
     test rax, rax
     jz .Lmalloc_bad
     mov [rbp-40], rax
@@ -1164,6 +1185,8 @@ rbl_print_values:
     lea rdi, [rip+.Lfmt_print_nl]
     xor eax, eax
     call printf
+    mov rdi, QWORD PTR [rip+stdout]
+    call fflush
     add rsp, 8
     pop r14
     pop r13
@@ -1234,7 +1257,7 @@ rbl_len:
 rbl_input0:
     push rbp
     mov rbp, rsp
-    sub rsp, 16
+    sub rsp, 32
     mov QWORD PTR [rbp-8], 0
     mov QWORD PTR [rbp-16], 0
     lea rdi, [rbp-8]
@@ -1243,7 +1266,19 @@ rbl_input0:
     call getline
     cmp rax, -1
     je .Linput_fail
+    mov [rbp-24], rax
+    lea rdi, [rax+1]
+    call rbl_string_alloc
+    mov [rbp-32], rax
+    mov rdi, rax
+    mov rsi, [rbp-8]
+    lea rdx, [rbp-24]
+    mov rdx, [rdx]
+    inc rdx
+    call memcpy
     mov rdi, [rbp-8]
+    call free
+    mov rdi, [rbp-32]
     call rbl_trim_newline
     mov rdx, rax
     mov eax, TAG_STR
@@ -1260,7 +1295,7 @@ rbl_input1:
     jne .Linput_type
     push rbp
     mov rbp, rsp
-    sub rsp, 16
+    sub rsp, 32
     mov [rbp-8], rsi
     mov rdi, rsi
     call rbl_print_raw_string
@@ -1273,7 +1308,18 @@ rbl_input1:
     call getline
     cmp rax, -1
     je .Linput_fail1
+    mov [rbp-24], rax
+    lea rdi, [rax+1]
+    call rbl_string_alloc
+    mov [rbp-32], rax
+    mov rdi, rax
+    mov rsi, [rbp-8]
+    mov rdx, [rbp-24]
+    inc rdx
+    call memcpy
     mov rdi, [rbp-8]
+    call free
+    mov rdi, [rbp-32]
     call rbl_trim_newline
     mov rdx, rax
     mov eax, TAG_STR
@@ -1350,7 +1396,7 @@ rbl_read_file:
     mov rdi, [rbp-16]
     add rdi, 1
     jc .Lread_io_bad
-    call malloc
+    call rbl_string_alloc
     test rax, rax
     jz .Lread_io_bad
     mov [rbp-24], rax
@@ -1372,7 +1418,7 @@ rbl_read_file:
     ret
 .Lread_buf_bad:
     mov rdi, [rbp-24]
-    call free
+    call rbl_string_free
 .Lread_io_bad:
     mov rdi, [rbp-8]
     test rdi, rdi
@@ -1839,7 +1885,7 @@ rbl_str:
     add rax, 1
     mov [rbp-16], rax
     mov rdi, rax
-    call malloc
+    call rbl_string_alloc
     test rax, rax
     jz .Lconv_str_oom_int
     mov [rbp-24], rax
@@ -1871,7 +1917,7 @@ rbl_str:
     add rax, 1
     mov [rbp-16], rax
     mov rdi, rax
-    call malloc
+    call rbl_string_alloc
     test rax, rax
     jz .Lconv_str_oom_float
     mov [rbp-24], rax
@@ -2119,7 +2165,7 @@ rbl_string_upper:
     mov [rbp-24], rax
     mov rdi, [rbp-16]
     add rdi, 1
-    call malloc
+    call rbl_string_alloc
     test rax, rax
     jz .Lstr_upper_oom
     mov [rbp-32], rax
@@ -2168,7 +2214,7 @@ rbl_string_lower:
     mov [rbp-24], rax
     mov rdi, [rbp-16]
     add rdi, 1
-    call malloc
+    call rbl_string_alloc
     test rax, rax
     jz .Lstr_lower_oom
     mov [rbp-32], rax
@@ -2263,7 +2309,7 @@ rbl_string_trim:
     inc rax
     mov [rbp-40], rax              # length
     lea rdi, [rax+1]
-    call malloc
+    call rbl_string_alloc
     test rax, rax
     jz .Lstr_trim_oom
     mov [rbp-48], rax
@@ -2281,7 +2327,7 @@ rbl_string_trim:
     ret
 .Lstr_trim_all:
     mov edi, 1
-    call malloc
+    call rbl_string_alloc
     test rax, rax
     jz .Lstr_trim_oom
     mov byte ptr [rax], 0
@@ -2323,7 +2369,7 @@ rbl_string_starts_with:
     jne .Lstr_two_bad
     push rbp
     mov rbp, rsp
-    sub rsp, 24
+    sub rsp, 32
     mov [rbp-8], rsi
     mov [rbp-16], rcx
     mov rdi, rsi

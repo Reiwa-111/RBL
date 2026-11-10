@@ -26,7 +26,8 @@ func main() (
         print(matrix[row])
     )
 
-    # Use a scale-relative pivot threshold so uniformly scaled systems remain solvable.
+    # Scale only the coefficient matrix. The RHS magnitude must not affect
+    # whether the coefficient matrix is classified as singular.
     for (row in 0..size) (
         for (column in 0..size) (
             if (abs(matrix[row][column]) > matrix_scale) (

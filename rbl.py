@@ -2,6 +2,7 @@
 """RBL command-line tool: cargo/pytest/python-like project workflow."""
 from __future__ import annotations
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -58,7 +59,74 @@ def run_tests() -> int:
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'run_tests.py')], cwd=ROOT)
     if rc:
         return rc
-    return subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_stdlib.py')], cwd=ROOT)
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_stdlib.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_build_cache.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_clean_command.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_asm_call_alignment.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_runtime_abi.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_gc_safepoint_codegen.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_string_ownership.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_string_io_gc.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_rbltool_streaming.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_bundled_toolchain.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_toolchain_manifest.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_linux_launcher.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_posix_file_metadata.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_wx_find_in_files_security.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_wx_project_tree_posix_security.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_wx_save_dirfd_security.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_wx_worker_lifecycle.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'native' / 'wx-ui' / 'tests' / 'dpi_static_test.py')], cwd=ROOT)
+    if rc:
+        return rc
+    if os.name == 'nt':
+        rc = subprocess.call([
+            'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-File', str(ROOT / 'tests' / 'test_windows_registry_policy.ps1'),
+        ], cwd=ROOT)
+        if rc:
+            return rc
+        rc = subprocess.call([
+            'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-File', str(ROOT / 'tests' / 'test_windows_save_cleanup.ps1'),
+        ], cwd=ROOT)
+        if rc:
+            return rc
+    return subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_diagnostics.py')], cwd=ROOT)
 
 
 def run_bench(args: list[str]) -> int:
@@ -67,8 +135,8 @@ def run_bench(args: list[str]) -> int:
     return subprocess.call(cmd, cwd=ROOT)
 
 
-def run_bench3way(args: list[str]) -> int:
-    """RBL vs CPython vs hand-written ASM. Needs a Linux host (Linux syscall baselines)."""
+def run_bench5way(args: list[str]) -> int:
+    """Five-implementation benchmark. Needs Linux/WSL for the syscall ASM baseline."""
     cmd = [sys.executable, str(ROOT / 'benchmarks' / 'compare_all.py'), *args]
     return subprocess.call(cmd, cwd=ROOT)
 
@@ -150,12 +218,33 @@ def new_project(name: str, target: Path) -> int:
 
 
 def clean(cwd: Path) -> int:
-    p = cwd / 'build'
-    if p.exists():
-        shutil.rmtree(p)
-        print(f'Removed {p}')
-    else:
+    # Build outputs are centralized beside this tool, not in the caller's
+    # project directory. Preserve evidence, source archives, RC bundles,
+    # visualizations and other user-owned data under build/.
+    build_root = Path(rbltool.BUILD_DIR)
+    cache_root = build_root / 'sources'
+    if not cache_root.exists() and not cache_root.is_symlink():
         print('Nothing to clean.')
+        return 0
+    is_junction = getattr(Path, 'is_junction', lambda self: False)
+    if (build_root.is_symlink() or is_junction(build_root)
+            or cache_root.is_symlink() or is_junction(cache_root)):
+        print(f'Refusing to clean a symlinked/junction build path: {cache_root}', file=sys.stderr)
+        return 1
+    try:
+        resolved_build = build_root.resolve(strict=True)
+        resolved_cache = cache_root.resolve(strict=True)
+    except OSError as exc:
+        print(f'Cannot safely resolve build cache: {exc}', file=sys.stderr)
+        return 1
+    if resolved_cache.parent != resolved_build or resolved_cache.name != 'sources':
+        print(f'Refusing to clean unexpected path: {resolved_cache}', file=sys.stderr)
+        return 1
+    if not resolved_cache.is_dir():
+        print(f'Refusing to clean non-directory build cache: {resolved_cache}', file=sys.stderr)
+        return 1
+    shutil.rmtree(resolved_cache)
+    print(f'Removed compiler build cache: {resolved_cache}')
     return 0
 
 
@@ -171,9 +260,10 @@ def main() -> int:
     for name in ('check', 'build', 'run', 'asm'):
         p = sub.add_parser(name)
         p.add_argument('source', nargs='?')
-    p_test = sub.add_parser('test'); p_test.add_argument('path', nargs='?')
+    sub.add_parser('test')
     sub.add_parser('bench')
-    p_bench3 = sub.add_parser('bench3way'); p_bench3.add_argument('--reps', type=int, default=10); p_bench3.add_argument('--warmups', type=int, default=2)
+    p_bench5 = sub.add_parser('bench5way'); p_bench5.add_argument('--reps', type=int, default=10); p_bench5.add_argument('--warmups', type=int, default=2)
+    p_bench3 = sub.add_parser('bench3way', help='Legacy alias for bench5way'); p_bench3.add_argument('--reps', type=int, default=10); p_bench3.add_argument('--warmups', type=int, default=2)
     p_diff = sub.add_parser('diff'); p_diff.add_argument('--a', default='wsl'); p_diff.add_argument('--b', default='native'); p_diff.add_argument('paths', nargs='*')
     p_fmt = sub.add_parser('fmt'); p_fmt.add_argument('source', nargs='?'); p_fmt.add_argument('--check', action='store_true')
     p_docs = sub.add_parser('doc'); p_docs.add_argument('source', nargs='?'); p_docs.add_argument('-o', '--output', default='target/docs.md')
@@ -229,7 +319,10 @@ def main() -> int:
         return rc
     if args.cmd == 'test': return run_tests()
     if args.cmd == 'bench': return run_bench([])
-    if args.cmd == 'bench3way': return run_bench3way([f'--reps={args.reps}', f'--warmups={args.warmups}'])
+    if args.cmd in {'bench5way', 'bench3way'}:
+        if args.cmd == 'bench3way':
+            print("rbl bench3way is a legacy alias; use rbl bench5way", file=sys.stderr)
+        return run_bench5way([f'--reps={args.reps}', f'--warmups={args.warmups}'])
     if args.cmd == 'diff': return run_differential([f'--a={args.a}', f'--b={args.b}', *args.paths])
     if args.cmd == 'fmt': return format_file(resolve_source(args.source, cwd), args.check)
     if args.cmd == 'doc': return generate_docs(resolve_source(args.source, cwd), (cwd / args.output).resolve())
