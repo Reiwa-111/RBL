@@ -12,11 +12,13 @@ programs. Run `RBLStudio.cmd` (GUI) or `rbl.cmd` (CLI) directly from the project
 root; no separate distribution archive is produced. The same sources build the
 Linux x86-64 payload.
 
-**Publication status:** the 0.8.0 checkout is prepared and locally verified. It
-is **not yet published**. The GitHub `v0.8.0` entry published on 2026-11-10 is
-the earlier pre-release placeholder with zero assets; it remains unchanged until
-the final checkout and disclosures are approved. The gates that still stand
-between this payload and publication are listed under
+**Publication status:** the 0.8.0 checkout was published on 2026-11-15 as the
+**`v0.8.0-r2` full release**
+(`https://github.com/Reiwa-111/RBL/releases/tag/v0.8.0-r2`). No binary assets are
+attached: the source checkout at that tag is the distributable payload. The
+older GitHub `v0.8.0` entry published on 2026-11-10 remains the pre-release
+placeholder with zero assets and still contains the damaged example; it was not
+moved. The acceptance and legal gates that remain open are listed under
 [Known limitations and publication gates](#known-limitations-and-publication-gates).
 
 ## Distribution layout

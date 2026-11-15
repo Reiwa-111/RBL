@@ -1,6 +1,6 @@
 # RBL Studio — RBL 0.8.0 release manifest
 # Snapshot: RBL 0.8.0 / 2026-11-15 (full 0.8.0 release candidate: wx frontend and release audit)
-# Status: FULL 0.8.0 RELEASE PREPARED — NOT PUBLISHED. The GitHub v0.8.0 entry visible since 2026-11-10 is the earlier pre-release placeholder with zero assets.
+# Status: FULL 0.8.0 RELEASE PUBLISHED as v0.8.0-r2 on 2026-11-15 (runnable checkout, no binary assets). The older GitHub v0.8.0 entry visible since 2026-11-10 remains the pre-release placeholder with zero assets and was not moved.
 # Distribution model: the repository checkout is the ready-to-run Windows payload (no separate ZIP/tar.zst release archives). Publication is gated by full interactive IDE/soak acceptance, pristine-VM verification, and owner/legal approval of the public corresponding-source disclosure.
 
 ## Current status — final 0.8.0 release (2026-11-15)

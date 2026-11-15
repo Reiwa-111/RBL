@@ -34,7 +34,7 @@ python3 ../rbl.py run
 
 The relative `../rbl.py` path assumes `hello` is a direct child of the RBL Studio checkout. For a project created elsewhere, use the `RBL_STUDIO_ROOT` instructions in its generated README.
 
-The 0.8.0 Windows payload is the repository checkout itself and is locally verified, but it is not yet published. The GitHub `v0.8.0` entry currently visible is the earlier 2026-11-10 pre-release placeholder with zero assets; it will be replaced by the final release only after the gates in the [release manifest](RELEASE_MANIFEST.txt) are closed. See the [release notes](docs/eng/release-notes.md) for the complete 0.8.0 description.
+The 0.8.0 Windows payload is the repository checkout itself and is locally verified. It was published on 2026-11-15 as the **`v0.8.0-r2` full release** (`https://github.com/Reiwa-111/RBL/releases/tag/v0.8.0-r2`); no binary assets are attached because the source checkout at that tag is the payload. The older GitHub `v0.8.0` entry remains the 2026-11-10 pre-release placeholder with zero assets and still contains the damaged example; it was not moved. The remaining acceptance/legal gates are recorded in the [release manifest](RELEASE_MANIFEST.txt). See the [release notes](docs/eng/release-notes.md) for the complete 0.8.0 description.
 
 RBL compiles user programs to native executables. **RBL source code is not translated into C**: the compiler parses the language, performs static analysis and selected optimizations, then emits x86-64 assembly. The C compiler is used to build parts of the compiler/runtime toolchain, not to transpile user programs.
 
@@ -86,7 +86,7 @@ The compiler frontend and code generator are shared between targets where possib
 
 ### Current version
 
-The repository/compiler version is stored in the root [`VERSION`](VERSION) file. The current source tree and both bundled compiler binaries target **RBL 0.8.0**. The full 0.8.0 Windows and Linux packages are built from this tree and locally verified; publication is pending the gates recorded in [`RELEASE_MANIFEST.txt`](RELEASE_MANIFEST.txt). The GitHub `v0.8.0` entry published on 2026-11-10 is the earlier pre-release placeholder and still has no attached assets.
+The repository/compiler version is stored in the root [`VERSION`](VERSION) file. The current source tree and both bundled compiler binaries target **RBL 0.8.0**. The full 0.8.0 Windows payload is the checkout itself and was published on 2026-11-15 as `v0.8.0-r2`; remaining acceptance/legal gates are recorded in [`RELEASE_MANIFEST.txt`](RELEASE_MANIFEST.txt). The older GitHub `v0.8.0` entry published on 2026-11-10 is the pre-release placeholder and still has no attached assets.
 
 - `python rbl.py version` reads `0.8.0` from `VERSION`.
 - The Linux and Windows `rblc-asm` binaries are built with the same version value and report `0.8.0`.
@@ -197,7 +197,7 @@ git clone https://github.com/Reiwa-111/RBL.git
 cd RBL
 ```
 
-As of 2026-11-11, the default branch `main` and annotated tag `v0.8.0` both resolve to commit `a0158bde41b14edece58828d82d44dc634cd1abc`; the root `VERSION` file is authoritative. The GitHub `v0.8.0` release currently visible is the 2026-11-10 **pre-release placeholder** with no attached binary assets. The full 0.8.0 payload is assembled from the current working tree, which also restores the previously corrupted `examples/utilities/source-WUDMB5.rbl`; the public tag still contains the damaged duplicate. The final release must therefore be cut from a new commit/tag — do not move the existing tag retroactively, and do not treat the tag's example corpus as a verified stable source snapshot.
+As of 2026-11-15, `main` and the new annotated tag `v0.8.0-r2` resolve to the full-release commit; the root `VERSION` file is authoritative. The earlier annotated tag `v0.8.0` still resolves to `a0158bde41b14edece58828d82d44dc634cd1abc` and its GitHub release remains the 2026-11-10 **pre-release placeholder** with no attached binary assets. The full 0.8.0 payload is the checkout at `v0.8.0-r2`, which also restores the previously corrupted `examples/utilities/source-WUDMB5.rbl`; the public `v0.8.0` tag still contains the damaged duplicate. Do not move the old tag retroactively and do not treat its example corpus as a verified stable source snapshot.
 
 ### Check the toolchain
 
@@ -733,7 +733,7 @@ executable is unavailable, `RBL_STUDIO_ALLOW_LEGACY=1` permits the launcher to
 use a separately built legacy executable from a developer checkout. It is not
 included in the wx installer payload.
 
-The 0.8.0 payload is the repository checkout itself: the wxWidgets GUI and Rust worker plus their wx DLLs live under `bin/win-x86_64/studio/`, app-local CPython 3.14.10 under `runtime/python`, and the pinned Windows toolchain under `toolchain/`. `RBLStudio.cmd` (GUI), `RBLStudio.vbs` (hidden launch) and `rbl.cmd` (CLI) in the project root run directly from the checkout with no separate distribution archive. Verified on 2026-11-15 from the repository root: Windows CTest 12/12, Linux CTest 11/11, 63/63 RBL regression tests, CLI `version`/`check`/`run`, and GUI `GUI_ALIVE=True` with title `RBL Studio` and a live worker process. The GitHub `v0.8.0` entry currently visible is still the 2026-11-10 **pre-release placeholder** with zero assets; this checkout has not been published yet. Publication is gated by the remaining items below and in [`RELEASE_MANIFEST.txt`](RELEASE_MANIFEST.txt).
+The 0.8.0 payload is the repository checkout itself: the wxWidgets GUI and Rust worker plus their wx DLLs live under `bin/win-x86_64/studio/`, app-local CPython 3.14.10 under `runtime/python`, and the pinned Windows toolchain under `toolchain/`. `RBLStudio.cmd` (GUI), `RBLStudio.vbs` (hidden launch) and `rbl.cmd` (CLI) in the project root run directly from the checkout with no separate distribution archive. Verified on 2026-11-15 from the repository root: Windows CTest 12/12, Linux CTest 11/11, 63/63 RBL regression tests, CLI `version`/`check`/`run`, and GUI `GUI_ALIVE=True` with title `RBL Studio` and a live worker process. The release is published as **`v0.8.0-r2`**; the older GitHub `v0.8.0` entry remains the 2026-11-10 **pre-release placeholder** with zero assets. The remaining gates are listed below and in [`RELEASE_MANIFEST.txt`](RELEASE_MANIFEST.txt).
 
 The current Windows SaveDocument suite passed 27/27 with an isolated fixture. Resource smoke runs passed at 60, 120 and 300 seconds using 32 open documents, a path-backed `resource-task.rbl`, all four task types and graceful GUI/worker shutdown; the 300-second run completed 84 task cycles. A 7,200-second attempt did not reach sampling because the harness failed to acquire notebook focus; it was not retried after the user requested no further IDE launches. The two-hour soak is therefore **NOT PASSED**.
 
