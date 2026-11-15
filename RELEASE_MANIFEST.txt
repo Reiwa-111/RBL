@@ -1,6 +1,51 @@
 # RBL Studio — RBL 0.8.0 release manifest
-# Snapshot: RBL 0.8.0 / 2026-11-10 (wx frontend follow-up, regression and packaging audit)
-# Status: UNRELEASED — not published, tagged or distributed; GUI acceptance and source-distribution blockers remain open.
+# Snapshot: RBL 0.8.0 / 2026-11-15 (full 0.8.0 release candidate: wx frontend and release audit)
+# Status: FULL 0.8.0 RELEASE PREPARED — NOT PUBLISHED. The GitHub v0.8.0 entry visible since 2026-11-10 is the earlier pre-release placeholder with zero assets.
+# Distribution model: the repository checkout is the ready-to-run Windows payload (no separate ZIP/tar.zst release archives). Publication is gated by full interactive IDE/soak acceptance, pristine-VM verification, and owner/legal approval of the public corresponding-source disclosure.
+
+## Current status — final 0.8.0 release (2026-11-15)
+
+- Repository/compiler version: 0.8.0. Runtime ABI: 1.2.0.
+- Distribution model: the repository checkout root is the portable application
+  directory. GUI, Rust worker and their wx DLLs live under
+  `bin/win-x86_64/studio/`; app-local CPython 3.14.10 lives under
+  `runtime/python`; the assembler/linker runtime closure is in `toolchain/` and
+  `bin/`. No separate ZIP/tar.zst release archives are produced; `RBLStudio.cmd`
+  and `rbl.cmd` in the checkout root launch the payload. There is no install
+  manifest, uninstaller or registry/XDG integration.
+- The earlier packaged archives (Windows 578 files / Linux 5,149 files) were
+  removed on 2026-11-15 when the distribution model changed; their hashes remain
+  recorded in the historical audit/verification material under `verification/`.
+- Re-verified 2026-11-15: 63/63 RBL direct-assembly tests; Windows wx CTest
+  12/12; Linux wx CTest 11/11; native Windows CLI (`version`, `check`, `run`)
+  and GUI startup from the checkout root with System32-only PATH and no `RBL_*`
+  variables; the earlier Linux package acceptance (CLI/worker in a PATH without
+  system Python or `cc`, GUI under WSLg) is retained as historical evidence.
+- Corresponding source in the checkout: the Rust worker source tree
+  (`rbl-ide/worker`), the wxWidgets IDE sources (`rbl-ide/wx-ui`) and the pinned
+  Windows toolchain bundle with `SOURCE_CODE.md` and the toolchain manifest.
+  The large upstream corresponding-source archives (MSYS2 toolchain, CPython,
+  python-build-standalone, wxWidgets) are not bundled in the checkout; their
+  exact source locations and hashes are recorded in
+  `toolchain/windows-x86_64/SOURCE_CODE.md`. The public source-delivery route
+  still requires owner/legal approval.
+- Remaining publication gates: full interactive GUI checklist, live
+  high-DPI/multi-monitor and all-theme acceptance, 7,200-second resource soak,
+  pristine-VM installation, and owner/legal approval of the release-page
+  corresponding-source disclosure. The Windows `ReplaceFileW` leaf race remains
+  documented for 0.9; CVE-2026-90801 residual risk is accepted only for the
+  supported compiler-generated COFF workflow.
+- Tag note: the public `v0.8.0` tag still contains the damaged
+  `examples/utilities/source-WUDMB5.rbl`. The working tree contains the corrected
+  1,093-byte file (the earlier packaged archives carried it too). The final
+  release must be cut from a new commit/tag; do not move the existing tag
+  retroactively.
+- The dated entries below are historical checkpoints. Where they say
+  `UNRELEASED`, `PRE-RELEASE` or `RELEASE BLOCKED`, that was the status at the
+  time of the entry; this section is authoritative for the current 0.8.0
+  payload.
+- No publication, upload, tag movement, release-status change or asset attach
+  was performed on 2026-11-15.
 
 ## Version and targets
 
@@ -43,7 +88,7 @@ x86-64 assembly; user RBL programs are not compiled through C.
 - Linux/Windows runtime and toolchain paths include ABI, container and format
   objects; the standalone Linux rebuild script builds the complete Runtime.
 - RBL Studio's primary desktop frontend is the native C++20/wxWidgets 3.2 /
-  Scintilla application in `native/wx-ui/`, paired with `rbl-studio-worker`.
+  Scintilla application in `rbl-ide/wx-ui/`, paired with `rbl-studio-worker`.
   The former Rust/egui source remains as a legacy reference; when wx is
   unavailable, `RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately
   built executable from a developer checkout. It is not included in the wx
@@ -130,7 +175,7 @@ documentation and licensing reconciliation is recorded at the end of this file.
 ### Initial IDE readiness snapshot — 2026-11-09 (historical)
 
 - At this snapshot, the native wxWidgets 3.2 / Scintilla frontend was being built
-  in `native/wx-ui/`; the existing Rust/egui Cargo frontend remained present as
+  in `rbl-ide/wx-ui/`; the existing Rust/egui Cargo frontend remained present as
   rollback/reference. The wx application now serves as the primary launcher/
   install target. It includes
   the full toolchain task menu (Run, Build, Check, ASM, Tests, Benchmarks,
@@ -145,7 +190,7 @@ documentation and licensing reconciliation is recorded at the end of this file.
   plus 9.8 MiB worker working set. This does not establish 32-tab/large-file/
   active-process peak memory or full interactive acceptance. At that historical
   snapshot it was not yet the default frontend; no commit, tag, push or release
-  was performed. Details and build instructions: `native/wx-ui/README.md`.
+  was performed. Details and build instructions: `rbl-ide/wx-ui/README.md`.
 - IDE follow-up engineering pass: the existing 256×256 RBL PNG is now wired to
   the native window icon; Settings now exposes RBL syntax highlighting and soft
   wrapping, supports Restore defaults and can be resized. Invalid settings files
@@ -284,8 +329,10 @@ documentation and licensing reconciliation is recorded at the end of this file.
   integration was retained instead of adding an unproven heavyweight editor
   stack. This is an explicit remaining editor limitation, not a claim of
   PyCharm-equivalent folding.
-- These open IDE verification items do not change the compiler/runtime version
-  or imply publication. RBL 0.8.0 remains UNRELEASED.
+- Historical status at this 2026-11-10 checkpoint (before the GitHub pre-release
+  was published): these open IDE verification items did not change the
+  compiler/runtime version or imply publication. The release was not yet
+  published at this checkpoint; see the dated 2026-11-11 current-status section.
 - Exact-version source-only archives for 9 toolchain and 11 wx/runtime package
   sources have now been downloaded and signature-verified (20/20); upstream
   source hashes, the CRT/winpthreads git commit and default-manifest source hash
@@ -302,7 +349,7 @@ documentation and licensing reconciliation is recorded at the end of this file.
   recognizes ELF input vectors, so the output-emulation list is not a general
   input-format restriction. The exact-source review confirmed that
   `cache_bwrite` is reachable during ordinary PE output writes; whether the
-  vulnerable write-size condition can be met by the supported RBL workflow is
+  vulnerable read-size condition can be met by the supported RBL workflow is
   unresolved. The default RBL path uses compiler-generated COFF objects and does
   not accept arbitrary object inputs or pass `--gc-sections -w`, which narrows
   exposure but does not establish N/A. CVE-2026-90801 remains release-blocking;
@@ -345,15 +392,17 @@ documentation and licensing reconciliation is recorded at the end of this file.
 
 ## wxWidgets primary frontend status — 2026-11-10
 
-The primary `native/wx-ui/` frontend uses C++20, wxWidgets 3.2.11,
+The primary `rbl-ide/wx-ui/` frontend uses C++20, wxWidgets 3.2.11,
 `wxStyledTextCtrl`/Scintilla and the Rust `rbl-studio-worker`. The top-level
 CMD/VBS/SH launchers and user-scope Windows/Linux installers select wx by
 default. The older Cargo/egui frontend source remains in the repository;
 `RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately built executable
 from a developer checkout when wx is unavailable, but it is not included in the
 wx installer payload.
-The wx application remains
-UNRELEASED until GUI, installer, security and distribution gates are complete.
+At this 2026-11-10 checkpoint, the wx application had not yet met stable product
+release acceptance. This wording describes IDE acceptance, not the GitHub
+pre-release publication; the published pre-release does not close GUI,
+installer, security or distribution gates.
 
 Latest completed checks in this follow-up:
 
@@ -632,20 +681,22 @@ source-level review of the exact signed source archive confirmed that
 ELF input vectors and the COFF final-link path can copy foreign sections through
 the generic BFD write path. The default RBL workflow has a narrower input path
 (compiler-generated COFF objects; no arbitrary object files or `--gc-sections -w`),
-but the CVE's vulnerable write-size condition has not been ruled out.
+but the CVE's vulnerable read-size condition has not been ruled out.
 Ubuntu still lists 24.04 as needing evaluation and Debian lists 2.47.50 as
 unfixed; this is a security blocker, not a claim of known exploitation or a
 confirmed unaffected target. Binary redistribution remains blocked. See
-`native/wx-ui/THIRD_PARTY_NOTICES.md`,
+`rbl-ide/wx-ui/THIRD_PARTY_NOTICES.md`,
 `toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md`,
 `toolchain/windows-x86_64/SOURCE_CODE.md` and
 `toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md`.
 
-**Status: ENGINEERING TESTS PASS / GUI ACCEPTANCE SUBSTANTIAL WITH REMAINING
-GAPS / RELEASE BLOCKED / UNRELEASED.** No commit, push, tag or publication has
-been made.
+**Historical status at this 2026-11-10 checkpoint: ENGINEERING TESTS PASS / GUI
+ACCEPTANCE SUBSTANTIAL WITH REMAINING GAPS / RELEASE BLOCKED.** No commit, push,
+tag or publication had been made at that checkpoint.
 
-This is the current RBL 0.8.0 pre-release manifest. Keep its candidate status explicit until release publication is separately authorized.
+This was the current RBL 0.8.0 candidate manifest at that checkpoint. The GitHub
+pre-release was subsequently published on 2026-11-10; current status is recorded
+in the dated 2026-11-11 verification section at the end of this file.
 
 ## Late verification update — 2026-11-10, 11:31 local
 
@@ -662,7 +713,7 @@ This is the current RBL 0.8.0 pre-release manifest. Keep its candidate status ex
 - The existing `build/wx-ui-win` directory lacks
   `licenses/Scintilla/License.txt`; it is not a complete installer payload.
   The registered acceptance used a temporary payload with the exact source
-  notice copied from `native/wx-ui/licenses/Scintilla-LICENSE.txt`. Installer
+  notice copied from `rbl-ide/wx-ui/licenses/Scintilla-LICENSE.txt`. Installer
   preflight and acceptance now reject a build directory missing that notice.
   A fresh packaging build with `tools/build_wx_ide.ps1` is required after the
   active soak; do not rebuild its current build directory while it is running.
@@ -680,7 +731,7 @@ This is the current RBL 0.8.0 pre-release manifest. Keep its candidate status ex
   during ordinary PE output linking through BFD's generic foreign-section
   write path. The default RBL path uses compiler-generated COFF objects and
   does not accept arbitrary object inputs or pass `--gc-sections -w`; this
-  narrows exposure but does not rule out the vulnerable write-size condition.
+  narrows exposure but does not rule out the vulnerable read-size condition.
   CVE-2026-90801 remains unresolved and release-blocking.
 
 The release remains **UNRELEASED / RELEASE BLOCKED**. Final packaging rebuild,
@@ -811,7 +862,7 @@ acceptance remain unverified.
   XDG migration, `--no-register`, symlink refusal and transactional rollback.
 - Linux CTest's POSIX metadata target now compiles the comprehensive root
   `tests/posix_file_metadata.cpp` suite with `-Werror`, rather than the older
-  minimal duplicate under `native/wx-ui/tests`; all 19 ext4 scenarios pass.
+  minimal duplicate under `rbl-ide/wx-ui/tests`; all 19 ext4 scenarios pass.
 - The shared Save dirfd/static suite was also run on Windows: 14 PASS / 2 SKIP
   (POSIX-only runtime cases); evidence is
   `build/verification/2026-11-10/save-security-windows-static.log`. Live Windows
@@ -1016,7 +1067,9 @@ unavailable live multi-monitor DPI acceptance, and the still-unpassed current-RC
 - `python tests/check_documentation.py` passed: 70 Markdown files, 489 relative links, no missing links/fragments, RU/EN page inventories aligned. `git diff --check` passed (line-ending warnings only).
 - Current Linux Runtime alignment inventory is 158 textual `call` sites and 178 emitted call instructions; the earlier 157/177 values are retained only in the older dated verification snapshot.
 - Detailed command/result record: `build/verification/first-checkpoint-2026-11-10.md`.
-- No release publication or Git tag was created.
+- No release publication or Git tag was created during this verification
+  checkpoint; this entry predates the 2026-11-10 18:51:29Z GitHub pre-release
+  publication. It does not describe the current remote state.
 
 ## Post-caret-fix verification — 2026-11-10
 
@@ -1048,3 +1101,602 @@ The verifier's remaining test/assurance gaps are recorded in `build/verification
 - Python syntax checks pass for the modified diagnostic/differential/verifier scripts.
 - WSL `bash tests/run_gcc_analyzer.sh` passes `-fanalyzer` and strict prototype checks for all seven compiler translation units and all three shared Runtime C modules.
 - The RFC requires independent semantics review before its model is frozen or verifier implementation begins.
+
+## Verification and source-material follow-up — 2026-11-11
+
+- Fresh Windows Gate D build completed. Windows CTest passed 10/10, including
+  Save security and worker lifecycle tests. The fresh portable build contains
+  the GUI executable, Rust worker, runtime DLLs, third-party notices, Scintilla
+  and Rust license payloads, and the Rust corresponding-source archive.
+- Fresh Ubuntu 24.04 Gate D build completed. Linux CTest passed 9/9; Rust
+  formatting passed; worker unit tests passed 27/27; Clippy passed with
+  `-D warnings`; shutdown ordering passed with 385 output events and `Finished`
+  before `bye`; control-reserve stress retained all 10,000 protocol errors and
+  emitted `bye` last. The fresh Windows worker binary also passed both native
+  stress tests: shutdown retained 3,590 output events and ordered `Finished`
+  before `bye`; control-reserve stress retained all 10,000 protocol errors
+  and emitted `bye` last.
+- A Windows GNU `cargo test` attempt could not link its test binary: MinGW ld
+  could not resolve Rust sysroot `.rlib` paths under the current user-profile
+  toolchain. No Windows Rust unit-test or Windows Clippy PASS is claimed.
+  The prebuilt Windows worker itself passed the two native protocol stress
+  tests above.
+- The current Windows registered installer acceptance passed against the fresh
+  Gate D payload in an isolated HKCU GUID subtree. Linux installer acceptance
+  passed against the fresh Linux payload, including XDG migration, no-register,
+  symlink refusal and transactional rollback. Both installers verify and retain
+  the Rust worker source archive. These tests do not attach the separate MSYS2
+  source bundle to the runtime package.
+- WSLg Wayland/X11 sockets are present. The Linux GUI process remained alive
+  during a five-second startup smoke, but no interactive visual/desktop
+  acceptance is claimed.
+- A new 331,187,525-byte Windows corresponding-source archive was assembled
+  on 2026-11-11 at
+  `build/source-material/RBL-0.8.0-Windows-Source-Materials-20261111-ref-corrected.tar.zst`.
+  SHA-256: `AE764168F5D6812885A4382E7B5B99C9B83F6EAB6BB1A5FD169E1488EDACC8A5`.
+  It supersedes the lost 2026-11-10 archive and is not claimed to be byte-identical.
+  Its 55 SHA256SUMS records passed after extraction; the bundle contains 20
+  signed MSYS2 source archives, five signed binary packages and audit metadata.
+  This confirms archive integrity and source correspondence only, not legal
+  review. The archive remains outside the binary runtime payload.
+- Upstream Bug 34442 describes a heap out-of-bounds READ in
+  `bfd/cache.c::cache_bwrite` (`fwrite` reads 32 bytes from a 22-byte allocation).
+  The MSYS2 package index still lists Binutils 2.47-4 with CVE-2026-90801;
+  Debian lists affected Binutils releases as unfixed and Ubuntu lists Noble as
+  “Needs evaluation”. The bundled linker remains 2.47-4; no fixed build or
+  proof excluding the vulnerable condition is available. CVE-2026-90801 remains
+  **UNRESOLVED / RELEASE BLOCKING**.
+- The stale link to the deleted `docs/ru/IDE_DESIGN_REWORK_PLAN.md` was removed
+  from the RU documentation index; the EN index no longer describes that
+  internal plan as indexed content. CVE notices now consistently identify an
+  out-of-bounds READ rather than a write.
+- Remaining acceptance/distribution blockers: current-candidate 7,200-second
+  soak, live Windows 125–200% multi-monitor acceptance, interactive Linux GUI
+  acceptance, and legal review/distribution of the MSYS2 corresponding-source
+  archive (or an applicable written offer). Windows path-based Save replacement
+  race and LOW orphan-temp cleanup edge remain documented; injected native
+  registry import/rollback failures and custom registry ACL preservation remain
+  untested.
+
+RBL Studio 0.8.0 remains **PUBLISHED PRE-RELEASE / STABLE RELEASE BLOCKED**. The
+GitHub release `RBL Studio 0.8.0 PRE RELEASE` was published on 2026-11-10 with
+`prerelease=true` and no attached assets (verified from the GitHub release API
+on 2026-11-11). No new commit, tag, push, asset upload or release-status change
+was performed during this verification; `v0.8.0` still points to
+`a0158bde41b14edece58828d82d44dc634cd1abc`.
+## Gate F source archive reference correction - 2026-11-11
+
+Earlier dated entries above record the then-current Windows and Rust source-archive
+candidates. Those entries are historical evidence; neither old artifact is the
+current source bundle. The Windows candidate `RBL-0.8.0-Windows-Source-Materials-20261110.tar.zst`
+(SHA-256 `6bc84404a077bcc438bafd0b6add5436bb8d1058f339aa5d1ebd988529c7fa57`) was
+found unavailable and superseded by `build/source-material/RBL-0.8.0-Windows-Source-Materials-20261111-ref-corrected.tar.zst`
+(331,187,525 bytes; SHA-256 `aaf0c1f41c83a38435985c53876339d3b6271285bf8cd236c584a22be52be696`).
+The earlier local 2026-11-11 candidate (SHA-256
+`ae764168f5d6812885a4382e7b5b99c9b83f6eab6bb1a5fd169e1488edacc8a5`) is retained
+only as a superseded pre-correction checkpoint; its embedded audit snapshots are
+stale and it must not be used for distribution.
+The Rust candidate `RBL-0.8.0-Rust-Worker-Source-Materials-20261110-1955.tar.zst`
+(8,099,357 bytes; SHA-256 `df5881aa72dc556d9fff6217fd436cec9ad9cb345ac899058a12d23bbdf40da5`)
+was superseded by `build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261111-ref-corrected.tar.zst`
+(8,256,908 bytes; SHA-256 `31fe751cbf74096e3ad36908d81a137c18f9da4277f59081f2745e4566c0d80a`).
+The old names and digests above are retained solely to identify the historical
+candidates and are not current distribution references.
+
+## Gate E follow-up — 2026-11-11
+
+The Windows orphan-temporary cleanup edge identified in the earlier audit is
+fixed by marking the exact exclusive temporary-file handle delete-pending before
+closing it. The Windows path-based `ReplaceFileW` destination-leaf race remains
+unresolved; identity/recovery checks preserve displaced data but cannot provide
+an atomic compare-and-swap on the destination name. CVE-2026-90801 remains
+unresolved for the bundled Binutils 2.47-4 and remains release-blocking.
+
+Verification performed after the cleanup patch:
+- `python tests/test_wx_save_dirfd_security.py`: 17 tests, 15 passed, 2 skipped
+  by platform gating.
+- `tests/test_windows_save_cleanup.ps1`: PASS, including the new case that
+  creates an exclusive temp without obtaining metadata and deletes the exact
+  object through its still-open handle.
+- `python tests/test_windows_path_logic.py`: PASS.
+- `python tests/test_bundled_toolchain.py`: PASS.
+- `python tests/test_toolchain_manifest.py`: PASS.
+- `git diff --check`: PASS.
+- Windows CMake target `rbl-studio-wx` rebuilt with the supported MSYS2 UCRT64
+  PATH: `cmake --build build/wx-ui-win-gate-d-20261111-locked --target
+  rbl-studio-wx --parallel 4`, exit code 0. No IDE process was launched for this
+  build verification.
+
+Gate D remains PARTIAL. Resource smokes on the path-backed RBL workload passed
+at 60 seconds (85 samples/16 cycles), 120 seconds (142 samples/32 cycles) and
+300 seconds (316 samples/84 cycles). SaveDocument passed 27/27. The 7,200-second
+attempt failed before sampling due to notebook-focus acquisition; it was not
+repeated after the user's explicit request to stop further IDE launches. Live
+DPI, Linux desktop and remaining manual GUI workflows are NOT RUN. The stable
+release remains blocked by CVE-2026-90801, the Windows replacement race, legal
+source-delivery review and the incomplete Gate D acceptance items.
+
+## Gate F final reviewed bundle — 2026-11-11
+
+A stale embedded `THIRD_PARTY_NOTICES.md` was found in the `ref-corrected` archive
+(the old copy described CVE-2026-90801 as an out-of-bounds write). A new
+`RBL-0.8.0-Windows-Source-Materials-20261111-final-reviewed.tar.zst` was built
+from current live audit documents. Size 331,187,540 bytes; SHA-256
+`2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066`.
+
+Verification: 60 tar members; 55/55 SHA256SUMS entries; 4 embedded audit
+snapshots byte-identical to live files; 25/25 GPG signatures valid under the
+MSYS2 keyring; 20/20 source archives; 5 binary packages; 18/18 PKGBUILD source
+hashes; 2/2 git snapshots; 43/43 shipped files chained to exact binary packages.
+Rust source bundle independently passes on Windows and Ubuntu 24.04 with 28
+active licensed crates, 35 Cargo.lock checksums and 60 upstream license/notice
+files byte-identical to copied license inventory.
+
+Public GitHub release API confirms v0.8.0 remains a pre-release with zero assets.
+Its published description still claims the MSYS2 source archive is not available
+locally and that corpus/differential work was incomplete; this text is stale.
+No public release edit or asset upload was made because legal source-delivery
+review is pending and no public mutation was authorized. Gate F remains PARTIAL:
+legal approval, public source delivery and fresh installer retention acceptance
+are not complete.
+
+## Gate G documentation reconciliation — 2026-11-11
+
+Local checkout remains on `main` at `a0158bde41b14edece58828d82d44dc634cd1abc`
+with `VERSION=0.8.0`; this is the same commit recorded for the public `main` and
+`v0.8.0` tag at the prior remote metadata check. The worktree is intentionally
+dirty with uncommitted audit fixes. No commit, push, tag movement, GitHub release
+edit or asset upload was performed. The GitHub release remains a pre-release
+with zero assets.
+
+Gate G documentation reconciliation passed. The root README now distinguishes
+the published pre-release from stable readiness and describes the actual CLI
+cleanup scope. EN/RU CLI, project workflow, testing, diagnostics, architecture,
+roadmap, IDE and release-note material was reconciled with the current source
+tree and Gate D/E/F findings. The project scaffold README generator now uses the
+actual `rbl.py` entry point and clarifies that `rbl.py test` tests the RBL Studio
+checkout, not a generated project. Current counts are 62 direct RBL regression
+cases, 63 diagnostic scenarios and 84 default differential cases (62 successful
+output comparisons, 11 expected runtime-error comparisons, 7 expected-negative
+diagnostic comparisons and 4 build/exit-only comparisons). Historical 61/83
+entries above describe earlier checkpoints and are intentionally retained.
+
+Current local evidence:
+
+- Windows Native `python rbl.py test`: PASS, exit 0; 62 direct cases, 63
+  diagnostics, scaffold tests 4/4. Log:
+  `../verification/2026-11-11-Gate-G/03_windows_full_test_clean_stderr.log`;
+  SHA-256 `90c4ffb134d8ba0bb3fb6e1a35d307125e632e9fe140f70c053001b6f99eed20`.
+- Ubuntu 24.04 WSL `python3 rbl.py test`: PASS, exit 0; same direct/diagnostic
+  and scaffold counts. Log:
+  `../verification/2026-11-11-Gate-G/04_wsl_full_test_clean_stderr.log`;
+  SHA-256 `27d6274ea4ef04e410dc9b34a21aacafb0c83aa3822ea9ce024886615934bb5f`.
+- Windows and WSL project CLI smoke (`new`, generated README, `check`, `run`,
+  `init`): PASS. Logs `05_windows_cli_project_smoke.log` and
+  `06_wsl_cli_project_smoke.log` under the same Gate G directory.
+- `python tests/differential.py --a wsl --b native`: PASS, 84/84. Log:
+  `07_differential_current_84_cases.log`; SHA-256
+  `5b949c533723e50576b31e3721195b4bbf1ade8ddcb11c63b0e0b62339183adb`.
+- `python tests/check_documentation.py`: PASS; 72 Markdown files, 502 relative
+  links, 0 missing targets, 0 bad fragments; EN/RU heading hierarchy aligned
+  for reference 8/8, how-to 6/6 and explanation 10/10 pairs.
+- External Markdown destinations: 20 unique URLs checked. All current URLs
+  returned HTTP 200 to GET. One obsolete MSYS2 security URL was corrected to
+  `https://packages.msys2.org/security`; two package pages reject HEAD (405)
+  but return HTTP 200 to GET.
+- `git diff --check`: PASS, with Git line-ending normalization warnings only.
+
+Current corresponding-source archives are present locally but not publicly
+delivered and not legally cleared:
+
+- Windows source materials: 331,187,540 bytes; SHA-256
+  `2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066`.
+- Rust worker source materials: 8,256,908 bytes; SHA-256
+  `31fe751cbf74096e3ad36908d81a137c18f9da4277f59081f2745e4566c0d80a`.
+
+Gate G is PASS for documentation reconciliation only. Gate D remains PARTIAL;
+the two-hour soak was not passed and no GUI retry was performed. Gate E remains
+BLOCKED by CVE-2026-90801, the Windows `ReplaceFileW` destination-leaf race and
+the POSIX fail-closed replacement limitation. Gate F remains PARTIAL because
+legal approval, public source delivery, release-page disclosure and fresh
+installer retention acceptance remain open. The overall stable-release and
+binary-distribution verdict remains BLOCKED.
+
+### Post-build corresponding-source documentation correction — 2026-11-11
+
+The live Windows source-audit document now points to the reachable MSYS2
+security index at `https://packages.msys2.org/security`. The frozen
+`final-reviewed` Windows source archive retains the previous URL in its
+embedded `SOURCE_ARCHIVE_AUDIT.md`; the other three embedded audit snapshots
+remain byte-identical to live files. Internal checksums and GPG signatures are
+still valid, but a new final-reviewed archive must be rebuilt and fully
+reverified before public source delivery. Preserve the existing final-reviewed
+archive and do not substitute the older `ref-corrected` candidate.
+
+The Rust source archive's embedded `RUST_DEPENDENCY_NOTICES.md` omits the
+live-only line that names the archive and its own digest; this self-reference is
+intentionally excluded to avoid a circular archive hash. The 60 copied upstream
+license/notice files remain byte-identical. No archive was changed or uploaded;
+Gate F remains PARTIAL.
+
+### Gate H / Gate I final verification — 2026-11-12
+
+Gate H independent code/test review is PASS for the reviewed 0.8.0 working-tree
+candidate. The final review report is
+`../verification/2026-11-11-Gate-H/GATE_H_REVIEW.md`. Confirmed findings were
+fixed with regressions: dictionary update growth/OOM threshold, exact Runtime
+ownership of `rbl.fs.cwd()`, toolchain manifest reparse/ancestor/`..` traversal
+and inventory errors, late Windows installer rollback coverage, marker-based
+worker backpressure, LF-inclusive 36 MiB frame boundaries, and atomic compiler
+`-S` output promotion/`--check` stream errors.
+
+Final regression evidence:
+
+- Windows Native `python rbl.py test`: PASS, exit 0; log
+  `../verification/2026-11-11-Gate-H/105_windows_full_rbl_test_atomic_output_final.log`;
+  SHA-256 `fcbda868d36a799934b7435f80a93d9fcea761cc1e548f43123da27c7242a582`.
+- Ubuntu 24.04 `python3 rbl.py test`: PASS, exit 0; log
+  `../verification/2026-11-11-Gate-H/106_wsl_full_rbl_test_atomic_output_final.log`;
+  SHA-256 `ef9dc926ca1283bb8e2bde05ee98de04e3fbfad03c8788f0b72e145e862f6a8a`.
+- Ubuntu 24.04 `make test`: PASS, exit 0; log
+  `../verification/2026-11-11-Gate-H/107_wsl_make_test_with_new_regressions_final.log`;
+  SHA-256 `d89da9a105efa104ed8b1b2a46de47ee4e2c761ced60ad38e1b502cb8cc55d1d`.
+- WSL vs Windows Native differential: 85/85 PASS; diagnostic differential:
+  30/30 PASS. Logs `108_differential_wsl_native_atomic_output_final.log`
+  (SHA-256 `be28b027e978c0974c8f6260db790546b6314d711889592e3768674159953da9`)
+  and `109_diagnostic_differential_atomic_output_final.log`
+  (SHA-256 `ef5af6cdb41748ffb03965a019d2646ac2d6455f92d0608708f89112e6978a70`).
+- Corpus: Windows Native, Windows-hosted WSL and Ubuntu native Linux each
+  passed 123 sources (116 positive, 7 expected rejects, 0 failures). Logs
+  `110_windows_native_corpus_atomic_output_final.log`,
+  `111_windows_host_wsl_corpus_atomic_output_final.log`, and
+  `113_wsl_native_corpus_atomic_output_final.log`.
+- Rust worker `cargo test --locked`: 29/29 PASS; log
+  `112_wsl_cargo_test_atomic_output_final.log`, SHA-256
+  `2a1b2731d8db65e6f477a339bdb4c7fc3de72652edb5b55cd8bc3e2b7c92197b`.
+- Worker backpressure/recovery passed on both final worker payloads with
+  marker-specific counts; Windows recovered 61,440,000/61,440,000 markers and
+  WSL recovered 61,440,000/61,440,000.
+
+Gate I is PARTIAL. Fresh Windows and Linux wx payload builds passed from
+isolated output directories; CTest passed 12/12 Windows and 11/11 Linux. The
+Windows registered installer acceptance passed, including Unicode-profile
+installed CLI smoke and the late COM shortcut-save rollback case. Linux
+installer acceptance passed, including XDG migration, no-register, symlink
+refusal, transactional rollback and retained recovery data. Both installed
+CLIs passed version/doctor/check/run/clean. See
+`../verification/2026-11-11-Gate-I/GATE_I_REVIEW.md` and logs `56`–`61`.
+
+The current Rust corresponding-source archive is local:
+
+- `build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261112-python-no-bytecode-r3.tar.zst`
+- 8,280,345 bytes; SHA-256
+  `7f814086a67a007b5fcbf7d871ae45a5fb990f644d884215eaf00ce6541d393f`.
+
+No versioned distributable package or `SHA256SUMS` release archive was created,
+no source archive was attached publicly, and no GitHub release/branch/tag was
+modified. GUI startup/backend action and the two-hour GUI soak were NOT RUN.
+The Gate H test boundary gaps (real 36 MiB pipe integration and live UNC/SMB
+share integration) are recorded in its review report. Compiler atomic output
+has a documented hostile concurrent-writer TOCTOU caveat and preserves POSIX
+mode bits but not previous owner/ACL/xattr/timestamp metadata.
+
+Overall release disposition remains BLOCKED: Gate D PARTIAL (interactive GUI
+acceptance/soak), Gate E BLOCKED (CVE-2026-90801 remains unresolved upstream in
+the reviewed sources, plus outstanding replacement-path race/fail-closed
+issues), and Gate F PARTIAL (owner/legal approval and public corresponding-
+source delivery; the final-reviewed Windows source archive still needs a new
+revision because its embedded audit URL is historical). Keep v0.8.0 marked
+pre-release and do not publish assets or claim stable readiness.
+
+## Gate E refresh — 2026-11-12
+
+The exact bundled Windows linker was re-hashed and executed with its UCRT64
+runtime directory on `PATH`: `ld.exe` SHA-256
+`a279cc83f198a606f255a597b3a067b51f11a9bbf8fe46de2a0dc8bb71b47f4f`, version
+`2.47.20260726`, emulations `i386pep`/`i386pe`. The staged signed Binutils 2.47-4
+source archive was inspected: the PKGBUILD patch set contains no `bfd/cache.c`
+or `cache_bwrite` fix, and upstream `bfd/cache.c:436` still calls
+`fwrite(from, 1, nbytes, f)`. MSYS2 continues to list CVE-2026-90801 for 2.47-4;
+Debian's current 2.47.50.20261021-1 is vulnerable/unfixed and Ubuntu Noble is
+`Needs evaluation`. The default RBL COFF workflow's vulnerable condition is
+not reproduced and not proven unreachable. CVE remains **UNRESOLVED / RELEASE
+BLOCKING**. Ubuntu 24.04's external, non-bundled Binutils is
+`2.42-4ubuntu2.10`; its CVE applicability remains unevaluated by Ubuntu.
+
+Microsoft's `FILE_RENAME_INFO` documentation confirms that `RootDirectory`
+supports handle-relative destination resolution, but `ReplaceIfExists` acts on
+whatever currently occupies the destination name; the API carries no expected
+destination file identity. Thus it does not supply compare-and-swap semantics.
+The Windows `ReplaceFileW` destination-leaf race remains unresolved and
+release-blocking; no unsafe replacement was introduced.
+
+POSIX `ExchangeFileNamesAt` now classifies only `ENOSYS`, `EOPNOTSUPP` and
+`ENOTSUP` as unsupported. `EINVAL` is propagated. Test skip handling no longer
+accepts `EIO`, `ENXIO` or `EPERM` as unsupported, and the C++ FIFO/linkat tests
+no longer accept `EPERM`. Ubuntu 24.04 WSL DrvFS supported `RENAME_EXCHANGE`
+in the current run; atomic exchange, metadata, recovery and save-security
+checks passed. Filesystems without exchange support continue to fail closed.
+
+Fresh focused evidence: Windows save-dirfd Python tests 16 passed / 2 platform
+skips; Windows handle-cleanup PowerShell test PASS; WSL save-dirfd Python tests
+18/18 PASS; POSIX metadata target rebuilt and direct test PASS; CTest POSIX
+metadata 1/1 PASS and static save-security 1/1 PASS. Logs:
+`../verification/2026-11-12-Gate-E/06_ubuntu_wsl_final.log` (SHA-256
+`509ea5dd1a0567664e6db74e5b48abde5fc62d24b0f08c2f06eb99d1c8473226`) and
+`../verification/2026-11-12-Gate-E/07_windows_final.log` (SHA-256
+`264ded16b287be46324f41a53b1ba491c5eced52838ed0846bb381c43ebf7d9c`).
+Gate E remains **BLOCKED pending CVE disposition**. The Windows replacement
+race and POSIX unsupported-filesystem compatibility limitation are deferred to
+the 0.9 backlog by owner decision; current fail-closed behavior is retained.
+Gate D/F/I remain open as previously recorded. No commit, tag, push, stable promotion,
+asset upload or release publication was performed.
+The live `toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md` was extended by this
+refresh; the frozen Windows corresponding-source archive therefore has another
+stale embedded audit snapshot and must be rebuilt/reverified before any public
+source delivery. It remains local and must not be distributed as-is.
+
+### Final documentation and evidence crosswalk reconciliation — 2026-11-12
+
+The final local candidate is a dirty working tree based on
+`a0158bde41b14edece58828d82d44dc634cd1abc`; the existing public `v0.8.0` tag
+does not contain these uncommitted changes. The consolidated gate matrix and
+evidence references are in
+`../verification/2026-11-12-Final/FINAL_RELEASE_EVIDENCE_CROSSWALK.md`.
+
+The final Gate H counts supersede the earlier Gate G snapshot: 63 direct
+compiler regression cases, 63 diagnostics, 85 differential source cases
+(62 successful-output, 11 expected runtime-error, 7 expected-negative and
+5 build/exit-only), and corpus 123 sources (116 positive / 7 expected rejects).
+The English/Russian testing guides, release notes and roadmaps were updated to
+these values. Final documentation validation passed with 72 Markdown files,
+506 relative links, zero missing targets and zero bad fragments; all 24 EN/RU
+page pairs retain matching heading hierarchy.
+
+Final gate disposition: A/B/C PASS; D PARTIAL; E BLOCKED; F PARTIAL; G PASS;
+H PASS; I PARTIAL. Overall stable/binary release remains BLOCKED. Gate I's
+fresh Windows/Linux payload builds, CTest (12/12 and 11/11), and isolated
+installer/installed-CLI acceptance are verified, but no versioned distributable
+archive, final `SHA256SUMS`, pristine-VM installation, GUI startup/backend
+acceptance or public assets exist. No commit, push, tag movement, release
+promotion, asset upload or source publication was performed. Keep the public
+GitHub release as a pre-release with zero assets.
+
+## Working-tree follow-up — source layout and clean-install readiness — 2026-11-12
+
+The IDE source tree is now consolidated under `rbl-ide/`:
+
+- `rbl-ide/wx-ui/` — C++20/wxWidgets/Scintilla frontend.
+- `rbl-ide/worker/` — Rust NDJSON worker and shared process/settings modules.
+- `rbl-ide/legacy-egui/` — retained legacy frontend; its process/settings modules explicitly reuse the worker sources.
+
+`Cargo.toml`, Rust module paths, CMake build scripts, source-bundle tooling, test fixtures, benchmarks, README/docs and launch/install scripts were updated. A dedicated `tests/test_ide_source_layout.py` protects the new canonical paths. The current Rust corresponding-source archive was rebuilt and verified for Windows GNU and Linux targets: 28 licensed crates, 35 checksum records; `build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261112-python-no-bytecode-r3.tar.zst`, 8,280,345 bytes, SHA-256 `7f814086a67a007b5fcbf7d871ae45a5fb990f644d884215eaf00ce6541d393f`.
+
+Fresh wx payload builds after the worker runtime-path changes passed CTest 12/12 on Windows and 11/11 on Ubuntu 24.04 WSL. Rust worker `cargo test --locked` passed 30/30 on WSL. The complete Windows `python rbl.py test` command exited 0; its compiler and diagnostic suites each passed 63/63, with platform-only cases explicitly skipped. Focused layout and bundled-toolchain tests passed. Windows registered installer acceptance passed after the installer changes. Linux installer acceptance passed install/upgrade/uninstall/rollback and installed CLI `version/doctor/check/run/clean`; a second CLI acceptance run used a scrubbed PATH containing only GNU `as` and `ld`, with no `cc`, and passed. This confirms shipped Linux compiler/runtime artifacts no longer trigger a developer C bootstrap merely because extraction changed mtimes.
+
+The Rust worker, installers and CLI wrappers now prefer `RBL_PYTHON`, then an app-local interpreter (`runtime/python/python.exe` on Windows or `runtime/python/bin/python3` on Linux), then the system interpreter. The fresh Windows/Linux portable payloads now include pinned app-local CPython 3.14.10. Installed CLI and headless worker backend actions have passed without system Python in isolated temporary installation roots. A source checkout still requires Python 3.9+ for development. Linux backend execution still requires GNU Binutils `as` and `ld`; no Linux Binutils bundle is shipped. No pristine VM or GUI startup acceptance was performed, and legal review remains required before redistribution.
+
+Documentation validation: 73 Markdown files, 508 relative links, zero missing targets and zero bad fragments; all 24 EN/RU pairs retain matching heading hierarchy. `git diff --check` passes (Git reports existing line-ending normalization warnings only).
+
+No GUI was launched, no 7,200-second soak was retried, and no commit, push, tag movement, package publication, release asset upload or source publication was performed. Gate I remains PARTIAL; Gate D/E/F remain open as recorded above.
+
+## Gate E owner scope update and CVE-2026-90801 review — 2026-11-12
+
+Owner disposition: defer the Windows `ReplaceFileW` destination-leaf race and
+the POSIX `RENAME_EXCHANGE` unsupported-filesystem compatibility limitation to
+RBL 0.9. They are no longer 0.8.0 blockers. Preserve the current POSIX
+fail-closed behavior; do not introduce an unconditional replacement fallback.
+
+CVE-2026-90801 review findings are recorded in
+`next-step/GATE-E-CVE-2026-90801.md`:
+
+- Upstream Bug 34442 remains `UNCONFIRMED`. Its reporter describes a malformed
+  ELF input causing an ASan heap out-of-bounds READ (32 bytes read beyond a
+  22-byte allocation) in `cache_bwrite`; the attached PoC could not be retrieved
+  for independent reproduction. No arbitrary code execution was demonstrated.
+- The exact bundled Windows Binutils 2.47-4 linker supports PE output
+  emulations only, but accepts ELF input. A benign ELF object was successfully
+  linked to PE output. Binutils' generic `ldlang.c` section-copy path uses
+  `bfd_get_full_section_contents` followed by `bfd_set_section_contents`, so
+  PE output alone does not prove that malformed ELF cannot trigger a related
+  size mismatch. The exact upstream PoC was not run against this Windows build.
+- The supported RBL Windows build path generates assembly from `.rbl`, creates
+  compiler-generated COFF objects with MinGW `as`, and links only those objects
+  with the bundled COFF runtime objects. It does not accept arbitrary ELF
+  objects or pass the reported `--gc-sections -w` combination. The CVE has not
+  been demonstrated in the supported RBL workflow; manual use of the bundled
+  linker with untrusted ELF remains a residual toolchain risk.
+
+Do not mark the CVE false positive, fixed, or universally inapplicable. Owner
+decision is still required on whether the supported RBL build workflow defines
+the 0.8.0 security boundary and whether the residual manual-linker risk is
+accepted. Until that decision, Gate E remains blocked by CVE disposition only;
+the two save-path findings are deferred to 0.9. No commit, push, tag movement,
+stable promotion, release asset upload or public source publication was done.
+
+## App-local CPython packaging and clean-PATH installer verification — 2026-11-12
+
+`tools/package_python_runtime.py` is now integrated into the Windows and Linux
+wx build scripts. It pins CPython 3.14.10 packages, verifies exact archive size
+and SHA-256, downloads through atomic temporary files, safely extracts ZIP/TAR
+members, validates the interpreter version and required standard-library
+imports, and writes `rbl-python-runtime.json` plus `UPSTREAM.md` provenance.
+An existing corrupt cache entry is rejected and preserved rather than silently
+replaced. Platform runtimes are staged beneath each build directory's
+`runtime/python/`, not the shared source `runtime/` directory.
+
+Pinned upstream package identities:
+
+- Windows x86-64 embeddable ZIP:
+  `python-3.14.10-embed-amd64.zip`, 12,619,664 bytes,
+  SHA-256 `90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159`.
+- Linux x86-64 glibc standalone TAR:
+  `cpython-3.14.10+20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz`,
+  36,875,876 bytes,
+  SHA-256 `c2ff2e97422f5d3896a16e0317fd212ba977bbf2688d93a6f7a03d817506bd30`.
+
+Windows retains the upstream embeddable `LICENSE.txt` and CPython third-party
+license inventory. Linux retains CPython's `lib/python3.14/LICENSE.txt`, pip
+and vendor notices, CPython PSF license and python-build-standalone MPL-2.0
+license. The Linux runtime targets x86-64 GNU/Linux with a glibc 2.17 baseline;
+it is not a musl/Alpine package. These records establish provenance, not legal
+approval to redistribute the runtime or the overall application payload.
+
+Verification on 2026-11-12:
+
+- Fresh Windows and Ubuntu 24.04 WSL builds completed in
+  `build/clean-machine-20261112-win` and
+  `build/clean-machine-20261112-linux`; CTest passed 12/12 and 11/11,
+  respectively. WSL Rust worker `cargo test --locked` passed 30/30.
+- Windows registered installer acceptance passed, including install/upgrade/
+  uninstall/rollback, installed CLI and headless worker backend, and `rbl.cmd`
+  `version/run/clean` with PATH limited to System32 plus the installed bundled
+  MinGW directory. No system Python or external MSYS2 PATH was used.
+- Linux installer acceptance passed, including install/uninstall, no-register,
+  symlink refusal, rollback and retained recovery data. Installed CLI and
+  headless worker backend passed without system Python or `cc`; the scrubbed
+  PATH contained only GNU `as`, `ld` and the shell utilities `bash`/`dirname`.
+- Full Windows and Ubuntu 24.04 WSL `python rbl.py test` both exited 0; each
+  passed 63/63 direct ASM cases and 63/63 diagnostic cases, with platform-only
+  skips explicitly reported. Logs are retained as
+  `windows_full_tests.log` and `linux_full_tests.log` in the clean-machine
+  verification directory.
+- `tests/test_python_runtime_packaging.py` passed 9/9 on Ubuntu, including the
+  POSIX relative-symlink extraction test; Windows passed 8 tests with that
+  POSIX-only test skipped. Documentation validation passed for 74 Markdown
+  files, 508 relative links, zero missing targets and zero bad fragments.
+- A clean VM and GUI startup/backend-through-GUI acceptance were not performed.
+  Linux GNU Binutils and wxWidgets/GTK system libraries remain external
+  prerequisites. `RBL_PYTHON` remains an explicit interpreter override.
+
+The installed-worker acceptance test was corrected to consume the worker's
+initial `worker_started` NDJSON event before waiting for `ready`. The Windows
+`rbl.cmd` launcher was corrected to avoid eager `%RBL_PYTHON%` expansion inside
+a parenthesized batch block, which had incorrectly selected the literal
+`python` fallback. The Linux clean-PATH test now exposes `bash` and `dirname`
+because its shell wrapper needs them; neither is a Python/compiler dependency.
+
+No distributable archive was created or published. Gate I remains PARTIAL until
+pristine-VM and GUI acceptance; Gate E remains blocked on CVE owner disposition,
+and Gate F/legal redistribution review remains open.
+
+## Linux app-local toolchain, wxWidgets and source-compliance update — 2026-11-12
+
+This section supersedes the earlier Linux dependency statement above for the
+new packaging path. The earlier clean-machine Linux acceptance used system GNU
+`as`/`ld` and does not validate this new app-local toolchain.
+
+- Linux backend selection now prefers ClangBuiltLinux LLVM 23.1.5: `clang` is
+  invoked as an integrated assembler (`-x assembler`) and `ld.lld` links ELF
+  outputs. The pinned archive is `llvm-23.1.5-x86_64.tar.xz`, 86,722,684 bytes,
+  SHA-256 `b69433120ad62420d789f601c58a5472873c724be088c99a70b72fd30ca4af3c`.
+  The staged toolchain retains Apache-2.0 with LLVM Exceptions license text,
+  source commit `392dfff97d29b59d77e5cac6d4b6ef2585fe7117` and a binary manifest.
+  `readelf` reports GLIBC 2.27 and GLIBCXX 3.4.22 as the highest symbol
+  requirements. The detached `.tar.sign` signature is now verified over the
+  decompressed `.tar` payload against pinned primary/subkey fingerprints
+  `2437CB76E544CB6AB3D9DFD399739260CB6CB716` /
+  `7BE325C731319CCD01D8CA921D6B269171C01A96`; key, signature and checksum
+  evidence are retained under `provenance/` in the staged toolchain.
+- Packaged Linux launchers set `RBL_REQUIRE_BUNDLED_LINUX_TOOLCHAIN=1` and fail
+  closed if app-local Clang or LLD is missing. `rbltool.py` links directly
+  against `libc.so.6` and `libm.so.6`, so the ordinary backend no longer needs
+  glibc development linker scripts. A WSL clean-PATH test with no `as`, `ld`,
+  `cc` or inherited Python PATH passed `doctor` and `run examples/test.rbl`.
+- `tools/package_wxwidgets.py` pins wxWidgets 3.2.4 source at 27,505,949 bytes,
+  SHA-256 `0640e1ab716db5af2ecb7389dbef6138d7679261fbff730d23845ba838ca133e`.
+  It safely extracts only regular files and non-escaping relative symlinks.
+  The Linux build script now compiles wxWidgets shared libraries into the app
+  payload and carries `wxWindows Library Licence 3.1` plus the exact source
+  archive. GNU Binutils and a system wxWidgets installation are not part of the
+  intended Linux backend/GUI payload.
+- CPython corresponding-source archives are now staged and hash-verified:
+  `source/Python-3.14.10.tar.xz` (24,240,392 bytes, SHA-256
+  `de414a57119abef52784d8993e341d53aed635fc2b05c2607d9f98a2c5b72032`) and
+  `source/python-build-standalone-20261110.tar.gz` (470,059 bytes, SHA-256
+  `63b8166347616283ee6d3ed449e957bc71b65368bc60945d21ab957e6fcaee49`; tag
+  commit `9244801782b78e4c4afc5c82a4524aa2101d3298`). Windows and Linux runtime
+  packagers retain these under their runtime staging tree; platform build
+  scripts copy them into the root corresponding-source directory. Installer
+  guards require and verify the archives and sidecars.
+- The Flatpak manifest at `packaging/flatpak/com.reiwa.rblstudio.yml` declares
+  `org.gnome.Platform//51` so GTK is supplied inside the sandbox rather than by
+  the host. The native shell installer still requires host GTK3 runtime
+  libraries. The manifest and payload-preparation script are authored, but no
+  completed Flatpak bundle or Flatpak runtime acceptance exists yet. The local
+  manifest packages a prebuilt payload and is not ready for Flathub submission;
+  public Flathub publication requires SDK source modules and app-ID namespace
+  confirmation.
+- Technical component inventory and source/license status are recorded in
+  `next-step/LEGAL-DISTRIBUTION-AUDIT-2026-11-12.md`. This does not constitute
+  formal legal advice or sign-off. The Linux wxWidgets build attempt stopped at
+  configure because GTK3 development headers are not installed in Ubuntu 24.04
+  WSL. A user-run request to install `flatpak`, `flatpak-builder` and
+  `libgtk-3-dev` remains open; do not assume it has completed.
+- New focused tests: wxWidgets source packager 5/5 PASS on Linux; LLVM source
+  packager 3/3 PASS; Linux toolchain selection/fail-closed tests 4/4 PASS;
+  Python runtime packager 10/10 PASS (the Windows run skips the POSIX-only
+  symlink test). These tests do not replace a completed Linux build, installer
+  acceptance or Flatpak acceptance.
+
+The Windows GNU ld CVE-2026-90801 disposition remains pending and is not resolved
+by replacing GNU Binutils on Linux. No new distributable archive was created or
+published. Gate E remains blocked; Gate F/legal review remains open; Gate I
+remains PARTIAL until the new Linux package, pristine-VM and GUI/backend
+acceptance paths are verified.
+
+## Same-day Linux/Windows packaging validation update — 2026-11-12 evening
+
+This addendum supersedes the earlier same-day Linux build/installer/Flatpak
+status above where it conflicts. The earlier statement that Linux backend
+execution still requires system GNU `as`/`ld` is no longer current: the native
+Linux payload now uses the bundled LLVM 23.1.5 integrated assembler and LLD,
+with packaged-mode system-toolchain fallback disabled.
+
+- Linux payload `build/portable-linux-20261112-r2`: app-local wxWidgets 3.2.4,
+  wx IDE, Rust worker, CPython 3.14.10 and signed/provenance-verified LLVM 23.1.5
+  built successfully on Ubuntu 24.04 WSL. CTest passed 11/11.
+- Full `tests/installer_linux_acceptance.sh` passed after fixes for source
+  checksum sidecar names, app-owned symlink tracking/removal and Python
+  `-B` launch behavior. It exercised install, CLI/backend/worker, XDG migration,
+  no-register preservation, symlink refusal, transactional rollback and
+  recovery-data retention. No GUI was launched.
+- Native Linux ELF audit passed. The complete native app's measured ABI floor
+  is GLIBC 2.39 / GLIBCXX 3.4.32 (wxWidgets/IDE built on Ubuntu 24.04); the
+  native installer still requires host GTK3. CPython 3.14.10 native-module
+  dependency checks and tkinter import passed without an external library
+  path. Two upstream Tcl/Tk libraries retain known `/tools/deps/lib` RUNPATH
+  metadata; this is recorded in the ELF audit and packaging notices.
+- Windows payload `build/portable-windows-20261112-r2` built successfully.
+  Registered Windows installer acceptance passed, including installed source
+  archive/hash checks. `install_windows.ps1` had one interpolated-variable
+  parser defect (`$Directory:`), corrected to `${Directory}:` before acceptance.
+- The Windows installer now re-hashes all three corresponding-source archives
+  (Rust worker, Windows MinGW and CPython/python-build-standalone) after the
+  staged tree is moved into the final installation directory. PowerShell parser
+  validation and registered-installer acceptance were rerun after this change
+  and passed.
+- Full `python rbl.py test` on Windows and `python3 rbl.py test` on WSL both
+  exited 0. Rust worker `cargo test --locked` passed 30/30. Documentation
+  validation passed: 78 Markdown files, 523 relative links, zero missing links
+  or bad fragments; EN/RU heading hierarchy matches in all three groups.
+- Current Rust corresponding-source archive:
+  `build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261112-python-no-bytecode-r3.tar.zst`,
+  8,280,345 bytes, SHA-256
+  `7f814086a67a007b5fcbf7d871ae45a5fb990f644d884215eaf00ce6541d393f`;
+  Windows GNU and Linux dependency closures verify (28 licensed crates / 35
+  checksum records).
+- Flatpak payload prepared on case-sensitive WSL ext4 in a local staging
+  directory. All 5,246 SHA256SUMS
+  entries passed and the generated manifest parses with `flatpak-builder
+  --show-manifest`. The preparer now rejects case-insensitive output filesystems
+  and validates payload symlink containment. Flatpak tools are installed, but
+  no remote is configured and GNOME Platform/SDK 51 is not installed; no bundle
+  or sandbox execution has been performed.
+
+The public `v0.8.0` tag/pre-release remains unchanged and has no assets. Gate E
+remains blocked by unresolved CVE-2026-90801 disposition; Gate F remains open
+for formal legal review and source-delivery approval; Gate I remains PARTIAL
+because Flatpak runtime/bundle, pristine-VM and GUI acceptance are incomplete.
+No GUI launch, 7,200-second soak, commit, push, tag movement, release promotion,
+asset upload or source publication was performed.

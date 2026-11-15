@@ -10,8 +10,9 @@ import win32gui
 import win32process
 
 ROOT = pathlib.Path.cwd()
-GUI = ROOT / "build/wx-ui-win/rbl-studio-wx.exe"
-WORKER = ROOT / "build/wx-ui-win/rbl-studio-worker.exe"
+BUILD_DIR = pathlib.Path(os.environ.get("RBL_STUDIO_GUI_BUILD_DIR", ROOT / "build/output/wx-ui-win"))
+GUI = pathlib.Path(os.environ.get("RBL_STUDIO_GUI", BUILD_DIR / "rbl-studio-wx.exe"))
+WORKER = pathlib.Path(os.environ.get("RBL_STUDIO_WORKER", BUILD_DIR / "rbl-studio-worker.exe"))
 LIMIT = 16 * 1024 * 1024
 
 
@@ -107,7 +108,7 @@ def run_open(path: pathlib.Path, profile: pathlib.Path):
 
 
 def main() -> None:
-    fixture = pathlib.Path(tempfile.mkdtemp(prefix="rbl-wx-file-limit-", dir=ROOT / "build"))
+    fixture = pathlib.Path(tempfile.mkdtemp(prefix="rbl-wx-file-limit-", dir=BUILD_DIR))
     profile = pathlib.Path(tempfile.mkdtemp(prefix="rbl-wx-file-limit-profile-"))
     try:
         exact = fixture / "exact-16MiB.rbl"

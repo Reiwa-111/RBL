@@ -31,15 +31,14 @@ def main() -> None:
     source = ROOT / "examples" / "utilities" / "unit_converter.rbl"
     snapshot_dir = ROOT / "build" / "worker-smoke"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    snapshot = snapshot_dir / "unit_converter_snapshot.rbl"
     source_bytes = source.read_bytes()
     padding = b"#" + b"x" * 1022 + b"\n"
-    with snapshot.open("wb") as snapshot_file:
-        snapshot_file.write(source_bytes)
-        while snapshot_file.tell() + len(padding) <= 2 * 1024 * 1024:
-            snapshot_file.write(padding)
-        snapshot_file.write(b" " * (2 * 1024 * 1024 - snapshot_file.tell()))
-    assert snapshot.stat().st_size == 2 * 1024 * 1024
+    snapshot_bytes = bytearray(source_bytes)
+    while len(snapshot_bytes) + len(padding) <= 2 * 1024 * 1024:
+        snapshot_bytes.extend(padding)
+    snapshot_bytes.extend(b" " * (2 * 1024 * 1024 - len(snapshot_bytes)))
+    snapshot_text = bytes(snapshot_bytes).decode("utf-8")
+    assert len(snapshot_text.encode("utf-8")) == 2 * 1024 * 1024
     process = subprocess.Popen(
         [str(worker)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True, encoding="utf-8", bufsize=1,
@@ -75,8 +74,7 @@ def main() -> None:
     send({
         "command": "start", "request_id": "interactive-smoke", "task": "run",
         "workspace_root": str(ROOT),
-        "source_path": str(source), "snapshot_file": str(snapshot),
-        "is_rbl": True, "snapshot": None,
+        "source_path": str(source), "is_rbl": True, "snapshot": snapshot_text,
     })
 
     output = ""
@@ -86,9 +84,12 @@ def main() -> None:
     saw_invalid_stdin_error = False
     accepted_inputs = 0
     exit_code: object = None
+    snapshot_created: Path | None = None
     while exit_code is None:
         event = receive()
-        if event.get("event") == "started" and not sent_invalid_stdin:
+        if event.get("event") == "snapshot_created":
+            snapshot_created = Path(str(event["temporary_path"]))
+        elif event.get("event") == "started" and not sent_invalid_stdin:
             send({"command": "stdin_line", "request_id": "interactive-smoke"})
             sent_invalid_stdin = True
         elif event.get("event") == "output":
@@ -114,7 +115,8 @@ def main() -> None:
     assert accepted_inputs == 2, f"expected two stdin acknowledgements, got {accepted_inputs}"
     assert exit_code == 0, (exit_code, output)
     assert "10.000 km = 6.214 mi" in output, output
-    assert not snapshot.exists(), "worker must remove the GUI-created snapshot after completion"
+    assert snapshot_created is not None, "worker must report its own source snapshot"
+    assert not snapshot_created.exists(), "worker-owned source snapshot must be removed after completion"
     send({"command": "stdin_line", "request_id": "interactive-smoke", "line": "late input"})
     inactive = receive()
     assert inactive.get("event") == "error" and "no active task" in str(inactive.get("message")), inactive

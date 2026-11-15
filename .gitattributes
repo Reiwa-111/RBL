@@ -15,4 +15,8 @@ Makefile text eol=lf
 *.bat text eol=crlf
 
 *.exe binary
+*.dll binary
+*.pyd binary
+*.lib binary
+*.zip binary
 *.o binary

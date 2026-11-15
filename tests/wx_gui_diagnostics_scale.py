@@ -14,6 +14,7 @@ import pathlib
 import subprocess
 import tempfile
 import time
+import shutil
 
 import psutil
 import win32con
@@ -21,9 +22,10 @@ import win32gui
 import win32process
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-GUI = pathlib.Path(os.environ.get("RBL_STUDIO_GUI", ROOT / "build/wx-ui-win/rbl-studio-wx.exe"))
+BUILD_DIR = pathlib.Path(os.environ.get("RBL_STUDIO_GUI_BUILD_DIR", ROOT / "build/output/wx-ui-win"))
+GUI = pathlib.Path(os.environ.get("RBL_STUDIO_GUI", BUILD_DIR / "rbl-studio-wx.exe"))
 GCC = ROOT / "toolchain/windows-x86_64/msys64/ucrt64/bin/gcc.exe"
-WORK = ROOT / "build/wx-ui-win/diagnostics-scale"
+WORK = pathlib.Path(tempfile.mkdtemp(prefix="diagnostics-scale-", dir=BUILD_DIR))
 STUB = WORK / "diagnostics-worker-stub.exe"
 SOURCE = WORK / "diagnostics-scale.rbl"
 CHECK_COMMAND = 6006
@@ -178,7 +180,7 @@ def main() -> int:
     (WORK / "diagnostics-worker-stub.c").write_text(STUB_C, encoding="utf-8")
     SOURCE.write_text("func main() (\n    print(\"synthetic diagnostics\")\n)\n", encoding="utf-8")
     built = subprocess.run([str(GCC), "-O2", str(WORK / "diagnostics-worker-stub.c"), "-o", str(STUB)],
-                           cwd=ROOT, capture_output=True, text=True)
+                           cwd=WORK, capture_output=True, text=True)
     if built.returncode:
         vsdev = pathlib.Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / \
             "Microsoft Visual Studio/2022/BuildTools/Common7/Tools/VsDevCmd.bat"
@@ -193,7 +195,7 @@ def main() -> int:
             encoding="ascii",
         )
         built = subprocess.run(["cmd.exe", "/d", "/c", str(build_script)],
-                               cwd=ROOT, capture_output=True, text=True)
+                               cwd=WORK, capture_output=True, text=True)
         if built.returncode:
             raise RuntimeError(f"could not build test worker stub with MSVC: {built.stdout}\n{built.stderr}")
     profile = pathlib.Path(tempfile.mkdtemp(prefix="rbl-wx-diagnostics-scale-"))
@@ -316,15 +318,14 @@ def main() -> int:
             if crash_process.poll() is None:
                 subprocess.run(["taskkill", "/PID", str(crash_process.pid), "/T", "/F"],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-            import shutil
             shutil.rmtree(crash_profile, ignore_errors=True)
         return 0
     finally:
         if process.poll() is None:
             subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-        import shutil
         shutil.rmtree(profile, ignore_errors=True)
+        shutil.rmtree(WORK, ignore_errors=True)
 
 
 if __name__ == "__main__":

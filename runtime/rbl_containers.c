@@ -69,7 +69,8 @@ enum {
     RBL_GC_TEST_FAIL_CONTAINER_REGISTRY = 3,
     RBL_GC_TEST_FAIL_MARK_STACK = 4,
     RBL_GC_TEST_FAIL_SURVIVORS = 5,
-    RBL_GC_TEST_FAIL_REBUILD_REGISTRY = 6
+    RBL_GC_TEST_FAIL_REBUILD_REGISTRY = 6,
+    RBL_GC_TEST_FAIL_DICT_GROW = 7
 };
 #endif
 
@@ -258,11 +259,102 @@ RBL_SYSV RBLValue rbl_list_set(uint64_t tag, uint64_t payload, uint64_t idx, uin
     return value(TAG_LIST, payload);
 }
 
+#define RBL_CONTAINER_RECURSION_LIMIT 256
+
+static const void *g_render_path[RBL_CONTAINER_RECURSION_LIMIT];
+static size_t g_render_depth;
+
+typedef struct {
+    uint64_t tag;
+    const void *left;
+    const void *right;
+} RBLEqPair;
+
+static RBLEqPair g_eq_pairs[RBL_CONTAINER_RECURSION_LIMIT];
+static size_t g_eq_depth;
+
+/* Return 1 when entered, 0 when this object is already on the render path,
+   and -1 when the bounded recursion path is full. */
+static int render_enter(const void *obj)
+{
+    for (size_t i = 0; i < g_render_depth; i++) {
+        if (g_render_path[i] == obj) {
+            return 0;
+        }
+    }
+    if (g_render_depth == RBL_CONTAINER_RECURSION_LIMIT) {
+        return -1;
+    }
+    g_render_path[g_render_depth++] = obj;
+    return 1;
+}
+
+static int render_contains(const void *obj)
+{
+    for (size_t i = 0; i < g_render_depth; i++) {
+        if (g_render_path[i] == obj) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void render_leave(void)
+{
+    if (g_render_depth) {
+        g_render_path[--g_render_depth] = NULL;
+    }
+}
+
+static RBLValue render_marker(const char *marker)
+{
+    size_t len = strlen(marker);
+    char *buffer = (char *)malloc(len + 1);
+    if (!buffer) {
+        rbl_fail("out of memory while rendering a recursive container");
+    }
+    memcpy(buffer, marker, len + 1);
+    return string_value_from_buffer(buffer, len);
+}
+
+/* A repeated ordered pair is a coinductive cycle: its remaining structure is
+   already being compared. Return 1 for a new pair, 0 for a repeated pair and -1
+   when the bounded comparison path is full. */
+static int eq_pair_enter(uint64_t tag, const void *left, const void *right)
+{
+    for (size_t i = 0; i < g_eq_depth; i++) {
+        if (g_eq_pairs[i].tag == tag && g_eq_pairs[i].left == left
+            && g_eq_pairs[i].right == right) {
+            return 0;
+        }
+    }
+    if (g_eq_depth == RBL_CONTAINER_RECURSION_LIMIT) {
+        return -1;
+    }
+    g_eq_pairs[g_eq_depth++] = (RBLEqPair){tag, left, right};
+    return 1;
+}
+
+static void eq_pair_leave(void)
+{
+    if (g_eq_depth) {
+        g_eq_depth--;
+    }
+}
+
 /* [1, 2, "x", [3]] — elements are rendered with the normal value-to-string path,
-   so nested lists print recursively. */
+   so nested lists print recursively. Cycles are rendered as <cycle>; very deep
+   acyclic nesting is bounded and rendered as <depth-limit>. */
 RBL_SYSV RBLValue rbl_list_str(uint64_t tag, uint64_t payload)
 {
     RBLList *l = as_list_checked(tag, payload);
+    int entered = render_enter(l);
+    if (entered == 0) {
+        return render_marker("<cycle>");
+    }
+    if (entered < 0) {
+        return render_marker("<depth-limit>");
+    }
     size_t cap = 32, n = 0;
     char *out = (char *)malloc(cap);
     if (!out) {
@@ -298,7 +390,9 @@ RBL_SYSV RBLValue rbl_list_str(uint64_t tag, uint64_t payload)
     }
     out[n++] = ']';
     out[n] = '\0';
-    return string_value_from_buffer(out, n);
+    RBLValue result = string_value_from_buffer(out, n);
+    render_leave();
+    return result;
 }
 
 /* Deep equality: nested containers compare element-wise, everything else through
@@ -339,7 +433,21 @@ RBL_SYSV RBLValue rbl_list_eq(uint64_t tag, uint64_t payload, uint64_t tag2, uin
     if (tag2 != TAG_LIST) {
         return value(TAG_BOOL, 0);
     }
-    return value(TAG_BOOL, items_equal(as_list(payload), as_list(payload2)));
+    RBLList *left = as_list(payload);
+    RBLList *right = as_list(payload2);
+    if (left == right) {
+        return value(TAG_BOOL, 1);
+    }
+    int entered = eq_pair_enter(TAG_LIST, left, right);
+    if (entered == 0) {
+        return value(TAG_BOOL, 1);
+    }
+    if (entered < 0) {
+        rbl_fail("container comparison nesting limit exceeded");
+    }
+    int equal = items_equal(left, right);
+    eq_pair_leave();
+    return value(TAG_BOOL, equal);
 }
 
 /* ------------------------------------------------------------------ */
@@ -363,6 +471,13 @@ RBL_SYSV RBLValue rbl_tuple_push(uint64_t tag, uint64_t payload, uint64_t vt, ui
 RBL_SYSV RBLValue rbl_tuple_str(uint64_t tag, uint64_t payload)
 {
     (void)tag;
+    RBLList *tuple = as_list(payload);
+    if (render_contains(tuple)) {
+        return render_marker("(<cycle>)");
+    }
+    if (g_render_depth == RBL_CONTAINER_RECURSION_LIMIT) {
+        return render_marker("(<depth-limit>)");
+    }
     /* Reuse the list renderer and swap the outer brackets, so nesting prints
        correctly ([1, (2, 3)]) with no second formatting loop. */
     RBLValue s = rbl_list_str(TAG_LIST, payload);
@@ -381,7 +496,21 @@ RBL_SYSV RBLValue rbl_tuple_eq(uint64_t tag, uint64_t payload, uint64_t tag2, ui
     if (tag2 != TAG_TUPLE) {
         return value(TAG_BOOL, 0);
     }
-    return value(TAG_BOOL, items_equal(as_list(payload), as_list(payload2)));
+    RBLList *left = as_list(payload);
+    RBLList *right = as_list(payload2);
+    if (left == right) {
+        return value(TAG_BOOL, 1);
+    }
+    int entered = eq_pair_enter(TAG_TUPLE, left, right);
+    if (entered == 0) {
+        return value(TAG_BOOL, 1);
+    }
+    if (entered < 0) {
+        rbl_fail("container comparison nesting limit exceeded");
+    }
+    int equal = items_equal(left, right);
+    eq_pair_leave();
+    return value(TAG_BOOL, equal);
 }
 
 RBL_SYSV RBLValue rbl_tuple_len(uint64_t tag, uint64_t payload)
@@ -431,6 +560,13 @@ static uint64_t dict_hash(uint64_t kt, uint64_t kp)
         }
         return h;
     }
+    /* IEEE-754 compares +0.0 and -0.0 equal. Dictionary hashing must use the
+       same equivalence relation as keys_equal(), otherwise an equal float key
+       can probe a different slot after the table grows. Canonicalize both zeros
+       to the +0 bit pattern before hashing. */
+    if (kt == TAG_FLOAT && (kp & UINT64_C(0x7fffffffffffffff)) == 0) {
+        kp = 0;
+    }
     h ^= kt;
     h *= 1099511628211ULL;
     for (int i = 0; i < 8; i++) {
@@ -442,9 +578,30 @@ static uint64_t dict_hash(uint64_t kt, uint64_t kp)
 
 static int keys_equal(uint64_t at, uint64_t ap, uint64_t bt, uint64_t bp)
 {
-    /* Reuse the ordinary ==, so int/float/string/bool keys compare the same way
-       they do anywhere else in the language. */
+    if (at != bt) {
+        return 0;
+    }
+    if (at == TAG_FLOAT) {
+        /* Dictionary key equality must be reflexive and match dict_hash().
+           Ordinary IEEE == is not reflexive for NaN, so inserting a NaN would
+           otherwise create an entry that cannot be found or updated. Preserve
+           numeric equality for signed zero; all other float keys use their
+           exact IEEE payload (including a stable NaN payload). */
+        if ((ap & UINT64_C(0x7fffffffffffffff)) == 0 &&
+            (bp & UINT64_C(0x7fffffffffffffff)) == 0) {
+            return 1;
+        }
+        return ap == bp;
+    }
+    /* Non-float scalar keys retain the language's ordinary equality. */
     return rbl_eq(at, ap, bt, bp).payload != 0;
+}
+
+static void validate_dict_key(uint64_t tag)
+{
+    if (tag == TAG_LIST || tag == TAG_DICT || tag == TAG_TUPLE) {
+        rbl_fail("dictionary keys must be scalar; list, dictionary and tuple keys are not supported");
+    }
 }
 
 #define RBL_DICT_CAP0 8
@@ -463,6 +620,10 @@ static void dict_grow(RBLDict *d)
 {
     RBLDictEntry *old = d->entries;
     uint64_t old_cap = d->cap;
+    if (gc_test_should_fail_site(RBL_GC_TEST_FAIL_DICT_GROW)) {
+        rbl_fail("out of memory while growing a dictionary");
+        return;
+    }
     if (old_cap > SIZE_MAX / (2 * sizeof(RBLDictEntry))) {
         rbl_fail("out of memory while growing a dictionary");
     }
@@ -494,6 +655,7 @@ static void dict_grow(RBLDict *d)
 
 static RBLDictEntry *dict_slot(RBLDict *d, uint64_t kt, uint64_t kp, int create)
 {
+    validate_dict_key(kt);
     uint64_t j = dict_hash(kt, kp) % d->cap;
     for (;;) {
         RBLDictEntry *e = &d->entries[j];
@@ -530,10 +692,15 @@ RBL_SYSV RBLValue rbl_dict_new(void)
 RBL_SYSV RBLValue rbl_dict_set(uint64_t tag, uint64_t payload, uint64_t kt, uint64_t kp, uint64_t vt, uint64_t vp)
 {
     RBLDict *d = as_dict_checked(tag, payload);
-    if ((d->len + 1) * 4 >= d->cap * 3) {
-        dict_grow(d);
+    /* Updating an existing key cannot increase the table's load factor and
+       must not allocate. Probe before deciding whether a new slot needs room. */
+    RBLDictEntry *e = dict_slot(d, kt, kp, 0);
+    if (!e) {
+        if ((d->len + 1) * 4 >= d->cap * 3) {
+            dict_grow(d);
+        }
+        e = dict_slot(d, kt, kp, 1);
     }
-    RBLDictEntry *e = dict_slot(d, kt, kp, 1);
     e->vt = vt;
     e->vp = vp;
     return value(TAG_DICT, payload);
@@ -564,6 +731,13 @@ RBL_SYSV RBLValue rbl_dict_len(uint64_t tag, uint64_t payload)
 RBL_SYSV RBLValue rbl_dict_str(uint64_t tag, uint64_t payload)
 {
     RBLDict *d = as_dict_checked(tag, payload);
+    int entered = render_enter(d);
+    if (entered == 0) {
+        return render_marker("<cycle>");
+    }
+    if (entered < 0) {
+        return render_marker("<depth-limit>");
+    }
     size_t cap = 32, n = 0;
     char *out = (char *)malloc(cap);
     if (!out) {
@@ -612,10 +786,45 @@ RBL_SYSV RBLValue rbl_dict_str(uint64_t tag, uint64_t payload)
     }
     out[n++] = '}';
     out[n] = '\0';
-    return string_value_from_buffer(out, n);
+    RBLValue result = string_value_from_buffer(out, n);
+    render_leave();
+    return result;
 }
 
 /* Order-insensitive deep equality. */
+static int dicts_equal(RBLDict *a, RBLDict *b)
+{
+    if (a->len != b->len) {
+        return 0;
+    }
+    for (uint64_t i = 0; i < a->cap; i++) {
+        RBLDictEntry *e = &a->entries[i];
+        if (!e->used) {
+            continue;
+        }
+        RBLDictEntry *o = dict_slot(b, e->kt, e->kp, 0);
+        if (!o) {
+            return 0;
+        }
+        if (e->vt == TAG_LIST || o->vt == TAG_LIST) {
+            if (!rbl_list_eq(e->vt, e->vp, o->vt, o->vp).payload) {
+                return 0;
+            }
+            continue;
+        }
+        if (e->vt == TAG_DICT || o->vt == TAG_DICT) {
+            if (!rbl_dict_eq(e->vt, e->vp, o->vt, o->vp).payload) {
+                return 0;
+            }
+            continue;
+        }
+        if (!rbl_eq(e->vt, e->vp, o->vt, o->vp).payload) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 RBL_SYSV RBLValue rbl_dict_eq(uint64_t tag, uint64_t payload, uint64_t tag2, uint64_t payload2)
 {
     (void)tag;
@@ -627,35 +836,16 @@ RBL_SYSV RBLValue rbl_dict_eq(uint64_t tag, uint64_t payload, uint64_t tag2, uin
     if (a == b) {
         return value(TAG_BOOL, 1);
     }
-    if (a->len != b->len) {
-        return value(TAG_BOOL, 0);
+    int entered = eq_pair_enter(TAG_DICT, a, b);
+    if (entered == 0) {
+        return value(TAG_BOOL, 1);
     }
-    for (uint64_t i = 0; i < a->cap; i++) {
-        RBLDictEntry *e = &a->entries[i];
-        if (!e->used) {
-            continue;
-        }
-        RBLDictEntry *o = dict_slot(b, e->kt, e->kp, 0);
-        if (!o) {
-            return value(TAG_BOOL, 0);
-        }
-        if (e->vt == TAG_LIST || o->vt == TAG_LIST) {
-            if (!rbl_list_eq(e->vt, e->vp, o->vt, o->vp).payload) {
-                return value(TAG_BOOL, 0);
-            }
-            continue;
-        }
-        if (e->vt == TAG_DICT || o->vt == TAG_DICT) {
-            if (!rbl_dict_eq(e->vt, e->vp, o->vt, o->vp).payload) {
-                return value(TAG_BOOL, 0);
-            }
-            continue;
-        }
-        if (!rbl_eq(e->vt, e->vp, o->vt, o->vp).payload) {
-            return value(TAG_BOOL, 0);
-        }
+    if (entered < 0) {
+        rbl_fail("container comparison nesting limit exceeded");
     }
-    return value(TAG_BOOL, 1);
+    int equal = dicts_equal(a, b);
+    eq_pair_leave();
+    return value(TAG_BOOL, equal);
 }
 
 /* `is`: identity, not structural equality. Two containers compare identical only
@@ -1203,6 +1393,11 @@ RBL_SYSV uint64_t rbl_gc_test_container_count(void)
 RBL_SYSV uint64_t rbl_gc_test_string_count(void)
 {
     return (uint64_t)g_strings_len;
+}
+
+RBL_SYSV uint64_t rbl_gc_test_string_has(uint64_t payload)
+{
+    return (uint64_t)strings_has((const void *)(uintptr_t)payload);
 }
 #endif
 

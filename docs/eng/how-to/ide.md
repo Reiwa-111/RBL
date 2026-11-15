@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.10 | IDE INTERACTION AND FOLDING
+# last verified: v0.8.0 | 2026.11.12 | IDE WORKFLOW AND RELEASE STATUS
 
 ## RBL Studio — native IDE
 
-RBL Studio's primary desktop IDE is a C++20 application built with wxWidgets 3.2 and `wxStyledTextCtrl`/Scintilla. A separate Rust `rbl-studio-worker` supervises compiler and toolchain processes through a bounded NDJSON protocol. Chromium, Electron and embedded WebView engines are not used. Python 3.9+ is required for backend actions, not for rendering or launching the GUI.
+RBL Studio's primary desktop IDE is a C++20 application built with wxWidgets 3.2 and `wxStyledTextCtrl`/Scintilla. A separate Rust `rbl-studio-worker` supervises compiler and toolchain processes through a bounded NDJSON protocol. Chromium, Electron and embedded WebView engines are not used. Fresh Windows/Linux portable build payloads include app-local CPython 3.14.10 for backend actions; an explicit `RBL_PYTHON` overrides it. A source checkout still needs Python 3.9+ for development. The Linux payload includes Clang's integrated assembler, LLD and wxWidgets 3.2.4 shared libraries; GNU Binutils and system wxWidgets are not required. The native shell installer uses the host GTK 3 runtime, while the Flatpak variant uses GNOME Platform 51 to provide GTK inside the sandbox.
 
 The workflow includes a multi-tab Scintilla editor, project tree, Find/Replace, Find in Files, command palette, Quick Open, diagnostics navigation, task output and interactive stdin/EOF. A full language server, semantic completion, refactorings and an integrated debugger are not implemented.
 
@@ -21,6 +21,8 @@ Windows PowerShell:
 ```
 
 The top-level CMD/VBS/SH launchers select the wx GUI and adjacent Rust worker from a portable directory or the last successful build pointer. If wx is unavailable, `RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately built Rust/egui executable in a developer checkout; that executable is not included in the installer. Linux requires a working wxWidgets/GTK display environment (X11 or Wayland).
+
+For a Linux installation that does not depend on host GTK, use the [Flatpak packaging guide](linux-packaging.md). It declares the GNOME Platform runtime, so Flatpak installs the GTK runtime into the application sandbox. The native shell installer still requires the host GTK 3 runtime.
 
 **Windows development build:** use the MSYS2 UCRT64 wxWidgets 3.2 toolchain and the repository-pinned Binutils overlay. `tools/build_wx_ide.ps1` builds the C++ GUI and the Rust worker, then collects the required runtime DLLs. End users do not need MSYS2 on `PATH` when using the staged portable payload.
 
@@ -83,7 +85,7 @@ When an RBL program calls `input()`, the Run panel displays a `STDIN` field and 
 
 The **Stop** command cancels the active task. The worker remains alive between tasks and is restarted only when its lifecycle requires it.
 
-The application checks external file changes before overwriting and warns when a save would split a multiply hard-linked file. Project Tree, Find in Files and Save use bounded traversal and filesystem identity checks. On Linux, existing-target saves use `renameat2(RENAME_EXCHANGE)` where available; when exchange is unsupported, the save fails closed with `operation_not_supported` instead of falling back to unconditional `renameat`. First-time saves use exclusive `linkat`. Windows uses `ReplaceFileW` with recovery artifacts and identity checks, but the path-based target replacement is not a full compare-and-swap. See the engineering audit for exact limitations.
+The application checks external file changes before overwriting and warns when a save would split a multiply hard-linked file. Project Tree, Find in Files and Save use bounded traversal and filesystem identity checks. On Linux, existing-target saves require `renameat2(RENAME_EXCHANGE)`; unsupported filesystems fail closed with `operation_not_supported` rather than falling back to unconditional `renameat`. This is an intentional safety/availability restriction; first-time saves still use exclusive `linkat`. A displaced symlink is identified without following it so the exchange can be safely rolled back when both entry identities still match. Windows uses `ReplaceFileW` with recovery artifacts and identity checks, but the path-based target replacement is not a full compare-and-swap. See the engineering audit for exact limitations.
 
 ## Verification and measurements
 
@@ -101,7 +103,7 @@ Linux/WSL build:
 
 The Windows long-duration resource acceptance is run with `python benchmarks/wx_resource_acceptance.py --duration 7200 --interval 1 --cycle-interval 60 --max-ui-ping-ms 500`. Its CSV records process-tree memory, handles, GDI/USER objects and UI responsiveness. See [`../../../benchmarks/IDE_RESOURCE_USAGE.md`](../../../benchmarks/IDE_RESOURCE_USAGE.md) for measurement context. For backend diagnostics use `python3 rbl.py doctor` or **Run → Toolchain doctor**.
 
-The wx frontend is the primary launcher/install target but remains **UNRELEASED / RELEASE BLOCKED**. The preliminary 480-second resource run passed thresholds but used the earlier harness; the second 7,200-second attempt failed early after task #45 without a CSV. A later strengthened 480-second run exited 1 after the initial Run Tests dispatch and produced no CSV/verdict. No current-RC two-hour soak PASS is claimed. Windows registered install/upgrade/uninstall acceptance passes in an isolated HKCU GUID subtree. DPI static checks pass 12/12, but live 125-200% multi-monitor acceptance and interactive Linux GUI acceptance remain unverified. The Rust worker corresponding-source archive is now copied into newly built payloads and installed by the updated installer; existing RC directories predate this change. The separate MSYS2 source bundle remains local and is not attached to the runtime package. No written offer or alternative source-distribution procedure has been legally reviewed. Binutils cache_bwrite is reachable during ordinary PE output writes; CVE-2026-90801 remains unresolved. POSIX existing-target saves fail closed when atomic exchange is unsupported; Windows retains a path-based replacement race and a LOW orphan-temp cleanup edge. See the [engineering audit](../explanation/ide-engineering-audit.md) and [release manifest](../../../RELEASE_MANIFEST.txt) for current evidence.
+GitHub `v0.8.0` is published as a **pre-release without attached assets**, not as a stable release. The wx frontend remains **RELEASE BLOCKED for stable/binary distribution**. The current Windows SaveDocument suite passed 27/27 with an isolated fixture. Resource smoke runs passed at 60/120/300 seconds using 32 documents, the path-backed `resource-task.rbl`, all four task types and graceful GUI/worker shutdown; the 300-second run completed 84 cycles. A 7,200-second attempt failed before sampling when the harness could not acquire notebook focus; it was not retried after the user requested no further IDE launches. The two-hour soak remains NOT PASSED. On 2026-11-12, fresh Windows/Linux payloads included pinned app-local CPython 3.14.10; installer acceptance passed in isolated roots, including rollback and user-data preservation. Installed CLI and headless worker backend actions passed without system Python. Windows wrapper acceptance used only System32 plus the app's bundled MinGW toolchain; Linux backend acceptance used a scrubbed PATH with `as`, `ld`, `bash` and `dirname`, but no Python or `cc`. The full Windows/Linux `python rbl.py test` suites passed; package safety tests passed 9/9 on Ubuntu and 8/9 on Windows with the POSIX-only symlink case skipped. Pristine-VM acceptance and GUI startup/backend-action acceptance remain NOT RUN. Linux Binutils remain external prerequisites. DPI static checks pass 12/12, but live 125-200% multi-monitor acceptance remains open. Linux GUI builds and headless CTest pass, but interactive Linux desktop acceptance has not been performed in a graphical session. The Rust worker and Windows MSYS2 corresponding-source bundles are local; neither is attached to the public pre-release, and component-specific legal review remains open. Binutils 2.47-4 is listed for CVE-2026-90801; exact exploitability for the default RBL link path remains unresolved and release-blocking. The Windows destination-leaf replacement race and POSIX filesystems lacking atomic exchange are deferred to RBL 0.9; POSIX saves remain fail-closed. The separate LOW orphan-temp cleanup edge is fixed by delete-on-handle cleanup. See the [engineering audit](../explanation/ide-engineering-audit.md) and [release manifest](../../../RELEASE_MANIFEST.txt) for current evidence.
 
 ## Known limitations
 
@@ -112,7 +114,7 @@ The wx frontend is the primary launcher/install target but remains **UNRELEASED 
 
 ## Legacy Rust/egui frontend
 
-The older Rust/egui application remains in `src/app.rs` and `src/editor.rs` for
+The older Rust/egui application remains in `rbl-ide/legacy-egui/app.rs` and `rbl-ide/legacy-egui/editor.rs` for
 rollback/reference. When the wx executable is unavailable,
 `RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately built executable
 from a developer checkout; it is not included in the wx installer payload and
@@ -120,7 +122,14 @@ is not the primary RBL Studio 0.8.0 frontend.
 
 The wx primary frontend's implementation, build instructions, historical test
 records and remaining acceptance gates are maintained in
-[`native/wx-ui/README.md`](../../../native/wx-ui/README.md). Do not redistribute
+[`rbl-ide/wx-ui/README.md`](../../../rbl-ide/wx-ui/README.md). Do not redistribute
 the portable Windows bundle until exact corresponding sources accompany it or
 an applicable source-offer process is legally reviewed; see the
-[`wx third-party inventory`](../../../native/wx-ui/THIRD_PARTY_NOTICES.md).
+[`wx third-party inventory`](../../../rbl-ide/wx-ui/THIRD_PARTY_NOTICES.md).
+## Current IDE acceptance - 2026-11-11
+
+Windows SaveDocument passed 27/27 with an isolated fixture. Resource smoke runs passed at 60, 120 and 300 seconds using 32 documents, the path-backed `resource-task.rbl`, all four task types and graceful GUI/worker shutdown. The 300-second run completed 84 cycles (316 samples); peak process-tree working set was 282.7 MiB, private bytes 208.0 MiB, handles 1,243, GDI/USER objects 441/132 and maximum UI ping 0.9 ms.
+
+A 7,200-second attempt failed before sampling because the harness did not acquire notebook focus. It was not retried after the user requested no further IDE launches. The two-hour soak is NOT PASSED. Live 125-200% DPI, interactive Linux desktop acceptance and remaining manual GUI workflows are NOT RUN. Gate D remains PARTIAL.
+
+The Windows orphan-temp cleanup edge is fixed by delete-on-handle cleanup; if cleanup itself fails, the retained path is reported. The `ReplaceFileW` destination-leaf race and CVE-2026-90801 remain release blockers. See the Gate E review and release manifest for evidence.

@@ -1,7 +1,7 @@
 import os,pathlib,subprocess,time,ctypes,tempfile,shutil
 import win32con,win32gui,win32process,win32api,win32clipboard
-root=pathlib.Path.cwd(); exe=pathlib.Path(os.environ.get('RBL_STUDIO_GUI',root/'build/wx-ui-win/rbl-studio-wx.exe')); worker=pathlib.Path(os.environ.get('RBL_STUDIO_WORKER',root/'build/wx-ui-win/rbl-studio-worker.exe'))
-fixture=pathlib.Path(tempfile.mkdtemp(prefix='wx-find-acceptance-',dir=root/'build/wx-ui-win'))
+root=pathlib.Path.cwd(); build_dir=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR',root/'build/output/wx-ui-win')); exe=pathlib.Path(os.environ.get('RBL_STUDIO_GUI',build_dir/'rbl-studio-wx.exe')); worker=pathlib.Path(os.environ.get('RBL_STUDIO_WORKER',build_dir/'rbl-studio-worker.exe'))
+fixture=pathlib.Path(tempfile.mkdtemp(prefix='wx-find-acceptance-',dir=build_dir))
 tests={'cr-only':('first\rneedle_cr_only\rthird\r','needle_cr_only'),'crlf':('first\r\nneedle_crlf\r\nthird\r\n','needle_crlf'),'lf':('first\nneedle_lf\nthird\n','needle_lf')}
 for name,(content,_) in tests.items(): (fixture/f'{name}.txt').write_bytes(content.encode())
 readable_dir=fixture/'00-readable'; readable_dir.mkdir(exist_ok=True)

@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-PY="$ROOT/.venv/bin/python3"
-[ -x "$PY" ] || PY="$(command -v python3)"
-exec "$PY" "$ROOT/rbl.py" "$@"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+export RBL_STUDIO_ROOT="$ROOT"
+export PYTHONDONTWRITEBYTECODE=1
+export RBL_BUILD_DIR="${RBL_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/RBLStudio/build}"
+export RBL_LINUX_TOOLCHAIN_ROOT="${RBL_LINUX_TOOLCHAIN_ROOT:-$ROOT/toolchain/linux-x86_64}"
+export RBL_REQUIRE_BUNDLED_LINUX_TOOLCHAIN=1
+export PATH="$RBL_LINUX_TOOLCHAIN_ROOT/bin:$PATH"
+export LD_LIBRARY_PATH="$ROOT/lib:$RBL_LINUX_TOOLCHAIN_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if [[ -n "${RBL_PYTHON:-}" ]]; then
+  exec "$RBL_PYTHON" -B "$ROOT/rbl.py" "$@"
+fi
+if [[ -x "$ROOT/runtime/python/bin/python3" ]]; then
+  exec "$ROOT/runtime/python/bin/python3" -B "$ROOT/rbl.py" "$@"
+fi
+exec python3 -B "$ROOT/rbl.py" "$@"

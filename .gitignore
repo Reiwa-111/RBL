@@ -2,6 +2,9 @@
 .venv/
 target/
 
+# Flatpak builder cache/state
+.flatpak-builder/
+
 # Temporary analysis scripts/files
 .analysis-tmp/
 

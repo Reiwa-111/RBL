@@ -8,12 +8,12 @@ license = "Apache-2.0"
 
 [[bin]]
 name = "rbl-studio"
-path = "src/main.rs"
+path = "rbl-ide/legacy-egui/main.rs"
 required-features = ["legacy-egui"]
 
 [[bin]]
 name = "rbl-studio-worker"
-path = "src/bin/rbl-studio-worker.rs"
+path = "rbl-ide/worker/rbl-studio-worker.rs"
 
 [features]
 default = []
@@ -39,4 +39,3 @@ lto = "thin"
 codegen-units = 1
 strip = true
 panic = "abort"
-

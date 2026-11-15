@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | PROJECT WORKFLOW RECHECK
+﻿# last verified: v0.8.0 | 2026.11.11 | GATE G PROJECT WORKFLOW RECHECK
 
 ## How-to: работа с проектом
 
@@ -16,7 +16,7 @@ python3 rbl.py new my_app
 python3 rbl.py new my_app --path ../my_app
 ```
 
-Целевой каталог должен быть пустым или отсутствовать. Новый проект содержит:
+Целевой каталог должен быть пустым или отсутствовать. NAME: 1-64 ASCII-буквы, цифры, `_` или `-`, первый символ - буква или цифра. Новый проект содержит:
 
 ```text
 my_app/
@@ -34,17 +34,28 @@ my_app/
 python3 /path/to/RBLStudio/rbl.py init
 ```
 
-Команда создаёт `rbl.toml`, `src/`, `tests/`, `benchmarks/` и стартовый `src/main.rbl`, если их ещё нет. Существующий манифест не перезаписывается.
+Команда создаёт `rbl.toml`, `src/`, `tests/`, `benchmarks/` и стартовый `src/main.rbl`, если их ещё нет. Имя текущего каталога должно соответствовать правилу имени проекта. Существующий манифест не перезаписывается.
 
 ## Собирать и запускать
 
-Команды выполняются из каталога проекта, а `rbl.py` указывается путём до checkout:
+CLI не устанавливает глобальную команду. Укажите `RBL_STUDIO_ROOT` как путь к checkout RBL Studio и выполняйте команды из каталога проекта:
 
 ```bash
-python3 /path/to/RBLStudio/rbl.py check
-python3 /path/to/RBLStudio/rbl.py build
-python3 /path/to/RBLStudio/rbl.py run
-python3 /path/to/RBLStudio/rbl.py asm
+export RBL_STUDIO_ROOT="/path/to/RBLStudio"
+python3 "$RBL_STUDIO_ROOT/rbl.py" check src/main.rbl
+python3 "$RBL_STUDIO_ROOT/rbl.py" build src/main.rbl
+python3 "$RBL_STUDIO_ROOT/rbl.py" run src/main.rbl
+python3 "$RBL_STUDIO_ROOT/rbl.py" asm src/main.rbl
+```
+
+Windows PowerShell:
+
+```powershell
+$env:RBL_STUDIO_ROOT = "C:\path\to\RBLStudio"
+python "$env:RBL_STUDIO_ROOT\rbl.py" check src\main.rbl
+python "$env:RBL_STUDIO_ROOT\rbl.py" build src\main.rbl
+python "$env:RBL_STUDIO_ROOT\rbl.py" run src\main.rbl
+python "$env:RBL_STUDIO_ROOT\rbl.py" asm src\main.rbl
 ```
 
 Путь к исходнику можно указать явно после команды. Без аргумента используется `package.entry` из `rbl.toml`; по умолчанию это `src/main.rbl`. Если такого файла нет, драйвер также проверяет `main.rbl` в корне проекта.
@@ -68,11 +79,23 @@ python3 /path/to/RBLStudio/rbl.py doc src/main.rbl -o target/api.md
 
 ## Очистить результаты сборки
 
+Disposable-артефакты в checkout разделены по назначению:
+
+- `build/cache/sources/` — скомпилированные пользовательские программы и
+  скачанные upstream-архивы исходников. Дорого пересобирать.
+- `build/output/` — выходы IDE, worker, Cargo и bootstrap из текущего checkout.
+
 ```bash
-python3 /path/to/RBLStudio/rbl.py clean
+python3 /path/to/RBLStudio/rbl.py clean   # только compiler cache
+make clean-cache                          # тот же cache, из корня checkout
+make clean-build                          # выходы IDE/worker/bootstrap
+make clean                                # alias для clean-build
 ```
 
-Команда удаляет `build/` в текущем каталоге проекта. Не запускайте её из каталога, содержащего данные, которые вы хотите сохранить в `build/`.
+`clean` удаляет только compiler source cache `build/cache/sources/` внутри
+checkout RBL Studio. `build/output/`, каталог сборки текущего проекта и
+остальные build evidence не удаляются. `make clean` не трогает cache; для него
+есть `make clean-cache`.
 
 ## Проверить окружение
 
@@ -83,17 +106,17 @@ python3 /path/to/RBLStudio/rbl.py env
 
 `doctor` проверяет доступность toolchain. `env` выводит корень установки RBL, текущий каталог проекта и путь к Python.
 
-## Что означает `rbl test`
+## Что означает `rbl.py test`
 
-`rbl test` последовательно запускает следующие наборы из checkout RBL:
+`rbl.py test` последовательно запускает наборы самого RBL Studio; эта команда не запускает тесты текущего проекта:
 
-1. Прямые compiler regression cases (`tests/run_tests.py`).
-2. Smoke-тесты standard library и input (`tests/test_stdlib.py`).
-3. Изоляция build cache для одинаковых имён исходников (`tests/test_build_cache.py`).
-4. Проверка SysV call alignment в Linux Runtime (`tests/test_asm_call_alignment.py`; в Windows запускается через WSL).
-5. Проверки совместимости и startup Runtime ABI (`tests/test_runtime_abi.py`).
-6. Тесты владения managed strings и детерминированных OOM collector (`tests/test_string_ownership.py`).
-7. Повторные `input()`/`read_file()` под нагрузкой сборщика мусора (`tests/test_string_io_gc.py`).
-8. Тесты source diagnostics компилятора (`tests/test_diagnostics.py`).
+Текущий runner включает:
+
+- Прямые compiler regression, standard library/input, build-cache isolation, проверки scaffold нового проекта и безопасной очистки.
+- Инструментальную проверку Linux Runtime call alignment, совместимость/startup Runtime ABI, GC safe-point codegen, владение managed strings/OOM и повторный I/O под GC pressure.
+- Проверки streaming output, bundled toolchain и manifest, Linux launcher, POSIX metadata, wx filesystem security и worker lifecycle, а также статические DPI checks.
+- Windows-only проверки registry policy и save cleanup, после которых запускаются compiler source diagnostics.
+
+Точный порядок и platform gates определены функцией `run_tests()` в `rbl.py`; контракты отдельных проверок описаны в [руководстве по тестированию](testing.md).
 
 Это не универсальный тестовый runner для произвольных проектов и команда не выполняет автоматически файлы из `my_app/tests/`. Контракты отдельных наборов и межплатформенные проверки описаны в [руководстве по тестированию](testing.md) и [справочнике CLI](../reference/cli.md).

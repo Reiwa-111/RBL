@@ -150,7 +150,8 @@ enum {
     RBL_GC_TEST_FAIL_CONTAINER_REGISTRY = 3,
     RBL_GC_TEST_FAIL_MARK_STACK = 4,
     RBL_GC_TEST_FAIL_SURVIVORS = 5,
-    RBL_GC_TEST_FAIL_REBUILD_REGISTRY = 6
+    RBL_GC_TEST_FAIL_REBUILD_REGISTRY = 6,
+    RBL_GC_TEST_FAIL_DICT_GROW = 7
 };
 RBL_ABI_CALL void rbl_gc_test_fail_site(uint64_t site);
 RBL_ABI_CALL uint64_t rbl_gc_test_fail_hits(void);
@@ -158,6 +159,7 @@ RBL_ABI_CALL uint64_t rbl_gc_test_string_bytes(void);
 RBL_ABI_CALL uint64_t rbl_gc_test_container_bytes(void);
 RBL_ABI_CALL uint64_t rbl_gc_test_container_count(void);
 RBL_ABI_CALL uint64_t rbl_gc_test_string_count(void);
+RBL_ABI_CALL uint64_t rbl_gc_test_string_has(uint64_t payload);
 #endif
 
 #endif

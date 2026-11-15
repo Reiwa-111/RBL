@@ -91,6 +91,32 @@ def main() -> int:
                 if old_rebuild is not None:
                     os.environ["RBL_REBUILD_COMPILER"] = old_rebuild
 
+            # Linux release installs must also trust the shipped compiler/runtime
+            old_rebuild_linux = os.environ.pop("RBL_REBUILD_COMPILER", None)
+            # files rather than rebuilding solely because extraction changed mtimes.
+            # This is the clean-install path: no C compiler or developer toolchain.
+            linux_artifacts = [Path(temp) / f"linux-{name}.bin" for name in (
+                "compiler", "runtime", "containers", "abi", "format"
+            )]
+            for artifact in linux_artifacts:
+                artifact.write_bytes(b"prebuilt")
+            linux_bin = Path(temp) / "linux-bin"
+            with patch.object(rbltool, "is_windows", return_value=False), \
+                 patch.object(rbltool, "use_wsl", return_value=False), \
+                 patch.object(rbltool, "LINUX_BIN_DIR", linux_bin), \
+                 patch.object(rbltool, "COMPILER_BIN", linux_artifacts[0]), \
+                 patch.object(rbltool, "RUNTIME_OBJ", linux_artifacts[1]), \
+                 patch.object(rbltool, "CONTAINERS_OBJ", linux_artifacts[2]), \
+                 patch.object(rbltool, "RUNTIME_ABI_OBJ", linux_artifacts[3]), \
+                 patch.object(rbltool, "RUNTIME_FORMAT_OBJ", linux_artifacts[4]), \
+                 patch.object(rbltool, "_stale", side_effect=AssertionError("release mtimes must not trigger bootstrap")), \
+                 patch.object(rbltool, "have", return_value=False), \
+                 patch.object(rbltool, "run_native", side_effect=AssertionError("unexpected Linux bootstrap")):
+                rbltool.ensure_toolchain({})
+            if not linux_bin.is_dir():
+                raise AssertionError("Linux install did not initialize its private output directory")
+            if old_rebuild_linux is not None:
+                os.environ["RBL_REBUILD_COMPILER"] = old_rebuild_linux
         print("PASS: bundled MinGW-w64 is preferred and external fallback remains available")
         return 0
     finally:

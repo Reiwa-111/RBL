@@ -12,8 +12,8 @@ The main entry point is the `rbl.py` Python script in the RBL repository. It doe
 | `rbl.py doctor` | Checks the toolchain through the low-level driver. |
 | `rbl.py bootstrap` | Forces a rebuild of bootstrap compiler/runtime artifacts. |
 | `rbl.py env` | Prints the RBL root, project root and Python executable. |
-| `rbl.py new NAME [--path DIR]` | Creates a new project. |
-| `rbl.py init` | Initializes the current directory. |
+| `rbl.py new NAME [--path DIR]` | Creates a new project. NAME must be 1-64 ASCII letters, digits, `_` or `-`, starting with a letter or digit. |
+| `rbl.py init` | Initializes the current directory; its directory name must satisfy the same project-name rule. |
 | `rbl.py check [FILE]` | Runs frontend, analysis and code generation without invoking the assembler or linker. |
 | `rbl.py build [FILE]` | Compiles, assembles and links an executable. |
 | `rbl.py run [FILE]` | Builds and runs a program. |
@@ -24,7 +24,7 @@ The main entry point is the `rbl.py` Python script in the RBL repository. It doe
 | `rbl.py diff [--a MODE] [--b MODE] [PATH ...]` | Compares two backends. Defaults to `wsl` and `native`. |
 | `rbl.py fmt [FILE] [--check]` | Formats a file or checks whether formatting is already applied. |
 | `rbl.py doc [FILE] [-o FILE]` | Generates a simple function-declaration table. |
-| `rbl.py clean` | Safely removes only the compiler cache at `build/sources/`; preserves other build evidence and user data. |
+| `rbl.py clean` | Safely removes only the compiler cache at `build/cache/sources/`; preserves `build/output/`, other build evidence and user data. |
 
 The `FILE` argument for `check`, `build`, `run`, `asm`, `fmt` and `doc` is optional. When omitted, the CLI uses `package.entry` from the manifest, or `src/main.rbl` by default. If that path does not exist and a root-level `main.rbl` exists in the current project, it is used instead.
 
@@ -38,8 +38,9 @@ cd demo
 python3 ../rbl.py check
 python3 ../rbl.py build
 python3 ../rbl.py run
-python3 ../rbl.py test
 ```
+
+These relative paths assume `demo` is a direct child of the RBL Studio checkout. For projects elsewhere, use the `RBL_STUDIO_ROOT` environment-variable form in the generated project README. `rbl.py test` runs the RBL Studio repository regression suite; it is not a project test runner.
 
 Windows PowerShell:
 

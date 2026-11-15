@@ -11,9 +11,10 @@ import win32gui
 import win32process
 
 ROOT = pathlib.Path.cwd()
-GUI = ROOT / "build/wx-ui-win/rbl-studio-wx.exe"
-WORKER = ROOT / "build/wx-ui-win/rbl-studio-worker.exe"
-SOURCE = ROOT / "build/wx-ui-win/gui-acceptance/cancel-loop.rbl"
+BUILD_DIR = pathlib.Path(os.environ.get("RBL_STUDIO_GUI_BUILD_DIR", ROOT / "build/output/wx-ui-win"))
+GUI = pathlib.Path(os.environ.get("RBL_STUDIO_GUI", BUILD_DIR / "rbl-studio-wx.exe"))
+WORKER = pathlib.Path(os.environ.get("RBL_STUDIO_WORKER", BUILD_DIR / "rbl-studio-worker.exe"))
+SOURCE = BUILD_DIR / "gui-acceptance/cancel-loop.rbl"
 RUN_COMMAND = 6005
 STOP_COMMAND = 6008
 STDIN_ID = 6009
@@ -60,8 +61,11 @@ def status(pid, frame):
 
 
 def main():
-    if not SOURCE.is_file():
-        raise RuntimeError(f"loop fixture missing: {SOURCE}")
+    SOURCE.parent.mkdir(parents=True, exist_ok=True)
+    SOURCE.write_text(
+        'func main() (\n    for (true) (\n        print("cancel-loop")\n    )\n)\n',
+        encoding="utf-8",
+    )
     profile = pathlib.Path(tempfile.mkdtemp(prefix="rbl-wx-cancel-profile-"))
     env = os.environ.copy()
     env["RBL_STUDIO_CONFIG_DIR"] = str(profile)

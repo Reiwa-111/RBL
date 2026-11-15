@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | LANGUAGE CONTRACT RECHECK
+# last verified: v0.8.0 | 2026.11.11 | GATE G CLI WORDING RECHECK
 
 ## Reference: RBL 0.8.0 limitations
 
@@ -35,7 +35,7 @@ This list deliberately distinguishes implemented language behavior from proposed
 ## Projects and tooling
 
 - No dependency/package manager or package registry.
-- `rbl test` runs tests for the RBL checkout, not a universal test runner for each project.
+- `rbl.py test` runs tests for the RBL checkout, not a universal test runner for each project.
 - `rbl doc` generates a simple function listing using a text pattern; it is not a full API reference generator.
 - The formatter normalizes block indentation; it does not perform full semantic formatting.
 

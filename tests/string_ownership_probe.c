@@ -105,6 +105,7 @@ int main(int argc, char **argv)
     volatile RBLRuntimeValue list;
     volatile RBLRuntimeValue capacity_list;
     volatile RBLRuntimeValue dict;
+    volatile RBLRuntimeValue threshold_dict;
     RBLRuntimeValue item;
     RBLRuntimeValue fanout;
     const uint64_t expected_live_bytes = (uint64_t)(2u * sizeof(uint64_t) + 32u) +
@@ -128,6 +129,18 @@ int main(int argc, char **argv)
         rbl_gc_test_fail_site(RBL_GC_TEST_FAIL_CONTAINER_REGISTRY);
         (void)rbl_list_new();
         fputs("FAIL: container allocation unexpectedly survived registry initialization failure\n", stderr);
+        return 1;
+    }
+    if (argc == 2 && strcmp(argv[1], "--dict-grow-oom") == 0) {
+        RBLRuntimeValue failure_dict = rbl_dict_new();
+        for (uint64_t i = 0; i < 5; i++) {
+            failure_dict = rbl_dict_set(failure_dict.tag, failure_dict.payload,
+                                        RBL_TAG_INT, i, RBL_TAG_INT, i);
+        }
+        rbl_gc_test_fail_site(RBL_GC_TEST_FAIL_DICT_GROW);
+        (void)rbl_dict_set(failure_dict.tag, failure_dict.payload,
+                           RBL_TAG_INT, 5, RBL_TAG_INT, 5);
+        fputs("FAIL: new dictionary insertion unexpectedly survived injected growth failure\n", stderr);
         return 1;
     }
     char *native_borrowed = rbl_string_alloc(32);
@@ -168,6 +181,30 @@ int main(int argc, char **argv)
         fputs("FAIL: dictionary capacity growth was not reflected in GC heap accounting\n", stderr);
         return 1;
     }
+    /* Keep this dictionary separate from the string-keyed GC fixture: exactly
+       five integer keys fill an 8-slot table to the pre-growth threshold. An
+       existing-key update must not request a new allocation. */
+    threshold_dict = rbl_dict_new();
+    for (uint64_t i = 0; i < 5; i++) {
+        threshold_dict = rbl_dict_set(threshold_dict.tag, threshold_dict.payload,
+                                      RBL_TAG_INT, i, RBL_TAG_INT, i);
+    }
+    if (rbl_dict_len(threshold_dict.tag, threshold_dict.payload).payload != 5) {
+        fputs("FAIL: dictionary threshold fixture did not contain five keys\n", stderr);
+        return 1;
+    }
+    rbl_gc_test_fail_site(RBL_GC_TEST_FAIL_DICT_GROW);
+    threshold_dict = rbl_dict_set(threshold_dict.tag, threshold_dict.payload,
+                                  RBL_TAG_INT, 0, RBL_TAG_INT, 99);
+    RBLRuntimeValue updated_dict_value = rbl_dict_get(threshold_dict.tag, threshold_dict.payload,
+                                                      RBL_TAG_INT, 0);
+    if (rbl_gc_test_fail_hits() != 0 || updated_dict_value.tag != RBL_TAG_INT ||
+        updated_dict_value.payload != 99 ||
+        rbl_dict_len(threshold_dict.tag, threshold_dict.payload).payload != 5) {
+        fputs("FAIL: updating an existing dictionary key attempted to grow the table\n", stderr);
+        return 1;
+    }
+    rbl_gc_test_fail_site(0);
 
     rooted = rbl_string_alloc(32);
     strcpy((char *)rooted, "rooted-string");

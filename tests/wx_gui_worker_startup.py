@@ -1,5 +1,5 @@
 ﻿import os,pathlib,subprocess,time,tempfile,shutil,psutil
-root=pathlib.Path.cwd();exe=root/'build/wx-ui-win/rbl-studio-wx.exe';worker=root/'build/wx-ui-win/rbl-studio-worker.exe'
+root=pathlib.Path.cwd();build_dir=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR',root/'build/output/wx-ui-win'));exe=pathlib.Path(os.environ.get('RBL_STUDIO_GUI',build_dir/'rbl-studio-wx.exe'));worker=pathlib.Path(os.environ.get('RBL_STUDIO_WORKER',build_dir/'rbl-studio-worker.exe'))
 profile=pathlib.Path(tempfile.mkdtemp());(profile/'ui.ini').write_text('[Workspace]\nRoot='+root.as_posix()+'\n')
 env=os.environ.copy();env['RBL_STUDIO_CONFIG_DIR']=str(profile);env['RBL_STUDIO_WORKER']=str(worker);env['RBL_PYTHON']=__import__('sys').executable
 p=subprocess.Popen([str(exe)],cwd=root,env=env)

@@ -9,11 +9,11 @@ shell.CurrentDirectory = root
 gui = ""
 worker = ""
 
-If fso.FileExists(root & "\rbl-studio-wx.exe") And fso.FileExists(root & "\rbl-studio-worker.exe") Then
-    gui = root & "\rbl-studio-wx.exe"
-    worker = root & "\rbl-studio-worker.exe"
+If fso.FileExists(root & "\bin\win-x86_64\studio\rbl-studio-wx.exe") And fso.FileExists(root & "\bin\win-x86_64\studio\rbl-studio-worker.exe") Then
+    gui = root & "\bin\win-x86_64\studio\rbl-studio-wx.exe"
+    worker = root & "\bin\win-x86_64\studio\rbl-studio-worker.exe"
 Else
-    pointerPath = root & "\build\wx-ui-current-win.path"
+    pointerPath = root & "\build\output\wx-ui-current-win.path"
     If fso.FileExists(pointerPath) Then
         Set stream = fso.OpenTextFile(pointerPath, 1, False)
         If Not stream.AtEndOfStream Then buildDir = Trim(stream.ReadLine)

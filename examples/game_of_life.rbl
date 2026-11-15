@@ -115,7 +115,7 @@ func main() (
         )
     )
 
-    write_file("life_report.txt", report)
+    write_file("build/life_report.txt", report)
     print(f"Done. Final live cells: {len(grid)}")
-    print("Saved: life_report.txt")
+    print("Saved: build/life_report.txt")
 )

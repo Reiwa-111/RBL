@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.10 | SOURCE ARCHIVE AUDIT
+# last verified: v0.8.0 | 2026.11.12 | SOURCE ARCHIVE AUDIT
 
 # Windows toolchain and wx runtime — corresponding-source audit
 
@@ -23,10 +23,15 @@ archive; it does not require a 21st unique source archive.
   whose SHA-256 matches its PKGBUILD.
 
 The source archives and logs are retained locally under
-build/toolchain-source-audit-20261110/. They are not committed into this
-repository and are not included in the 43-file Windows toolchain runtime bundle.
-The source-material bundle must accompany any binary distribution or be
-replaced by another legally sufficient source-distribution method.
+build/toolchain-source-audit-20261111/. They are not committed into this
+repository and are not embedded in the 43-file Windows toolchain runtime subtree.
+The source-material bundle is separately assembled at
+  build/source-material/RBL-0.8.0-Windows-Source-Materials-20261111-final-reviewed.tar.zst;
+fresh Windows build payloads and installations now include it as
+`source/Windows-toolchain-source.tar.zst` with a verified SHA-256 sidecar. It is
+still not attached to the published pre-release; any future binary release must
+attach this source archive alongside the matching binaries (or use another
+legally sufficient source-distribution method reviewed before release).
 
 ## Signature verification
 
@@ -37,8 +42,9 @@ All 20 source archives were signed by the MSYS2 developer key with fingerprint:
 The fingerprint matches the lazka developer key in the official
 [MSYS2 keyring documentation](https://www.msys2.org/dev/keyring/), which states
 that each developer key is signed by at least three MSYS2 master keys.
-Verification output is retained in
-build/toolchain-source-audit-20261110/signature-verification-current.log.
+Verification output is retained in the external dated verification directory
+`verification/2026-11-11-Gate-F/02_gpg_verify.log` and its full 25-signature
+rerun `rust-addendum/08_gpg_verify_all_25.log`.
 
 The current source set contains 20 exact-version source archives. The Binutils
 2.47-4 source archive and its corresponding binary package were independently
@@ -118,19 +124,24 @@ build/backups/toolchain-binutils-pre-2.47-4-20261110/.
 
 ## Remaining release blockers
 
-- The 20 source archives and signatures have been assembled into a 330,067,308-
-  byte source-material archive at
-  build/source-material/RBL-0.8.0-Windows-Source-Materials-20261110.tar.zst.
-  SHA-256:
-  6bc84404a077bcc438bafd0b6add5436bb8d1058f339aa5d1ebd988529c7fa57.
-  The archive contains 52 members; its SHA256SUMS file has 51 records covering
-  every other member (the checksum file cannot include its own hash). These
-  records were rechecked after archive creation. The archive
-  is local build output and has not yet been attached to a distributable binary.
-- No written source offer or alternative distribution procedure has been
-  legally reviewed. Keep the release manifest UNRELEASED.
+- The 20 source archives and signatures have been assembled into a new
+  source-material archive at
+  build/source-material/RBL-0.8.0-Windows-Source-Materials-20261111-final-reviewed.tar.zst.
+  SHA-256 is recorded in the external Gate F report and `bundle_sha256.txt`;
+  it is omitted here because this document is embedded in that archive.
+  This supersedes the lost 2026-11-10 archive and is not claimed byte-identical.
+  Its 55 SHA256SUMS records passed after extraction, covering every other file
+  (20 source archives, 20 detached signatures, five binary packages, five
+  package signatures and audit metadata). The Windows build script copies this
+  archive into `source/`; the installer verifies and preserves it. The public
+  pre-release still lacks both binary and corresponding-source assets, so keep
+  their pairing when publishing.
+- No alternative written-offer procedure has been legally reviewed. A release
+  that includes the complete corresponding-source archive with each matching
+  binary distribution is the selected technical delivery path, but this audit
+  is not legal advice or formal legal sign-off.
 - The bundled Binutils package was updated to 2.47-4. The [MSYS2 security
-  index](https://www.msys2.org/security/) explicitly lists CVE-2026-90801
+  index](https://packages.msys2.org/security) explicitly lists CVE-2026-90801
   against `mingw-w64-binutils 2.47-4`; the [installed UCRT64 package
   page](https://packages.msys2.org/package/mingw-w64-ucrt-x86_64-binutils)
   confirms `mingw-w64-ucrt-x86_64-binutils 2.47-4`. The shipped linker reports only the
@@ -141,6 +152,11 @@ build/backups/toolchain-binutils-pre-2.47-4-20261110/.
 
 ### CVE-2026-90801 source-level reachability review
 
+Upstream Bug 34442 reports a heap out-of-bounds READ: `fwrite` is called with
+32 bytes from a 22-byte section-content allocation in `cache_bwrite`. The
+reported trigger uses malformed ELF and `--gc-sections --no-print-gc-sections
+-w`; this is an out-of-bounds read, not an out-of-bounds write.
+
 A read-only review of the exact signed Binutils 2.47-4 source archive confirmed
 that `bfd/cache.c:cache_bwrite` is reachable during ordinary PE output linking.
 The linker recognizes ELF object inputs through the BFD target vector; the COFF
@@ -148,7 +164,7 @@ final-link path has a generic foreign-section copy route which reaches
 `bfd_set_section_contents`/`bfd_write`, and the PE output cache uses
 `cache_bwrite`. Therefore PE-only output emulations do not establish that the
 cache-write path is unreachable. The review did not reproduce the CVE or prove
-that a normal bounded RBL-generated object satisfies the vulnerable write-size
+that a normal bounded RBL-generated object satisfies the vulnerable read-size
 condition.
 
 The current Debian tracker still marks Binutils vulnerable in bookworm, trixie,
@@ -202,3 +218,49 @@ they provide no basis to close the finding either. Combined with the BFD
 reachability analysis above, `CVE-2026-90801` remains **UNRESOLVED / RELEASE
 BLOCKING** pending a fixed linker or a defensible source-level proof that the
 vulnerable condition cannot occur in the supported workflow.
+
+## CVE status and exact-package patch-set refresh — 2026-11-12
+
+The current installed linker was re-hashed and executed with the bundled UCRT64
+runtime directory on `PATH`:
+
+- `ld.exe` SHA-256 remains
+  `a279cc83f198a606f255a597b3a067b51f11a9bbf8fe46de2a0dc8bb71b47f4f`.
+- `ld.exe --version` reports `GNU ld (GNU Binutils) 2.47.20260726`.
+- `ld.exe -V` reports only `i386pep` and `i386pe` output emulations. This is not
+  an input-format restriction and does not exclude the BFD ELF input backend.
+
+The exact staged `mingw-w64-binutils-2.47-4.src.tar.zst` (source SHA-256
+`e829fa1387f3f1ab14187c34c94e180f6d2da2b6aad8acdf6b1597abb4c0eb2f`) was
+inspected without modifying the archive. Its `PKGBUILD` declares `pkgrel=4`
+and applies the package patch set listed there. None of those patches modifies
+`bfd/cache.c` or `cache_bwrite`. The embedded upstream `binutils-2.47` source
+still implements `cache_bwrite` at `bfd/cache.c:423-444` with
+`fwrite(from, 1, nbytes, f)` at line 436. No CVE-specific fix/backport is
+present in this exact package source set.
+
+The live MSYS2 security inventory still lists CVE-2026-90801 for
+`mingw-w64-ucrt-x86_64-binutils 2.47-4`; Debian still reports the current
+2.47.50.20261021-1 source as vulnerable with fixed version `unfixed`; Ubuntu
+still marks Noble 24.04 `Needs evaluation`. Red Hat's product-specific
+determination does not establish non-applicability to the MSYS2 package.
+References: https://packages.msys2.org/security,
+https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-binutils,
+https://security-tracker.debian.org/tracker/CVE-2026-90801,
+https://ubuntu.com/security/CVE-2026-90801,
+https://access.redhat.com/security/cve/cve-2026-90801,
+https://mail-archive.com/bug-binutils%40gnu.org/msg53880.html.
+
+The separate Ubuntu 24.04 system toolchain was observed as
+`binutils 2.42-4ubuntu2.10`; `/usr/bin/ld` and `/usr/bin/as` report Binutils
+2.42. This package is not bundled by RBL. Ubuntu's `Needs evaluation` status
+does not establish either affectedness or non-affectedness for that package.
+
+No vulnerable input was executed and no exploit reproduction is claimed. The
+source/package review still does not prove whether the vulnerable read-size
+condition can occur with the default RBL-generated COFF workflow. The CVE is
+therefore unresolved upstream. On 2026-11-13 the owner accepted the residual
+risk only for the supported RBL compiler-generated COFF workflow (no arbitrary
+object input and no `--gc-sections`); this is neither a fix nor a
+non-applicability claim. Manual linking of untrusted ELF objects remains outside
+the supported workflow and requires a separate disposition.

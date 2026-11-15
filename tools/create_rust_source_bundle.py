@@ -38,8 +38,8 @@ def main() -> int:
             raise RuntimeError(f"Cargo cache checksum mismatch: {name} {version}")
         crates[f"crates/{name}-{version}.crate"] = data
     files = {path: (root / path).read_bytes() for path in LIVE_SOURCE_FILES}
-    files["native/wx-ui/RUST_DEPENDENCY_NOTICES.md"] = normalized_notice(
-        (root / "native/wx-ui/RUST_DEPENDENCY_NOTICES.md").read_bytes())
+    files["rbl-ide/wx-ui/RUST_DEPENDENCY_NOTICES.md"] = normalized_notice(
+        (root / "rbl-ide/wx-ui/RUST_DEPENDENCY_NOTICES.md").read_bytes())
     files.update(crates)
     manifest = "".join(f"{hashlib.sha256(data).hexdigest()}  {path}\n" for path, data in sorted(files.items()))
     files["SHA256SUMS.txt"] = manifest.encode("ascii")

@@ -59,10 +59,22 @@ def run_tests() -> int:
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'run_tests.py')], cwd=ROOT)
     if rc:
         return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_fast_call_fallback.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_wx_build_script.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_ide_source_layout.py')], cwd=ROOT)
+    if rc:
+        return rc
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_stdlib.py')], cwd=ROOT)
     if rc:
         return rc
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_build_cache.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_cli_new_project.py')], cwd=ROOT)
     if rc:
         return rc
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_clean_command.py')], cwd=ROOT)
@@ -83,13 +95,40 @@ def run_tests() -> int:
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_string_io_gc.py')], cwd=ROOT)
     if rc:
         return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_fs_cwd_ownership.py')], cwd=ROOT)
+    if rc:
+        return rc
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_rbltool_streaming.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_python_runtime_packaging.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_flatpak_payload.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_wxwidgets_packaging.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_llvm_toolchain_packaging.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_linux_toolchain_resolution.py')], cwd=ROOT)
     if rc:
         return rc
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_bundled_toolchain.py')], cwd=ROOT)
     if rc:
         return rc
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_toolchain_manifest.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_rbltool_windows_paths.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_make_clean_safety.py')], cwd=ROOT)
+    if rc:
+        return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_container_semantics.py')], cwd=ROOT)
     if rc:
         return rc
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_linux_launcher.py')], cwd=ROOT)
@@ -110,7 +149,7 @@ def run_tests() -> int:
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_wx_worker_lifecycle.py')], cwd=ROOT)
     if rc:
         return rc
-    rc = subprocess.call([sys.executable, str(ROOT / 'native' / 'wx-ui' / 'tests' / 'dpi_static_test.py')], cwd=ROOT)
+    rc = subprocess.call([sys.executable, str(ROOT / 'rbl-ide' / 'wx-ui' / 'tests' / 'dpi_static_test.py')], cwd=ROOT)
     if rc:
         return rc
     if os.name == 'nt':
@@ -126,6 +165,9 @@ def run_tests() -> int:
         ], cwd=ROOT)
         if rc:
             return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_codegen_source_comment.py')], cwd=ROOT)
+    if rc:
+        return rc
     return subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_diagnostics.py')], cwd=ROOT)
 
 
@@ -196,9 +238,18 @@ def generate_docs(source: Path, out: Path) -> int:
     return 0
 
 
+def validate_project_name(name: str) -> None:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", name):
+        raise SystemExit(
+            "project name must be 1-64 ASCII letters, digits, '_' or '-', "
+            "and must start with a letter or digit"
+        )
+
+
 def new_project(name: str, target: Path) -> int:
-    if target.exists() and any(target.iterdir()):
-        raise SystemExit(f'target directory is not empty: {target}')
+    validate_project_name(name)
+    if target.exists() and (not target.is_dir() or any(target.iterdir())):
+        raise SystemExit(f'target directory is not empty or is not a directory: {target}')
     (target / 'src').mkdir(parents=True, exist_ok=True)
     (target / 'tests').mkdir(exist_ok=True)
     (target / 'benchmarks').mkdir(exist_ok=True)
@@ -212,38 +263,71 @@ def new_project(name: str, target: Path) -> int:
         '    print("Hello from RBL!")\n'
         ')\n', encoding='utf-8')
     (target / 'README.md').write_text(
-        f'# {name}\n\nBuilt with RBL Studio.\n\n```bash\nrbl check\nrbl run\nrbl test\n```\n', encoding='utf-8')
+        f'''# {name}
+
+Built with RBL Studio.
+
+The RBL CLI is part of the RBL Studio checkout and is not installed globally.
+Set `RBL_STUDIO_ROOT` to the path of your RBL Studio checkout, then run these
+commands from this project directory.
+
+Bash:
+
+```bash
+export RBL_STUDIO_ROOT="/path/to/RBLStudio"
+python3 "$RBL_STUDIO_ROOT/rbl.py" check src/main.rbl
+python3 "$RBL_STUDIO_ROOT/rbl.py" run src/main.rbl
+```
+
+Windows PowerShell:
+
+```powershell
+$env:RBL_STUDIO_ROOT = "C:\\path\\to\\RBLStudio"
+python "$env:RBL_STUDIO_ROOT\\rbl.py" check src\\main.rbl
+python "$env:RBL_STUDIO_ROOT\\rbl.py" run src\\main.rbl
+```
+
+`rbl.py test` runs the RBL Studio repository regression suite; it is not a
+project test runner. Use this project's `tests/` directory for your own tests.
+''', encoding='utf-8')
     print(f'Created RBL project: {target}')
     return 0
 
 
 def clean(cwd: Path) -> int:
-    # Build outputs are centralized beside this tool, not in the caller's
-    # project directory. Preserve evidence, source archives, RC bundles,
-    # visualizations and other user-owned data under build/.
-    build_root = Path(rbltool.BUILD_DIR)
-    cache_root = build_root / 'sources'
+    # This command touches the disposable compiler cache only. Build outputs
+    # (build/output), source archives, release candidates, visualizations and
+    # other user-owned data under build/ are preserved; use `make clean-build`
+    # for build outputs and `make clean-cache` for the cache.
+    cache_dir = Path(rbltool.CACHE_DIR)
+    cache_root = cache_dir / 'sources'
     if not cache_root.exists() and not cache_root.is_symlink():
         print('Nothing to clean.')
         return 0
     is_junction = getattr(Path, 'is_junction', lambda self: False)
-    if (build_root.is_symlink() or is_junction(build_root)
+    if (cache_dir.is_symlink() or is_junction(cache_dir)
             or cache_root.is_symlink() or is_junction(cache_root)):
-        print(f'Refusing to clean a symlinked/junction build path: {cache_root}', file=sys.stderr)
+        print(f'Refusing to clean a symlinked/junction cache path: {cache_root}', file=sys.stderr)
         return 1
     try:
-        resolved_build = build_root.resolve(strict=True)
+        resolved_cache_dir = cache_dir.resolve(strict=True)
         resolved_cache = cache_root.resolve(strict=True)
     except OSError as exc:
         print(f'Cannot safely resolve build cache: {exc}', file=sys.stderr)
         return 1
-    if resolved_cache.parent != resolved_build or resolved_cache.name != 'sources':
+    if resolved_cache.parent != resolved_cache_dir or resolved_cache.name != 'sources':
         print(f'Refusing to clean unexpected path: {resolved_cache}', file=sys.stderr)
         return 1
     if not resolved_cache.is_dir():
         print(f'Refusing to clean non-directory build cache: {resolved_cache}', file=sys.stderr)
         return 1
     shutil.rmtree(resolved_cache)
+    # Drop the now-empty cache container so a fresh installed tree has no
+    # leftover empty directory. Keep it when it still holds downloaded archives.
+    try:
+        resolved_cache_dir.rmdir()
+    except OSError:
+        pass
     print(f'Removed compiler build cache: {resolved_cache}')
     return 0
 
@@ -255,7 +339,7 @@ def main() -> int:
     sub.add_parser('doctor')
     sub.add_parser('bootstrap')
     sub.add_parser('env')
-    p_new = sub.add_parser('new'); p_new.add_argument('name'); p_new.add_argument('--path', default=None)
+    p_new = sub.add_parser('new'); p_new.add_argument('name', help="1-64 ASCII letters, digits, '_' or '-', starting with a letter or digit"); p_new.add_argument('--path', default=None)
     sub.add_parser('init')
     for name in ('check', 'build', 'run', 'asm'):
         p = sub.add_parser(name)
@@ -296,6 +380,7 @@ def main() -> int:
         if mpath.exists():
             print(f'rbl.toml already exists: {mpath}')
             return 0
+        validate_project_name(cwd.name)
         (cwd / 'src').mkdir(exist_ok=True)
         (cwd / 'tests').mkdir(exist_ok=True)
         (cwd / 'benchmarks').mkdir(exist_ok=True)

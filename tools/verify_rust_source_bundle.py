@@ -16,9 +16,9 @@ LIVE_SOURCE_FILES = (
     "Cargo.toml",
     "Cargo.lock",
     "LICENSE",
-    "src/bin/rbl-studio-worker.rs",
-    "src/process.rs",
-    "src/settings.rs",
+    "rbl-ide/worker/rbl-studio-worker.rs",
+    "rbl-ide/worker/process.rs",
+    "rbl-ide/worker/settings.rs",
 )
 
 
@@ -61,9 +61,37 @@ def normalized_notice(data: bytes) -> bytes:
     text = data.decode("utf-8")
     lines = [
         line for line in text.splitlines()
-        if not line.startswith("- The verified corresponding-source archive is ")
+        if not line.startswith((
+            "- The verified corresponding-source archive is ",
+            "- The current restored corresponding-source archive is ",
+            "- The current corrected corresponding-source archive is ",
+            "- The current Gate H corresponding-source archive is ",
+        "- The current layout-migration corresponding-source archive is ",
+        ))
     ]
     return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def verify_notice_archive_reference(data: bytes, archive: Path) -> None:
+    """Verify the notice's external self-reference against the selected archive."""
+    text = data.decode("utf-8")
+    prefixes = (
+        "- The verified corresponding-source archive is ",
+        "- The current restored corresponding-source archive is ",
+        "- The current corrected corresponding-source archive is ",
+        "- The current Gate H corresponding-source archive is ",
+        "- The current layout-migration corresponding-source archive is ",
+    )
+    matches = [line for line in text.splitlines() if line.startswith(prefixes)]
+    if len(matches) != 1:
+        raise RuntimeError("dependency notice must contain exactly one corresponding-source archive reference")
+    line = matches[0]
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    expected = (archive.name, f"{archive.stat().st_size:,} bytes", digest)
+    if any(value not in line for value in expected):
+        raise RuntimeError(f"dependency notice archive reference does not match the verified archive: {expected!r}")
+    if "df5881aa72dc556d9fff6217fd436cec9ad9cb345ac899058a12d23bbdf40da5" in line:
+        raise RuntimeError("dependency notice still references the superseded Rust source archive")
 
 
 def decompress_with_libzstd(archive: Path, output: Path) -> None:
@@ -155,8 +183,9 @@ def verify(root: Path, archive: Path, zstd: str | None, targets: list[str]) -> t
     for rel in LIVE_SOURCE_FILES:
         if files.get(rel) != (root / rel).read_bytes():
             raise RuntimeError(f"source bundle is stale: {rel} differs from the live repository")
-    archived_notice = files.get("native/wx-ui/RUST_DEPENDENCY_NOTICES.md")
-    live_notice = (root / "native/wx-ui/RUST_DEPENDENCY_NOTICES.md").read_bytes()
+    archived_notice = files.get("rbl-ide/wx-ui/RUST_DEPENDENCY_NOTICES.md")
+    live_notice = (root / "rbl-ide/wx-ui/RUST_DEPENDENCY_NOTICES.md").read_bytes()
+    verify_notice_archive_reference(live_notice, archive)
     if archived_notice is None or archived_notice != normalized_notice(live_notice):
         raise RuntimeError("source bundle dependency inventory is stale")
 
@@ -205,7 +234,7 @@ def verify(root: Path, archive: Path, zstd: str | None, targets: list[str]) -> t
             f"extra={sorted(actual_crates - expected_crates)}"
         )
 
-    license_root = root / "native/wx-ui/licenses/Rust"
+    license_root = root / "rbl-ide/wx-ui/licenses/Rust"
     license_dirs = set()
     for path in license_root.iterdir():
         if path.is_dir():

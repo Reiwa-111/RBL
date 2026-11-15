@@ -1,54 +1,86 @@
 param(
-    [string]$BuildDir = "build/wx-ui-win"
+    [string]$BuildDir = "build/output/wx-ui-win",
+    [switch]$IgnoreRepoToolchain,
+    [switch]$StageToolchainOnly
 )
 
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$msysBin = "C:\msys64\ucrt64\bin"
-$repoBinutilsBin = Join-Path $root "toolchain/windows-x86_64/msys64/ucrt64/bin"
-$repoBinutilsTargetBin = Join-Path $root "toolchain/windows-x86_64/msys64/ucrt64/x86_64-w64-mingw32/bin"
-$cmake = (Get-Command cmake -ErrorAction Stop).Source
+$msysRoot = "C:\msys64\ucrt64"
+$msysBin = Join-Path $msysRoot "bin"
+$outputDir = Join-Path $root "build/output"
 $buildPath = if ([System.IO.Path]::IsPathRooted($BuildDir)) {
     [System.IO.Path]::GetFullPath($BuildDir)
 } else {
     [System.IO.Path]::GetFullPath((Join-Path $root $BuildDir))
 }
 $workerTargetName = [System.IO.Path]::GetFileName($buildPath.TrimEnd('\','/'))
-$workerTargetPath = Join-Path $root "build/cargo-target-$workerTargetName"
+$workerTargetPath = Join-Path $outputDir "cargo-target-$workerTargetName"
+
+# The pinned repository bundle is the 0.8.0 release input and wins when present.
+# Otherwise stage the minimal as/ld runtime closure from the host MSYS2 install
+# into build/output, so a source checkout does not need tracked tool binaries.
+# -IgnoreRepoToolchain forces the host-staged path (used to verify that the
+# repository bundle is not required).
+$repoToolchainRoot = Join-Path $root "toolchain/windows-x86_64"
+$outputToolchainRoot = Join-Path $outputDir "toolchain/windows-x86_64"
+$toolchainRoot = if ((-not $IgnoreRepoToolchain) -and (Test-Path -LiteralPath (Join-Path $repoToolchainRoot "msys64/ucrt64/bin/as.exe") -PathType Leaf)) {
+    $repoToolchainRoot
+} else {
+    $outputToolchainRoot
+}
+$toolchainUcrt = Join-Path $toolchainRoot "msys64/ucrt64"
+$toolchainBin = Join-Path $toolchainUcrt "bin"
+$toolchainTargetBin = Join-Path $toolchainUcrt "x86_64-w64-mingw32/bin"
+if (-not (Test-Path -LiteralPath (Join-Path $toolchainBin "as.exe") -PathType Leaf)) {
+    $python = (Get-Command python -ErrorAction Stop).Source
+    & $python (Join-Path $root "tools/package_windows_toolchain.py") --source $msysRoot --dest $toolchainUcrt
+    if ($LASTEXITCODE -ne 0) { throw "Windows runtime toolchain staging failed ($LASTEXITCODE)" }
+}
+$pythonForCheck = (Get-Command python -ErrorAction Stop).Source
+& $pythonForCheck (Join-Path $root "tools/package_windows_toolchain.py") --check --dest $toolchainUcrt
+if ($LASTEXITCODE -ne 0) { throw "Windows runtime toolchain verification failed ($LASTEXITCODE)" }
+if ($StageToolchainOnly) {
+    Write-Host "Toolchain staging verified: $toolchainRoot"
+    exit 0
+}
+$cmake = (Get-Command cmake -ErrorAction Stop).Source
 
 if (-not (Test-Path (Join-Path $msysBin "g++.exe"))) {
     throw "MSYS2 UCRT64 compiler not found at $msysBin"
 }
-foreach ($required in @((Join-Path $repoBinutilsBin "as.exe"),
-                         (Join-Path $repoBinutilsTargetBin "ld.exe"))) {
+foreach ($required in @((Join-Path $toolchainBin "as.exe"),
+                         (Join-Path $toolchainTargetBin "ld.exe"))) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
-        throw "Repository-pinned Binutils executable is missing: $required"
+        throw "Pinned Binutils executable is missing: $required"
     }
 }
 
 $env:PATH = "$msysBin;$env:PATH"
 # Use the host GCC frontend (16.2.0-4) but resolve assembler/linker from the
-# repository's signature-verified Binutils 2.47-4 overlay. COMPILER_PATH is
-# inherited by both CMake and Cargo's GNU linker invocation.
-$repoCompilerPaths = "$(($repoBinutilsBin -replace '\\','/'));$(($repoBinutilsTargetBin -replace '\\','/'))"
+# pinned/staged Binutils 2.47-4 overlay. COMPILER_PATH is inherited by both
+# CMake and Cargo's GNU linker invocation.
+$repoCompilerPaths = "$(($toolchainBin -replace '\\','/'));$(($toolchainTargetBin -replace '\\','/'))"
 $env:COMPILER_PATH = if ($env:COMPILER_PATH) {
     "$repoCompilerPaths;$env:COMPILER_PATH"
 } else {
     $repoCompilerPaths
 }
 $gcc = Join-Path $msysBin "gcc.exe"
-$expectedAssembler = [System.IO.Path]::GetFullPath((Join-Path $repoBinutilsBin "as.exe"))
-$expectedLinker = [System.IO.Path]::GetFullPath((Join-Path $repoBinutilsTargetBin "ld.exe"))
+$expectedAssembler = [System.IO.Path]::GetFullPath((Join-Path $toolchainBin "as.exe"))
+$expectedLinker = [System.IO.Path]::GetFullPath((Join-Path $toolchainTargetBin "ld.exe"))
 $resolvedAssembler = [System.IO.Path]::GetFullPath((& $gcc -print-prog-name=as).Trim())
 $resolvedLinker = [System.IO.Path]::GetFullPath((& $gcc -print-prog-name=ld).Trim())
 if ($resolvedAssembler -ine $expectedAssembler -or $resolvedLinker -ine $expectedLinker) {
-    throw "GCC did not resolve repository-pinned Binutils. as=$resolvedAssembler ld=$resolvedLinker"
+    throw "GCC did not resolve the pinned Binutils overlay. as=$resolvedAssembler ld=$resolvedLinker"
 }
 $env:RUSTUP_TOOLCHAIN = "stable-x86_64-pc-windows-gnu"
 $env:RUSTUP_HOME = "C:\Rustup"
-$env:RUSTFLAGS = "-L native=$($root.Replace('\','/'))/build/rust-link-libs"
+& (Join-Path $root "tools/prepare_windows_rust_link.ps1") | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Windows Rust import-library staging failed ($LASTEXITCODE)" }
+$env:RUSTFLAGS = "-L native=$($root.Replace('\','/'))/build/output/rust-link-libs"
 
-& $cmake -S (Join-Path $root "native/wx-ui") -B $buildPath `
+& $cmake -S (Join-Path $root "rbl-ide/wx-ui") -B $buildPath `
     -G "MinGW Makefiles" `
     -DCMAKE_MAKE_PROGRAM="$msysBin/mingw32-make.exe" `
     -DCMAKE_PREFIX_PATH="C:/msys64/ucrt64" `
@@ -60,9 +92,22 @@ if ($LASTEXITCODE -ne 0) { throw "GUI build failed ($LASTEXITCODE)" }
 
 Push-Location $root
 try {
-    cargo build --release --bin rbl-studio-worker --target x86_64-pc-windows-gnu `
-        --target-dir $workerTargetPath
-    if ($LASTEXITCODE -ne 0) { throw "Rust worker build failed ($LASTEXITCODE)" }
+    # Capture native streams outside PowerShell's error pipeline. Quote the
+    # target-dir argument explicitly because Start-Process joins ArgumentList.
+    $cargoStdout = Join-Path $env:TEMP ("rbl-worker-build-$PID.stdout.log")
+    $cargoStderr = Join-Path $env:TEMP ("rbl-worker-build-$PID.stderr.log")
+    try {
+        $cargoExe = (Get-Command cargo -ErrorAction Stop).Source
+        $cargoArguments = 'build --locked --release --bin rbl-studio-worker --target x86_64-pc-windows-gnu --target-dir "{0}"' -f $workerTargetPath
+        $cargoProcess = Start-Process -FilePath $cargoExe -ArgumentList $cargoArguments `
+            -WorkingDirectory $root -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $cargoStdout -RedirectStandardError $cargoStderr
+        if (Test-Path -LiteralPath $cargoStdout) { Get-Content -LiteralPath $cargoStdout | ForEach-Object { Write-Output $_ } }
+        if (Test-Path -LiteralPath $cargoStderr) { Get-Content -LiteralPath $cargoStderr | ForEach-Object { Write-Output $_ } }
+        if ($cargoProcess.ExitCode -ne 0) { throw "Rust worker build failed ($($cargoProcess.ExitCode))" }
+    } finally {
+        Remove-Item -LiteralPath $cargoStdout, $cargoStderr -Force -ErrorAction SilentlyContinue
+    }
 } finally {
     Pop-Location
 }
@@ -88,14 +133,14 @@ foreach ($dll in $runtimeDlls) {
 
 # Use the repository-pinned, signature-verified zlib runtime rather than the
 # host MSYS2 installation's independently managed zlib version.
-$toolchainZlib = Join-Path $root "toolchain/windows-x86_64/msys64/ucrt64/bin/zlib1.dll"
+$toolchainZlib = Join-Path $toolchainBin "zlib1.dll"
 $expectedZlibHash = "aa658771fb152b095eda1614d8bde798efb92324b6f4a0c99c743cd96b67ac90"
 if (-not (Test-Path -LiteralPath $toolchainZlib)) {
-    throw "Repository-pinned zlib1.dll is missing: $toolchainZlib"
+    throw "Pinned zlib1.dll is missing from the staged toolchain: $toolchainZlib"
 }
 $actualZlibHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $toolchainZlib).Hash.ToLowerInvariant()
 if ($actualZlibHash -ne $expectedZlibHash) {
-    throw "Repository-pinned zlib1.dll hash mismatch: $actualZlibHash"
+    throw "Pinned zlib1.dll hash mismatch (expected 1.4-2): $actualZlibHash"
 }
 Copy-Item -LiteralPath $toolchainZlib -Destination (Join-Path $buildPath "zlib1.dll") -Force
 
@@ -116,15 +161,15 @@ foreach ($licenseName in $licenseNames) {
     }
     Copy-Item -LiteralPath $source -Destination $licenseDestination -Recurse -Force
 }
-$scintillaLicense = Join-Path $Root 'native\wx-ui\licenses\Scintilla-LICENSE.txt'
+$scintillaLicense = Join-Path $Root 'rbl-ide\wx-ui\licenses\Scintilla-LICENSE.txt'
 if (-not (Test-Path -LiteralPath $scintillaLicense -PathType Leaf)) {
     throw "Missing Scintilla license notice: $scintillaLicense"
 }
 $scintillaLicenseDir = Join-Path $licenseDestination 'Scintilla'
 New-Item -ItemType Directory -Path $scintillaLicenseDir -Force | Out-Null
 Copy-Item -LiteralPath $scintillaLicense -Destination (Join-Path $scintillaLicenseDir 'License.txt') -Force
-$rustLicenseSource = Join-Path $Root 'native\wx-ui\licenses\Rust'
-$rustNoticeSource = Join-Path $Root 'native\wx-ui\RUST_DEPENDENCY_NOTICES.md'
+$rustLicenseSource = Join-Path $Root 'rbl-ide\wx-ui\licenses\Rust'
+$rustNoticeSource = Join-Path $Root 'rbl-ide\wx-ui\RUST_DEPENDENCY_NOTICES.md'
 if (-not (Test-Path -LiteralPath $rustLicenseSource -PathType Container)) { throw 'Missing Rust worker license payload: ' + $rustLicenseSource }
 if (-not (Test-Path -LiteralPath $rustNoticeSource -PathType Leaf)) { throw 'Missing Rust worker license inventory: ' + $rustNoticeSource }
 $rustLicenseDestination = Join-Path $licenseDestination 'Rust'
@@ -161,25 +206,40 @@ $packageInventory = foreach ($packageId in $packageIds) {
 }
 $packageInventory += "mingw-w64-ucrt-x86_64-zlib 1.4-2 (repository-pinned runtime DLL)"
 $sourceMaterialDir = Join-Path $root "build\source-material"
-$sourceMaterialArchive = Get-ChildItem -LiteralPath $sourceMaterialDir -Filter "RBL-0.8.0-Windows-Source-Materials-*.tar.zst" -File -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if ($sourceMaterialArchive) {
-    $sourceMaterialRelativePath = $sourceMaterialArchive.FullName.Substring($root.Length).TrimStart([char[]]@([char]92, [char]47)).Replace([char]92, [char]47)
-    $sourceMaterialHash = (Get-FileHash -LiteralPath $sourceMaterialArchive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    $sourceMaterialNotice = @"
-A separate source-material archive is available at $sourceMaterialRelativePath
-(SHA-256: $sourceMaterialHash). This archive is not copied into this portable
-directory by the build script and must accompany any binary distribution.
-Legal review of the selected source-distribution procedure or written offer
-remains incomplete.
-"@
-} else {
-    $sourceMaterialNotice = @"
-No separate source-material archive is present under build/source-material.
-Do not distribute this binary build until corresponding source materials are
-provided or an applicable written offer has been legally reviewed.
-"@
+$sourceMaterialName = "RBL-0.8.0-Windows-Source-Materials-20261111-final-reviewed.tar.zst"
+$sourceMaterialArchive = Join-Path $sourceMaterialDir $sourceMaterialName
+$expectedSourceMaterialHash = "2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066"
+if (-not (Test-Path -LiteralPath $sourceMaterialArchive -PathType Leaf)) {
+    throw "Required corresponding-source archive is missing: $sourceMaterialArchive"
 }
+$actualSourceMaterialHash = (Get-FileHash -LiteralPath $sourceMaterialArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualSourceMaterialHash -ne $expectedSourceMaterialHash) {
+    throw "Windows toolchain source archive SHA-256 mismatch: $actualSourceMaterialHash"
+}
+if ((Get-Item -LiteralPath $sourceMaterialArchive).Length -ne 331187540) {
+    throw "Windows toolchain source archive size mismatch: $sourceMaterialArchive"
+}
+$zstdExe = Join-Path $msysBin "zstd.exe"
+if (-not (Test-Path -LiteralPath $zstdExe -PathType Leaf)) { throw "zstd is required to verify corresponding source: $zstdExe" }
+& $zstdExe -t $sourceMaterialArchive
+if ($LASTEXITCODE -ne 0) { throw "Windows toolchain source archive integrity check failed ($LASTEXITCODE)" }
+$sourcePayloadDir = Join-Path $buildPath "source"
+New-Item -ItemType Directory -Path $sourcePayloadDir -Force | Out-Null
+$sourcePayloadName = "Windows-toolchain-source.tar.zst"
+$sourcePayloadPath = Join-Path $sourcePayloadDir $sourcePayloadName
+Copy-Item -LiteralPath $sourceMaterialArchive -Destination $sourcePayloadPath -Force
+$sourceMaterialHash = (Get-FileHash -LiteralPath $sourcePayloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($sourceMaterialHash -ne $expectedSourceMaterialHash) { throw "Copied Windows source archive hash mismatch: $sourceMaterialHash" }
+[System.IO.File]::WriteAllText((Join-Path $sourcePayloadDir "Windows-toolchain-source.sha256"), "$sourceMaterialHash  $sourcePayloadName`n", [System.Text.UTF8Encoding]::new($false))
+$sourceMaterialNotice = @"
+The exact corresponding source materials for the redistributed Windows
+MinGW-w64/GCC/Binutils/wxWidgets/runtime package closure are included at
+source/$sourcePayloadName (SHA-256: $sourceMaterialHash). The archive contains
+the exact upstream source archives and signature/audit material for the
+20 redistributed MSYS2 package families. Verify the archive with
+source/Windows-toolchain-source.sha256. Keep this archive beside any binary
+installer or portable package; do not distribute the binaries without it.
+"@
 $rustSourceMaterialArchive = Get-ChildItem -LiteralPath $sourceMaterialDir -Filter "RBL-0.8.0-Rust-Worker-Source-Materials-*.tar.zst" -File -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $rustSourceMaterialArchive) {
@@ -204,6 +264,23 @@ Rust worker corresponding-source archive is included at
 source/$rustSourcePayloadName (SHA-256: $rustSourceMaterialHash).
 The archive contains worker source, Cargo manifests and exact active crate
 source archives; verify it with source/Rust-worker-source.sha256.
+"@
+& $pythonExe (Join-Path $root "tools/package_python_runtime.py") --platform windows --output (Join-Path $buildPath "runtime/python")
+if ($LASTEXITCODE -ne 0) { throw "App-local CPython packaging failed ($LASTEXITCODE)" }
+$pythonSourceDir = Join-Path $buildPath "runtime/python/source"
+foreach ($sourceName in @('Python-3.14.10.tar.xz', 'Python-3.14.10.tar.xz.sha256', 'python-build-standalone-20261110.tar.gz', 'python-build-standalone-20261110.tar.gz.sha256')) {
+    $sourcePath = Join-Path $pythonSourceDir $sourceName
+    if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) { throw "CPython corresponding-source file is missing: $sourcePath" }
+    Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $buildPath "source/$sourceName") -Force
+}
+$pythonRuntimeNotice = @"
+App-local CPython 3.14.10 embeddable runtime is included under runtime/python.
+The verified official Python.org package SHA-256 is
+90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159.
+The upstream LICENSE.txt and full CPython/third-party license inventory under
+runtime/python/licenses are retained. See runtime/python/UPSTREAM.md.
+Corresponding CPython and python-build-standalone source archives are included
+under source/ with SHA-256 sidecars.
 "@
 
 @"
@@ -231,11 +308,25 @@ license directories are copied separately; their COPYING files are byte-identica
 
 $sourceMaterialNotice
 $rustSourceNotice
+$pythonRuntimeNotice
 This inventory is not legal certification.
 "@ | Set-Content -LiteralPath (Join-Path $buildPath "THIRD_PARTY_NOTICES.txt") -Encoding UTF8
 
+# Stage the minimal runtime toolchain inside the build payload. The installers
+# must be able to assemble/link RBL programs from the installed copy without a
+# developer MSYS2 installation; the repository bundle is only a build input.
+$payloadToolchain = Join-Path $buildPath "toolchain/windows-x86_64"
+New-Item -ItemType Directory -Path $payloadToolchain -Force | Out-Null
+Get-ChildItem -LiteralPath $toolchainRoot -File -Filter '*.md' | Copy-Item -Destination $payloadToolchain -Force
+Copy-Item -LiteralPath (Join-Path $toolchainRoot "msys64") -Destination $payloadToolchain -Recurse -Force
+foreach ($toolchainMarker in @('SOURCE_CODE.md', 'SOURCE_ARCHIVE_AUDIT.md', 'THIRD_PARTY_NOTICES.md', 'msys64/ucrt64/rbl-toolchain-manifest.json', 'msys64/ucrt64/bin/as.exe', 'msys64/ucrt64/x86_64-w64-mingw32/bin/ld.exe')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $payloadToolchain $toolchainMarker) -PathType Leaf)) {
+        throw "Staged payload toolchain is missing required marker: $toolchainMarker"
+    }
+}
+
 # Publish the last successful build directory for the repository launcher.
-$pointerDir = Join-Path $root "build"
+$pointerDir = $outputDir
 New-Item -ItemType Directory -Path $pointerDir -Force | Out-Null
 $pointerTemp = Join-Path $pointerDir "wx-ui-current-win.path.tmp"
 $pointer = Join-Path $pointerDir "wx-ui-current-win.path"

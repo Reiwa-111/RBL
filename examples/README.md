@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.10 | EXAMPLES RECHECK
+# last verified: v0.8.0 | 2026.11.11 | EXAMPLES RECHECK
 
 # RBL 0.8.0 — example programs
 
@@ -21,7 +21,7 @@ These compact programs cover the language surface, standard library, input and f
 | [`input_demo.rbl`](input_demo.rbl) | Reading one line from standard input. | Greets the supplied name. |
 | [`stdlib.rbl`](stdlib.rbl) | Global utility functions and basic file I/O. | Prints utility results; writes, reads and deletes `rbl_example.txt` in the current working directory. |
 | [`stdlib_demo.rbl`](stdlib_demo.rbl) | Namespaced math, string, filesystem, time and random APIs. | Prints representative standard-library results. |
-| [`game_of_life.rbl`](game_of_life.rbl) | A compact 48×24 Conway simulation using dictionaries, nested loops and strings. | ASCII snapshots every five generations; writes `life_report.txt` in the working directory. |
+| [`game_of_life.rbl`](game_of_life.rbl) | A compact 48×24 Conway simulation using dictionaries, nested loops and strings. | ASCII snapshots every five generations; writes `build/life_report.txt` under the repository build directory. |
 | [`mega_test.rbl`](mega_test.rbl) | Broad language smoke test: numeric types, functions, branching, ranges, Unicode and logging. | Sectioned console output. |
 | [`mega_test_v07.rbl`](mega_test_v07.rbl) | RBL 0.7-era syntax and standard-library smoke test. | Console output covering core and namespaced APIs. |
 
@@ -68,14 +68,16 @@ python3 rbl.py run examples/simulations/double_pendulum.rbl
 To save a data stream, redirect standard output. The programs deliberately emit standard formats rather than custom diagnostic protocols:
 
 ```bash
-python3 rbl.py run examples/simulations/double_pendulum.rbl > double_pendulum.csv
-python3 rbl.py run examples/fractals/mandelbrot_256.rbl > mandelbrot_256.pgm
+mkdir -p build/examples
+python3 rbl.py run examples/simulations/double_pendulum.rbl > build/examples/double_pendulum.csv
+python3 rbl.py run examples/fractals/mandelbrot_256.rbl > build/examples/mandelbrot_256.pgm
 ```
 
 On Windows PowerShell, text CSV output can be redirected with `>` in the usual way. For portable ASCII PGM files, use `cmd /c` for byte-preserving native redirection:
 
 ```powershell
-cmd /c "python rbl.py run examples\fractals\mandelbrot_256.rbl > mandelbrot_256.pgm"
+New-Item -ItemType Directory -Force build\examples | Out-Null
+cmd /c "python rbl.py run examples\fractals\mandelbrot_256.rbl > build\examples\mandelbrot_256.pgm"
 ```
 
 The PGM examples use the plain-text `P2` variant of Netpbm. It is intentionally easy to inspect, parse and open in image tools that support PGM. CSV files include column headers and use decimal values with a dot separator.
@@ -142,13 +144,16 @@ The 4K tile spans a 3840×2160 image. For a regular 6×5 tiling, use x offsets `
 Linux example:
 
 ```bash
-printf '0\n0\n' | python3 rbl.py run examples/fractals/mandelbrot_4k_tile.rbl > tile_0_0.pgm
+mkdir -p build/examples
+printf '0\n0\n' | python3 rbl.py run examples/fractals/mandelbrot_4k_tile.rbl > build/examples/tile_0_0.pgm
 ```
 
-Windows example, with `tile_offsets.txt` containing `0` and `0` on separate lines:
+Windows example (run from the repository root):
 
 ```powershell
-cmd /c "python rbl.py run examples\fractals\mandelbrot_4k_tile.rbl < tile_offsets.txt > tile_0_0.pgm"
+New-Item -ItemType Directory -Force build\examples | Out-Null
+Set-Content -Path build\examples\tile_offsets.txt -Value @('0', '0') -Encoding ascii
+cmd /c "python rbl.py run examples\fractals\mandelbrot_4k_tile.rbl < build\examples\tile_offsets.txt > build\examples\tile_0_0.pgm"
 ```
 
 ## Generators

@@ -38,6 +38,16 @@ public static class RblWindowsSaveCleanupTestApi
         return handle;
     }
 
+    public static SafeFileHandle CreateExclusiveTemporaryForDelete(string path)
+    {
+        // GENERIC_WRITE | DELETE, no sharing, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY.
+        var handle = CreateFile(path, 0x40000000u | 0x00010000u, 0u,
+            IntPtr.Zero, 1u, 0x100u, IntPtr.Zero);
+        if (handle.IsInvalid)
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateFile CREATE_NEW failed");
+        return handle;
+    }
+
     public static void MarkOpenedFileForDelete(SafeFileHandle handle)
     {
         var disposition = new FileDispositionInfo { DeleteFile = true };
@@ -65,6 +75,23 @@ try {
     finally { $handle.Dispose() }
     if (-not (Test-Path -LiteralPath $original) -or (Test-Path -LiteralPath $backup)) {
         throw 'Handle-based cleanup did not remove exactly the backup hard-link name.'
+    }
+
+    # Simulate the early metadata-query failure path: the exclusive file exists,
+    # but no file ID was obtained. Delete disposition on the original handle
+    # must still remove the exact created object without a pathname lookup.
+    $unidentified = Join-Path $root 'unidentified-temp.rblstudio-tmp'
+    $handle0 = [RblWindowsSaveCleanupTestApi]::CreateExclusiveTemporaryForDelete($unidentified)
+    try {
+        if (-not (Test-Path -LiteralPath $unidentified)) {
+            throw 'CREATE_NEW did not create the temporary file.'
+        }
+        [RblWindowsSaveCleanupTestApi]::MarkOpenedFileForDelete($handle0)
+    } finally {
+        $handle0.Dispose()
+    }
+    if (Test-Path -LiteralPath $unidentified) {
+        throw 'Handle-based cleanup left the unidentified temporary file behind.'
     }
 
     # If the pathname is renamed/replaced after opening, disposition applies to

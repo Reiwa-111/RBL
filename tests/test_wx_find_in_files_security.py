@@ -5,7 +5,7 @@ import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "native" / "wx-ui" / "src" / "main_frame.cpp"
+SOURCE = ROOT / "rbl-ide" / "wx-ui" / "src" / "main_frame.cpp"
 
 
 class FindInFilesPosixSecurityTests(unittest.TestCase):

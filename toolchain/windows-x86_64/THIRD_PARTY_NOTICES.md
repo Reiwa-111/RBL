@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.10 | WINDOWS TOOLCHAIN THIRD-PARTY NOTICES
+# last verified: v0.8.0 | 2026.11.11 | WINDOWS TOOLCHAIN THIRD-PARTY NOTICES
 
 # Third-party notices: Windows MinGW-w64 toolchain
 
@@ -38,11 +38,14 @@ unless specific parts are enabled (for example profiling). The default
 manifest object is supplied by the public-domain package listed above.
 
 The machine-readable rbl-toolchain-manifest.json records package IDs, versions
-and MSYS2 source-only archive URLs. The exact source archives and signatures have
-been collected and verified in the local audit bundle, but are not included in
-the 43-file runtime bundle; see [SOURCE_CODE.md](SOURCE_CODE.md) and
-[SOURCE_ARCHIVE_AUDIT.md](SOURCE_ARCHIVE_AUDIT.md) for evidence and remaining
-distribution requirements.
+and MSYS2 source-only archive URLs. The exact source archives and signatures are
+not embedded in the 43-file runtime toolchain subtree; they are delivered as a
+separate corresponding-source archive at
+`source/Windows-toolchain-source.tar.zst` in the Windows build/install payload,
+with `source/Windows-toolchain-source.sha256`. The build and installer require
+and verify this archive. See [SOURCE_CODE.md](SOURCE_CODE.md) and
+[SOURCE_ARCHIVE_AUDIT.md](SOURCE_ARCHIVE_AUDIT.md) for package coverage and
+verification evidence.
 
 The RBL repository's Apache-2.0 license applies to RBL-authored project files;
 it does not relicense this toolchain. Before publishing binary distributions,
@@ -82,24 +85,29 @@ Upstream project/source locations:
   BFD can recognize ELF inputs even though the linker emits PE/COFF. Generic
   linker findings require individual reachability review. This is a target-scope
   assessment, not a claim that the upstream Binutils source is patched.
-- CVE-2026-90801 concerns an out-of-bounds write in `bfd/cache.c:cache_bwrite`
+- CVE-2026-90801 concerns a heap out-of-bounds READ in `bfd/cache.c:cache_bwrite`
   in GNU Binutils 2.47's `ld`. The bundled package is 2.47-4 and its executable
-  reports 2.47.20260726. A read-only review of the exact signed 2.47-4 source
-  archive confirmed that `cache_bwrite` is reachable during ordinary PE output
-  linking: BFD's input target vector includes ELF backends, and the COFF
-  final-link path has a generic foreign-section copy route that reaches
-  `bfd_set_section_contents`/`bfd_write` and the PE output cache. Thus the
-  `i386pep`/`i386pe` output-emulation list is not an input-format restriction.
-  The review did not reproduce the CVE or prove that ordinary RBL-generated
-  objects meet its vulnerable write-size condition.
+  reports 2.47.20260726. The upstream report describes `fwrite` reading 32 bytes
+  from a 22-byte section-content allocation after malformed ELF input reaches
+  `cache_bwrite`; this is an out-of-bounds read, not an out-of-bounds write.
+  A read-only review of the exact signed 2.47-4 source archive confirmed that
+  `cache_bwrite` is reachable during ordinary PE output linking: BFD's input
+  target vector includes ELF backends, and the COFF final-link path has a generic
+  foreign-section copy route that reaches `bfd_set_section_contents`/`bfd_write`
+  and the PE output cache. Thus the `i386pep`/`i386pe` output-emulation list is
+  not an input-format restriction. The review did not reproduce the CVE or
+  prove that ordinary RBL-generated objects can reach the vulnerable read-size
+  condition.
   The default RBL invocation assembles one generated COFF object and links the
   bundled runtime objects; it does not accept arbitrary user-supplied object
   files or pass `--gc-sections -w`. This narrows normal workflow exposure but
-  does not establish that the linker is unaffected. Keep the CVE unresolved and
-  release-blocking until a fixed build or a proof excluding the vulnerable
-  condition is available. Ubuntu rates the issue Medium (CVSS 5.3) and still
-  lists Noble as “Needs evaluation”; Debian's tracker, updated after the
-  2.47.50.20261021 snapshot, still lists 2.47.50 as unfixed.
+  does not establish that the linker is unaffected. The CVE remains unresolved
+  upstream. On 2026-11-13 the owner accepted residual risk only for the
+  supported RBL compiler-generated COFF workflow (no arbitrary object input and
+  no `--gc-sections`); this is neither a fix nor a non-applicability claim.
+  Ubuntu rates the issue Medium (CVSS 5.3) and still
+  lists Noble as “Needs evaluation”; Debian's tracker still lists affected
+  Binutils releases as unfixed.
 - The signed 2.47-4 package contains the latest MSYS2 packaging revision
   inspected in this audit. It does not remove the generic CVE inventory; keep
   this scope assessment with the exact binary hashes and re-check it whenever

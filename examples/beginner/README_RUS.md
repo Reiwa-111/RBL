@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | BEGINNER GUIDE RECHECK
+# last verified: v0.8.0 | 2026.11.11 | BEGINNER GUIDE RECHECK
 
 # RBL 0.8.0 — руководство для начинающих
 

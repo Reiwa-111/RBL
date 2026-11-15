@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | EXAMPLE AND TEST DOCUMENTATION
+# last verified: v0.8.0 | 2026.11.11 | GATE G TESTING RECONCILIATION
 
 ## How-to: testing RBL
 
@@ -12,7 +12,7 @@ From the checkout root:
 python3 tests/run_tests.py
 ```
 
-The RBL 0.8.0 suite contains 61 direct RBL test cases. The runner executes each case through the active backend and compares the exit code, stdout and selected diagnostic fragments. It also inspects generated assembly for GC safe-point placement: proven non-allocating scalar functions omit redundant checks, allocating functions retain them, and proven fast-integer loops contain no per-iteration `rbl_gc_safepoint` call. A separate code-generation regression test exercises the scalar/allocating distinction at runtime.
+The current RBL 0.8.0 checkout contains 63 direct RBL test cases in the final Gate H candidate. The runner executes each case through the active backend and compares the exit code, stdout and selected diagnostic fragments. It includes a seven-argument user-function case to keep the generic call fallback covered beyond the six-register fast-call limit. It also inspects generated assembly for GC safe-point placement: proven non-allocating scalar functions omit redundant checks, allocating functions retain them, and proven fast-integer loops contain no per-iteration `rbl_gc_safepoint` call. A separate code-generation regression test exercises the scalar/allocating distinction at runtime.
 
 ## Standard library and input
 
@@ -118,7 +118,7 @@ On Windows, with both WSL and native MinGW-w64 configured:
 python tests\differential.py --a wsl --b native
 ```
 
-The default selection is 83 source cases: 68 files under `tests/cases/`, the standard-library smoke source, 8 RBL files directly under `examples/` and 6 directly under `benchmarks/`. It does not recursively execute every example. The runner compares exit code/stdout/stderr for 61 successful deterministic programs and 11 expected runtime-error programs (including their non-zero exit code), requires 7 expected-negative fixtures to be rejected with matching compiler diagnostics, and requires 4 random/platform-dependent programs to build and exit successfully on both backends without comparing their output. Each executable runs in a private temporary working directory, so relative file outputs do not overwrite repository files. The `--a` and `--b` options select the backend; common values are `wsl` and `native`. Specific paths can be added after the options.
+The final Gate H selection contains 85 source cases: 68 files under `tests/cases/`, the standard-library smoke source, 8 RBL files directly under `examples/` and 8 directly under `benchmarks/`. It does not recursively execute every example. The runner compares exit code/stdout/stderr for 62 successful deterministic programs and 11 expected runtime-error programs (including their non-zero exit code), requires 7 expected-negative fixtures to be rejected with matching compiler diagnostics, and requires 5 random/platform-dependent programs to build and exit successfully on both backends without comparing their output. Each executable runs in a private temporary working directory, so relative file outputs do not overwrite repository files. The `--a` and `--b` options select the backend; common values are `wsl` and `native`. Specific paths can be added after the options. The earlier Gate G snapshot contained 84 cases; the additional benchmark source was added and verified during Gate H.
 
 For a focused cross-platform comparison of compiler diagnostics (including source positions, excerpts, malformed UTF-8 and nested f-string cases), run:
 

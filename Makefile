@@ -6,7 +6,12 @@ VERSION := $(shell cat VERSION)
 CFLAGS += -DRBL_VERSION=\"$(VERSION)\"
 ROOT := $(abspath .)
 BIN := $(ROOT)/bin/linux-x86_64
-COMPILER_BUILD := $(ROOT)/build/compiler
+# Disposable artifacts are split by purpose: the cache keeps compiled user
+# programs and downloaded upstream sources, while output/ holds everything
+# produced from the current checkout (bootstrap compiler, IDE, Cargo targets).
+CACHE := $(ROOT)/build/cache
+OUTPUT := $(ROOT)/build/output
+COMPILER_BUILD := $(OUTPUT)/compiler
 COMPILER_SOURCES := compiler/common.c compiler/lexer.c compiler/ast.c compiler/parser.c compiler/sema.c compiler/codegen.c compiler/driver.c
 COMPILER_HEADERS := compiler/rblc_internal.h runtime/rbl_abi.h
 COMPILER_OBJECTS := $(patsubst compiler/%.c,$(COMPILER_BUILD)/%.o,$(COMPILER_SOURCES))
@@ -14,7 +19,7 @@ COMPILER_OBJECTS := $(patsubst compiler/%.c,$(COMPILER_BUILD)/%.o,$(COMPILER_SOU
 # Linux host targets. On Windows the toolchain is driven by rbl.py /
 # tools/rbltool.py instead (`python rbl.py doctor`, `python rbl.py run file.rbl`),
 # which selects the native MinGW-w64 toolchain or WSL automatically.
-.PHONY: all compiler runtime test analyze bench bench5way bench3way fmt clean doctor ide ide-test
+.PHONY: all compiler runtime test analyze bench bench5way bench3way fmt clean clean-cache clean-build doctor ide ide-test
 all: compiler runtime
 
 # Bootstrap only: user RBL programs are assembled natively and never passed through C.
@@ -58,9 +63,17 @@ test: compiler runtime
 	python3 tests/test_build_cache.py
 	python3 tests/test_asm_call_alignment.py
 	python3 tests/test_runtime_abi.py
+	python3 tests/test_fast_call_fallback.py
+	python3 tests/test_wx_build_script.py
 	python3 tests/test_string_ownership.py
 	python3 tests/test_string_io_gc.py
 	python3 tests/test_toolchain_manifest.py
+	python3 tests/test_fs_cwd_ownership.py
+	python3 tests/test_rbltool_windows_paths.py
+	python3 tests/test_codegen_source_comment.py
+	python3 tests/test_wx_worker_lifecycle.py
+	python3 tests/test_make_clean_safety.py
+	python3 tests/test_container_semantics.py
 	python3 tests/test_diagnostics.py
 
 analyze:
@@ -88,5 +101,18 @@ ide-test:
 ide:
 	./RBLStudio.sh
 
-clean:
-	rm -rf build $(BIN)/rblc-asm $(BIN)/rbl_runtime.o $(BIN)/rbl_containers.o $(BIN)/rbl_abi.o $(BIN)/rbl_format.o
+clean: clean-build
+	@echo "Removed build outputs. The compiler cache under build/cache/sources was preserved; use 'make clean-cache' to remove it."
+
+# Cache of compiled user programs and downloaded upstream sources. Removing it
+# forces a rebuild but never touches IDE/Cargo/bootstrap outputs or evidence.
+clean-cache:
+	rm -rf -- "$(CACHE)/sources"
+
+# Outputs produced from the current checkout. This removes only known
+# disposable directories; source materials and release evidence under build/
+# are intentionally left in place.
+clean-build:
+	rm -rf -- "$(COMPILER_BUILD)" "$(OUTPUT)/wx-ui-linux" "$(OUTPUT)/cargo-target-wx-ui-linux" "$(OUTPUT)/wxwidgets-source-3.2.4" "$(OUTPUT)/rust-link-libs"
+	rm -f -- "$(OUTPUT)/wx-ui-current-linux.path"
+	rm -f -- "$(BIN)/rblc-asm" "$(BIN)/rbl_runtime.o" "$(BIN)/rbl_containers.o" "$(BIN)/rbl_abi.o" "$(BIN)/rbl_format.o"

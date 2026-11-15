@@ -1,0 +1,28 @@
+app-id: com.reiwa.rblstudio
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: rblstudio
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=home
+  - --env=GTK_USE_PORTAL=1
+modules:
+  - name: rbl-studio
+    buildsystem: simple
+    build-commands:
+      - sha256sum -c SHA256SUMS
+      - install -d /app/share/rbl-studio /app/bin /app/share/applications /app/share/icons/hicolor/256x256/apps
+      - cp -a . /app/share/rbl-studio/
+      - install -m755 rbl-studio-wx /app/bin/rbl-studio-wx
+      - install -m755 rbl-studio-worker /app/bin/rbl-studio-worker
+      - install -m755 rblstudio-launcher /app/bin/rblstudio
+      - install -m755 rbl-cli /app/bin/rbl
+      - install -m644 com.reiwa.rblstudio.desktop /app/share/applications/com.reiwa.rblstudio.desktop
+      - install -m644 com.reiwa.rblstudio.png /app/share/icons/hicolor/256x256/apps/com.reiwa.rblstudio.png
+    sources:
+      - type: dir
+        path: ../../build/flatpak-payload

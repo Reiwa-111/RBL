@@ -79,6 +79,7 @@ def main() -> int:
             ("--string-alloc-oom", "out of memory while allocating a string"),
             ("--registry-init-oom", "out of memory while tracking a string"),
             ("--container-registry-init-oom", "out of memory while tracking a container"),
+            ("--dict-grow-oom", "out of memory while growing a dictionary"),
         ):
             if rbltool.use_wsl(settings):
                 command = f"{shlex.quote(rbltool.wsl_path(executable, settings))} {mode}"

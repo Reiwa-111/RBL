@@ -59,13 +59,13 @@ class LinuxLauncherTests(unittest.TestCase):
             install = base / "installation with spaces"
             bin_dir = base / "user bin"
             build = install / "build output with spaces"
-            (install / "build").mkdir(parents=True)
+            (install / "build" / "output").mkdir(parents=True)
             bin_dir.mkdir()
             build.mkdir()
 
             launcher = install / "RBLStudio.sh"
             shutil.copy2(ROOT / "RBLStudio.sh", launcher)
-            (install / "build" / "wx-ui-current-linux.path").write_text(
+            (install / "build" / "output" / "wx-ui-current-linux.path").write_text(
                 "build output with spaces\n", encoding="utf-8"
             )
             gui = build / "rbl-studio-wx"

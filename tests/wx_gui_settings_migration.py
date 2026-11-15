@@ -3,7 +3,7 @@ import win32gui,win32con,win32process
 SendMessageW=ctypes.windll.user32.SendMessageW
 SendMessageW.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_size_t,ctypes.c_void_p]
 SendMessageW.restype=ctypes.c_ssize_t
-root=pathlib.Path.cwd();build_dir=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR',root/'build/wx-ui-win'));exe=build_dir/'rbl-studio-wx.exe';worker=build_dir/'rbl-studio-worker.exe'
+root=pathlib.Path.cwd();build_dir=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR',root/'build/output/wx-ui-win'));exe=build_dir/'rbl-studio-wx.exe';worker=build_dir/'rbl-studio-worker.exe'
 cases=[
 	('valid',{'theme':'Nord','font_size':17,'tab_size':6,'show_line_numbers':False,'soft_wrap':True,'indent_guides':False,'auto_check':False,'auto_save':True,'syntax_highlighting':False,'wsl_mode':'wsl','wsl_distro':'Ubuntu-24.04'},{'Theme':'Nord','EditorColorScheme':'Nord','FontSize':'17','TabSize':'6','LineNumbers':'0','SoftWrap':'1','IndentGuides':'0','AutoCheck':'0','AutoSave':'1','SyntaxHighlighting':'0','Mode':'wsl','WslDistribution':'Ubuntu-24.04'}),
  ('oversized',{'font_size':999999999999999999999999999999999999,'tab_size':999999999999999999999999999999999999,'auto_check':False,'soft_wrap':True},{'FontSize':'11','TabSize':'4','AutoCheck':'0','SoftWrap':'1'}),

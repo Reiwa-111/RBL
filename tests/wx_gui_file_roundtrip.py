@@ -14,10 +14,13 @@ file serializer directly.
 
 from __future__ import annotations
 
+import atexit
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import ctypes
 
@@ -33,12 +36,9 @@ except ImportError as exc:  # pragma: no cover - depends on Windows desktop setu
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-GUI = pathlib.Path(os.environ.get(
-    "RBL_STUDIO_GUI", ROOT / "build" / "wx-ui-win" / "rbl-studio-wx.exe"
-))
-WORKER = pathlib.Path(os.environ.get(
-    "RBL_STUDIO_WORKER", ROOT / "build" / "wx-ui-win" / "rbl-studio-worker.exe"
-))
+BUILD_DIR = pathlib.Path(os.environ.get("RBL_STUDIO_GUI_BUILD_DIR", ROOT / "build" / "output" / "wx-ui-win"))
+GUI = pathlib.Path(os.environ.get("RBL_STUDIO_GUI", BUILD_DIR / "rbl-studio-wx.exe"))
+WORKER = pathlib.Path(os.environ.get("RBL_STUDIO_WORKER", BUILD_DIR / "rbl-studio-worker.exe"))
 SAVE_COMMAND_ID = 6002  # ID_Save = wxID_HIGHEST + 3 in main_frame.cpp
 TEXT = 'func main() {\n    print("Космос 🚀")\n}\n'
 
@@ -561,11 +561,29 @@ def main() -> int:
     env = os.environ.copy()
     env["RBL_STUDIO_WORKER"] = str(WORKER)
     env["RBL_PYTHON"] = sys.executable
-    fixture_dir = pathlib.Path(os.environ.get(
-        "RBL_STUDIO_GUI_FIXTURE_DIR",
-        str(ROOT / "build" / "wx-ui-win" / "gui-acceptance"),
-    ))
-    fixture_dir.mkdir(parents=True, exist_ok=True)
+    fixture_override = os.environ.get("RBL_STUDIO_GUI_FIXTURE_DIR")
+    owns_fixture_dir = not fixture_override
+    if fixture_override:
+        fixture_dir = pathlib.Path(fixture_override)
+        fixture_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        # Every invocation gets a clean, private fixture tree. Reusing a prior
+        # run's snapshot/recovery artifacts made the native Save As test
+        # nondeterministic when GUI acceptance scripts ran back-to-back.
+        fixture_dir = pathlib.Path(tempfile.mkdtemp(
+            prefix="gui-file-roundtrip-", dir=BUILD_DIR
+        ))
+
+    # Never let this GUI test persist window/workspace settings in the user's
+    # normal RBL Studio profile. RBL_STUDIO_GUI_CONFIG_DIR is an explicit
+    # test-only override; the application-wide RBL_STUDIO_CONFIG_DIR is ignored.
+    config_override = os.environ.get("RBL_STUDIO_GUI_CONFIG_DIR")
+    if config_override:
+        config_dir = pathlib.Path(config_override)
+    else:
+        config_dir = pathlib.Path(tempfile.mkdtemp(prefix="rbl-wx-roundtrip-profile-"))
+        atexit.register(shutil.rmtree, config_dir, ignore_errors=True)
+    env["RBL_STUDIO_CONFIG_DIR"] = str(config_dir)
 
     cases = {
         "utf8-lf": TEXT.encode("utf-8"),
@@ -970,21 +988,33 @@ def main() -> int:
         path.write_bytes(original)
         process = subprocess.Popen([str(GUI), str(path)], cwd=ROOT, env=env)
         try:
-            # The second launch can overlap worker shutdown from the preceding
-            # case on slower machines; allow the wx startup dialog to settle.
-            time.sleep(2.0)
+            # Startup and worker teardown from the preceding case can delay the
+            # modal encoding rejection. Poll for this process' dialog instead
+            # of treating a fixed two-second snapshot as a product failure.
+            deadline = time.monotonic() + 10.0
             dialogs: list[int] = []
-            win32gui.EnumWindows(
-                lambda hwnd, _: dialogs.append(hwnd)
-                if win32gui.IsWindowVisible(hwnd)
-                and win32process.GetWindowThreadProcessId(hwnd)[1] == process.pid
-                and win32gui.GetClassName(hwnd) == "#32770"
-                else None,
-                None,
-            )
-            if path.read_bytes() != original or not dialogs:
+            while time.monotonic() < deadline and process.poll() is None:
+                dialogs = []
+                win32gui.EnumWindows(
+                    lambda hwnd, _: dialogs.append(hwnd)
+                    if win32gui.IsWindowVisible(hwnd)
+                    and win32process.GetWindowThreadProcessId(hwnd)[1] == process.pid
+                    and win32gui.GetClassName(hwnd) == "#32770"
+                    else None,
+                    None,
+                )
+                if dialogs:
+                    break
+                time.sleep(0.1)
+            titles = [win32gui.GetWindowText(hwnd) for hwnd in dialogs]
+            unchanged = path.read_bytes() == original
+            if not unchanged or "Unsupported encoding" not in titles:
                 failures.append(name)
-                print(f"{name}: FAIL (file changed or rejection dialog missing)", flush=True)
+                print(
+                    f"{name}: FAIL (unchanged={unchanged}, dialogs={titles}, "
+                    f"process_exit={process.poll()})",
+                    flush=True,
+                )
             else:
                 print(f"{name}: PASS (rejected without modifying source)", flush=True)
         finally:
@@ -993,6 +1023,8 @@ def main() -> int:
 
     total = len(cases) + len(malformed) + 18
     print(f"wx GUI file round-trip: {total - len(failures)}/{total} passed")
+    if owns_fixture_dir and not failures:
+        shutil.rmtree(fixture_dir, ignore_errors=True)
     return 1 if failures else 0
 
 

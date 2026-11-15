@@ -141,7 +141,7 @@ single-document observations remain valid only for those exact scenarios.
 ## wxWidgets frontend — current resource acceptance (2026-11-10)
 
 The primary frontend is the C++20/wxWidgets 3.2/Scintilla application in
-`native/wx-ui/`, with a separate Rust worker. Its document limits are 32 tabs,
+`rbl-ide/wx-ui/`, with a separate Rust worker. Its document limits are 32 tabs,
 16 MiB per document and 64 MiB aggregate UTF-8 editor text. The project tree is
 bounded to 1,500 entries per directory and 50,000 nodes globally. Find in Files
 is bounded to 100,000 entries, 128 MiB total scanned data, 2 MiB per file,
@@ -203,8 +203,8 @@ scenarios require an interactive desktop session with permission to focus and
 send input to the IDE; a headless session is not a valid substitute. Linux
 scenarios require X11 automation support and a working X11/WSLg display.
 Each legacy run prints the executable SHA-256 and an IDE source-set fingerprint
-computed at measurement time from `src/main.rs`, `src/app.rs`, `src/editor.rs`,
-`src/process.rs`, `src/settings.rs`, `Cargo.toml` and `Cargo.lock`. The latter is
+computed at measurement time from `rbl-ide/legacy-egui/main.rs`, `rbl-ide/legacy-egui/app.rs`, `rbl-ide/legacy-egui/editor.rs`,
+`rbl-ide/worker/process.rs`, `rbl-ide/worker/settings.rs`, `Cargo.toml` and `Cargo.lock`. The latter is
 not embedded in the executable and therefore does not prove which sources
 produced that binary; retain the executable hash and build record together when
 archiving measurements.
@@ -236,7 +236,7 @@ archiving measurements.
 
 ## Separate wxWidgets frontend observations — 2026-11-10
 
-These measurements apply to `native/wx-ui/` (wxWidgets 3.2 + Scintilla + the
+These measurements apply to `rbl-ide/wx-ui/` (wxWidgets 3.2 + Scintilla + the
 Rust worker), not to the Rust/egui executable measured above. They were captured
 before the 2026-11-10 EOL and search-close follow-up patches; the retained
 measurement record does not contain the exact executable hash. Do not attribute

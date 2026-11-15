@@ -13,7 +13,7 @@ param(
 $ErrorActionPreference = "Stop"
 $executable = (Resolve-Path -LiteralPath $ExecutablePath).Path
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$sourceFiles = @("src\main.rs", "src\app.rs", "src\editor.rs", "src\process.rs", "src\settings.rs", "Cargo.toml", "Cargo.lock") |
+$sourceFiles = @("rbl-ide\legacy-egui\main.rs", "rbl-ide\legacy-egui\app.rs", "rbl-ide\legacy-egui\editor.rs", "rbl-ide\worker\process.rs", "rbl-ide\worker\settings.rs", "Cargo.toml", "Cargo.lock") |
     ForEach-Object { Join-Path $root $_ }
 $sourceHashText = ($sourceFiles | ForEach-Object { (Get-FileHash -Algorithm SHA256 -LiteralPath $_).Hash }) -join ""
 $sha256 = [System.Security.Cryptography.SHA256]::Create()

@@ -153,7 +153,7 @@ scenario = sys.argv[6]
 with open(executable, "rb") as binary:
     executable_hash = hashlib.sha256(binary.read()).hexdigest()
 source_hashes = []
-for relative in ("src/main.rs", "src/app.rs", "src/editor.rs", "src/process.rs", "src/settings.rs", "Cargo.toml", "Cargo.lock"):
+for relative in ("rbl-ide/legacy-egui/main.rs", "rbl-ide/legacy-egui/app.rs", "rbl-ide/legacy-egui/editor.rs", "rbl-ide/worker/process.rs", "rbl-ide/worker/settings.rs", "Cargo.toml", "Cargo.lock"):
     with open(os.path.join(root, relative), "rb") as source:
         source_hashes.append(hashlib.sha256(source.read()).hexdigest())
 source_fingerprint = hashlib.sha256("".join(source_hashes).encode()).hexdigest()

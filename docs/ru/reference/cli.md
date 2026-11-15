@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.10 | CLI AND TEST SUITE DOCUMENTATION
+﻿# last verified: v0.8.0 | 2026.11.10 | CLI AND TEST SUITE DOCUMENTATION
 
 ## Reference: CLI RBL
 
@@ -12,8 +12,8 @@
 | `rbl.py doctor` | Проверяет toolchain через низкоуровневый driver. |
 | `rbl.py bootstrap` | Принудительно перестраивает bootstrap compiler/runtime artifacts. |
 | `rbl.py env` | Печатает RBL root, project root и Python executable. |
-| `rbl.py new NAME [--path DIR]` | Создаёт новый проект. |
-| `rbl.py init` | Инициализирует текущий каталог. |
+| `rbl.py new NAME [--path DIR]` | Создаёт новый проект. NAME: 1-64 ASCII-буквы, цифры, `_` или `-`, первый символ - буква или цифра. |
+| `rbl.py init` | Инициализирует текущий каталог; его имя должно соответствовать тому же правилу. |
 | `rbl.py check [FILE]` | Выполняет frontend/analysis/codegen check без assembler и linker. |
 | `rbl.py build [FILE]` | Компилирует, ассемблирует и линкует executable. |
 | `rbl.py run [FILE]` | Собирает и запускает программу. |
@@ -24,7 +24,7 @@
 | `rbl.py diff [--a MODE] [--b MODE] [PATH ...]` | Сравнивает два backend. По умолчанию `wsl` и `native`. |
 | `rbl.py fmt [FILE] [--check]` | Форматирует файл либо проверяет, что форматирование уже применено. |
 | `rbl.py doc [FILE] [-o FILE]` | Генерирует простую таблицу объявлений функций. |
-| `rbl.py clean` | Безопасно удаляет только compiler cache `build/sources/`, сохраняя остальные build evidence и пользовательские данные. |
+| `rbl.py clean` | Безопасно удаляет только compiler cache `build/cache/sources/`, сохраняя `build/output/`, остальные build evidence и пользовательские данные. |
 
 Файл `FILE` для `check`, `build`, `run`, `asm`, `fmt` и `doc` необязателен: если он не передан, CLI берёт `package.entry` из манифеста, иначе `src/main.rbl` по умолчанию. Если этого пути нет и в корне текущего проекта существует `main.rbl`, используется он.
 
@@ -38,8 +38,10 @@ cd demo
 python3 ../rbl.py check
 python3 ../rbl.py build
 python3 ../rbl.py run
-python3 ../rbl.py test
 ```
+
+
+Относительный путь `../rbl.py` работает, если `demo` - непосредственный дочерний каталог checkout RBL Studio. Для внешнего проекта используйте `RBL_STUDIO_ROOT` из сгенерированного README. `rbl.py test` запускает regression suite самого RBL Studio, а не тесты проекта.
 
 Windows PowerShell:
 

@@ -5,12 +5,12 @@ if "%APP_ROOT:~-1%"=="\" set "APP_ROOT=%APP_ROOT:~0,-1%"
 set "GUI="
 set "WORKER="
 
-rem Portable package: keep GUI, worker and backend payload together.
-if exist "%APP_ROOT%\rbl-studio-wx.exe" if exist "%APP_ROOT%\rbl-studio-worker.exe" goto :portable
+rem Checkout payload: GUI, worker and wx DLLs live under bin\win-x86_64\studio.
+if exist "%APP_ROOT%\bin\win-x86_64\studio\rbl-studio-wx.exe" if exist "%APP_ROOT%\bin\win-x86_64\studio\rbl-studio-worker.exe" goto :portable
 
 rem Developer checkout: use the last successful wx build pointer.
 set "BUILD_DIR="
-set "POINTER=%APP_ROOT%\build\wx-ui-current-win.path"
+set "POINTER=%APP_ROOT%\build\output\wx-ui-current-win.path"
 if exist "%POINTER%" set /p BUILD_DIR=<"%POINTER%"
 if defined BUILD_DIR if not "%BUILD_DIR:~0,2%"=="\\" if not "%BUILD_DIR:~1,1%"==":" set "BUILD_DIR=%APP_ROOT%\%BUILD_DIR%"
 if defined BUILD_DIR if exist "%BUILD_DIR%\rbl-studio-wx.exe" if exist "%BUILD_DIR%\rbl-studio-worker.exe" (
@@ -30,8 +30,8 @@ if not defined LEGACY (
 exit /b %errorlevel%
 
 :portable
-set "GUI=%APP_ROOT%\rbl-studio-wx.exe"
-set "WORKER=%APP_ROOT%\rbl-studio-worker.exe"
+set "GUI=%APP_ROOT%\bin\win-x86_64\studio\rbl-studio-wx.exe"
+set "WORKER=%APP_ROOT%\bin\win-x86_64\studio\rbl-studio-worker.exe"
 :launch
 set "RBL_STUDIO_ROOT=%APP_ROOT%"
 set "RBL_STUDIO_WORKER=%WORKER%"

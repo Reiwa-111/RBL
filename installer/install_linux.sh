@@ -4,13 +4,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 INSTALL_DIR="${HOME}/.local/lib/rblstudio"
 NO_REGISTER=0
+PORTABLE=0
 BUILD_DIR="${RBL_STUDIO_BUILD_DIR:-}"
 while (($#)); do
   case "$1" in
     --install-dir) (($# >= 2)) || { echo '--install-dir requires a path' >&2; exit 2; }; INSTALL_DIR="$2"; shift 2 ;;
     --no-register) NO_REGISTER=1; shift ;;
+    --portable) PORTABLE=1; NO_REGISTER=1; shift ;;
     --build-dir) (($# >= 2)) || { echo '--build-dir requires a path' >&2; exit 2; }; BUILD_DIR="$2"; shift 2 ;;
-    -h|--help) echo 'Usage: install_linux.sh [--install-dir PATH] [--no-register] [--build-dir PATH]'; exit 0 ;;
+    -h|--help) echo 'Usage: install_linux.sh [--install-dir PATH] [--no-register|--portable] [--build-dir PATH]'; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -34,31 +36,29 @@ assert_no_symlink_components() {
 assert_no_symlink_components "$INSTALL_DIR"
 
 if [[ -z "$BUILD_DIR" ]]; then
-  POINTER="$ROOT/build/wx-ui-current-linux.path"
+  POINTER="$ROOT/build/output/wx-ui-current-linux.path"
   [[ -f "$POINTER" ]] && IFS= read -r BUILD_DIR < "$POINTER" || true
 fi
 if [[ -n "$BUILD_DIR" && "$BUILD_DIR" != /* ]]; then BUILD_DIR="$ROOT/$BUILD_DIR"; fi
 if [[ -z "$BUILD_DIR" || ! -d "$BUILD_DIR" ]]; then
   bash "$ROOT/tools/build_wx_ide.sh"
-  IFS= read -r BUILD_DIR < "$ROOT/build/wx-ui-current-linux.path"
+  IFS= read -r BUILD_DIR < "$ROOT/build/output/wx-ui-current-linux.path"
   if [[ "$BUILD_DIR" != /* ]]; then BUILD_DIR="$ROOT/$BUILD_DIR"; fi
 fi
 BUILD_DIR="$(cd "$BUILD_DIR" && pwd -P)"
-for required in rbl-studio-wx rbl-studio-worker THIRD_PARTY_NOTICES.txt licenses/Scintilla/License.txt licenses/Rust/THIRD_PARTY_NOTICES.md source/Rust-worker-source.tar.zst source/Rust-worker-source.sha256; do
+for required in rbl-studio-wx rbl-studio-worker THIRD_PARTY_NOTICES.txt lib/libwx_gtk3u_core-3.2.so.0 toolchain/linux-x86_64/bin/clang toolchain/linux-x86_64/bin/ld.lld toolchain/linux-x86_64/manifest.json toolchain/linux-x86_64/SHA256SUMS toolchain/linux-x86_64/UPSTREAM.md toolchain/linux-x86_64/LICENSE.TXT toolchain/linux-x86_64/provenance/llvm-23.1.5-x86_64.tar.sign toolchain/linux-x86_64/provenance/llvm-signing-key.asc runtime/python/python-runtime.tar.gz runtime/python/rbl-python-runtime.json runtime/python/UPSTREAM.md runtime/python/python-runtime.sha256 runtime/python/licenses/LICENSE.cpython.txt runtime/python/licenses/LICENSE.python-build-standalone-MPL-2.0.txt licenses/Scintilla/License.txt licenses/wxWidgets/License.txt licenses/Rust/THIRD_PARTY_NOTICES.md source/Rust-worker-source.tar.zst source/Rust-worker-source.sha256 source/wxWidgets-3.2.4.tar.bz2 source/wxWidgets-3.2.4.sha256 source/Python-3.14.10.tar.xz source/Python-3.14.10.tar.xz.sha256 source/python-build-standalone-20261110.tar.gz source/python-build-standalone-20261110.tar.gz.sha256; do
   [[ -f "$BUILD_DIR/$required" ]] || { echo "Incomplete wx build: missing $BUILD_DIR/$required" >&2; exit 1; }
 done
 
-PYTHON_COMMAND="${RBL_PYTHON:-python3}"
-command -v "$PYTHON_COMMAND" >/dev/null 2>&1 || { echo 'Python >=3.9 is required for backend actions; install Python or set RBL_PYTHON.' >&2; exit 1; }
-"$PYTHON_COMMAND" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' || {
-  echo "Python >=3.9 is required (selected interpreter: $PYTHON_COMMAND)." >&2; exit 1;
-}
-for tool in as ld; do
-  command -v "$tool" >/dev/null 2>&1 || { echo "GNU $tool is required for RBL backend actions; install binutils." >&2; exit 1; }
-done
+if ! grep -Eq '"signature_verified"[[:space:]]*:[[:space:]]*true' "$BUILD_DIR/toolchain/linux-x86_64/manifest.json"; then
+  echo "LLVM toolchain manifest does not record a verified upstream GPG signature" >&2
+  exit 1
+fi
+(cd "$BUILD_DIR/toolchain/linux-x86_64" && sha256sum -c SHA256SUMS)
+
 if command -v ldd >/dev/null 2>&1; then
-  for binary in "$BUILD_DIR/rbl-studio-wx" "$BUILD_DIR/rbl-studio-worker"; do
-    missing="$(ldd "$binary" 2>&1 | grep 'not found' || true)"
+  for binary in "$BUILD_DIR/rbl-studio-wx" "$BUILD_DIR/rbl-studio-worker" "$BUILD_DIR/toolchain/linux-x86_64/bin/clang" "$BUILD_DIR/toolchain/linux-x86_64/bin/ld.lld"; do
+    missing="$(LD_LIBRARY_PATH="$BUILD_DIR/lib:$BUILD_DIR/toolchain/linux-x86_64/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ldd "$binary" 2>&1 | grep 'not found' || true)"
     [[ -z "$missing" ]] || { echo "Missing runtime dependencies for $binary:" >&2; echo "$missing" >&2; exit 1; }
   done
 else
@@ -80,6 +80,7 @@ INSTALL_SUCCESS=0
 FAILED_DIR=""
 INTEGRATION_BACKUP_DIR=""
 INTEGRATION_BACKUPS_COMPLETE=0
+INTEGRATION_RESTORE_FAILED=0
 DESKTOP_TMP=""
 ICON_TMP=""
 MIME_TMP=""
@@ -94,28 +95,44 @@ cleanup() {
   if [[ -n "$INTEGRATION_BACKUP_DIR" ]]; then
     if ((INSTALL_SUCCESS == 0 && INTEGRATION_BACKUPS_COMPLETE == 1)); then
       if [[ -f "$INTEGRATION_BACKUP_DIR/desktop.present" && -f "$INTEGRATION_BACKUP_DIR/desktop.ready" ]]; then
-        cp -a -- "$INTEGRATION_BACKUP_DIR/desktop" "$DESKTOP_TARGET" 2>/dev/null || \
+        if ! cp -a -- "$INTEGRATION_BACKUP_DIR/desktop" "$DESKTOP_TARGET" 2>/dev/null; then
+          INTEGRATION_RESTORE_FAILED=1
           echo "WARNING: could not restore desktop entry $DESKTOP_TARGET" >&2
+        fi
       elif [[ ! -f "$INTEGRATION_BACKUP_DIR/desktop.present" ]]; then
-        rm -f -- "$DESKTOP_TARGET" 2>/dev/null || \
+        if ! rm -f -- "$DESKTOP_TARGET" 2>/dev/null; then
+          INTEGRATION_RESTORE_FAILED=1
           echo "WARNING: could not remove partial desktop entry $DESKTOP_TARGET" >&2
+        fi
       fi
       if [[ -f "$INTEGRATION_BACKUP_DIR/icon.present" && -f "$INTEGRATION_BACKUP_DIR/icon.ready" ]]; then
-        cp -a -- "$INTEGRATION_BACKUP_DIR/icon" "$ICON_TARGET" 2>/dev/null || \
+        if ! cp -a -- "$INTEGRATION_BACKUP_DIR/icon" "$ICON_TARGET" 2>/dev/null; then
+          INTEGRATION_RESTORE_FAILED=1
           echo "WARNING: could not restore icon $ICON_TARGET" >&2
+        fi
       elif [[ ! -f "$INTEGRATION_BACKUP_DIR/icon.present" ]]; then
-        rm -f -- "$ICON_TARGET" 2>/dev/null || \
+        if ! rm -f -- "$ICON_TARGET" 2>/dev/null; then
+          INTEGRATION_RESTORE_FAILED=1
           echo "WARNING: could not remove partial icon $ICON_TARGET" >&2
+        fi
       fi
       if [[ -f "$INTEGRATION_BACKUP_DIR/mime.present" && -f "$INTEGRATION_BACKUP_DIR/mime.ready" ]]; then
-        cp -a -- "$INTEGRATION_BACKUP_DIR/mime" "$MIME_TARGET" 2>/dev/null || \
+        if ! cp -a -- "$INTEGRATION_BACKUP_DIR/mime" "$MIME_TARGET" 2>/dev/null; then
+          INTEGRATION_RESTORE_FAILED=1
           echo "WARNING: could not restore MIME package $MIME_TARGET" >&2
+        fi
       elif [[ ! -f "$INTEGRATION_BACKUP_DIR/mime.present" ]]; then
-        rm -f -- "$MIME_TARGET" 2>/dev/null || \
+        if ! rm -f -- "$MIME_TARGET" 2>/dev/null; then
+          INTEGRATION_RESTORE_FAILED=1
           echo "WARNING: could not remove partial MIME package $MIME_TARGET" >&2
+        fi
       fi
     fi
-    rm -rf -- "$INTEGRATION_BACKUP_DIR"
+    if ((INSTALL_SUCCESS == 1 || (INSTALL_COMMITTED == 1 && INTEGRATION_BACKUPS_COMPLETE == 1 && INTEGRATION_RESTORE_FAILED == 0))); then
+      rm -rf -- "$INTEGRATION_BACKUP_DIR"
+    else
+      echo "WARNING: integration recovery data retained at: $INTEGRATION_BACKUP_DIR" >&2
+    fi
   fi
   if ((INSTALL_SUCCESS == 0)); then
     if ((INSTALL_COMMITTED == 1)) && [[ -e "$INSTALL_DIR" ]]; then
@@ -142,23 +159,80 @@ trap 'exit 143' TERM
 
 cp -- "$BUILD_DIR/rbl-studio-wx" "$BUILD_DIR/rbl-studio-worker" "$STAGE/"
 cp -- "$ROOT/RBLStudio.sh" "$STAGE/"
-cp -- "$ROOT/installer/uninstall_linux.sh" "$STAGE/Uninstall-RBLStudio.sh"
+cp -- "$ROOT/rbl" "$STAGE/"
+if ((PORTABLE == 0)); then
+  cp -- "$ROOT/installer/uninstall_linux.sh" "$STAGE/Uninstall-RBLStudio.sh"
+fi
+cp -a -- "$BUILD_DIR/lib" "$STAGE/lib"
+mkdir -p "$STAGE/toolchain"
+cp -a -- "$BUILD_DIR/toolchain/linux-x86_64" "$STAGE/toolchain/linux-x86_64"
+(cd "$STAGE/toolchain/linux-x86_64" && sha256sum -c SHA256SUMS)
 if [[ -d "$BUILD_DIR/licenses" ]]; then cp -a -- "$BUILD_DIR/licenses" "$STAGE/licenses"; fi
 cp -a -- "$BUILD_DIR/source" "$STAGE/source"
+cp -- "$BUILD_DIR/LINUX_ABI_AUDIT.txt" "$BUILD_DIR/PYTHON_RUNTIME_ELF_AUDIT.txt" "$STAGE/"
 for directory in tools compiler runtime bin toolchain tests benchmarks examples docs assets; do
   [[ -d "$ROOT/$directory" ]] || { echo "Missing required payload directory: $directory" >&2; exit 1; }
   cp -a -- "$ROOT/$directory" "$STAGE/$directory"
 done
+
+PYTHON_RUNTIME_PAYLOAD="$BUILD_DIR/runtime/python"
+PYTHON_RUNTIME_ARCHIVE="$PYTHON_RUNTIME_PAYLOAD/python-runtime.tar.gz"
+EXPECTED_PYTHON_ARCHIVE_SHA256='c2ff2e97422f5d3896a16e0317fd212ba977bbf2688d93a6f7a03d817506bd30'
+ACTUAL_PYTHON_ARCHIVE_SHA256="$(sha256sum "$PYTHON_RUNTIME_ARCHIVE" | awk '{print $1}')"
+[[ "$ACTUAL_PYTHON_ARCHIVE_SHA256" == "$EXPECTED_PYTHON_ARCHIVE_SHA256" ]] || {
+  echo "CPython runtime archive SHA-256 mismatch: $ACTUAL_PYTHON_ARCHIVE_SHA256" >&2; exit 1;
+}
+grep -Fq '"python_version": "3.14.10"' "$PYTHON_RUNTIME_PAYLOAD/rbl-python-runtime.json" || { echo 'CPython runtime manifest version mismatch.' >&2; exit 1; }
+grep -Fq '"platform": "linux-x86_64-gnu"' "$PYTHON_RUNTIME_PAYLOAD/rbl-python-runtime.json" || { echo 'CPython runtime manifest platform mismatch.' >&2; exit 1; }
+grep -Fq '"archive_sha256": "c2ff2e97422f5d3896a16e0317fd212ba977bbf2688d93a6f7a03d817506bd30"' "$PYTHON_RUNTIME_PAYLOAD/rbl-python-runtime.json" || { echo 'CPython runtime manifest hash mismatch.' >&2; exit 1; }
+grep -Fxq "$EXPECTED_PYTHON_ARCHIVE_SHA256  python-runtime.tar.gz" "$PYTHON_RUNTIME_PAYLOAD/python-runtime.sha256" || {
+  echo 'CPython runtime checksum sidecar does not match the pinned package hash.' >&2; exit 1;
+}
+
+# The upstream CPython runtime contains case-sensitive terminfo aliases. Do not
+# install it onto a case-insensitive filesystem (for example, a Windows mount).
+CASE_PROBE="$STAGE/.case-sensitivity-probe"
+mkdir -p "$CASE_PROBE"
+: > "$CASE_PROBE/lowercase"
+if [[ -e "$CASE_PROBE/LOWERCASE" ]]; then
+  echo 'The Linux CPython runtime requires a case-sensitive install filesystem.' >&2; exit 1
+fi
+: > "$CASE_PROBE/LOWERCASE"
+[[ -e "$CASE_PROBE/lowercase" && -e "$CASE_PROBE/LOWERCASE" ]] || {
+  echo 'The Linux CPython runtime requires a case-sensitive install filesystem.' >&2; exit 1;
+}
+rm -rf -- "$CASE_PROBE"
+
+mkdir -p "$STAGE/runtime"
+[[ ! -e "$STAGE/runtime/python" ]] || { echo 'Refusing to overwrite an existing staged runtime/python directory.' >&2; exit 1; }
+tar -xzf "$PYTHON_RUNTIME_ARCHIVE" -C "$STAGE/runtime" --no-same-owner --no-same-permissions
+mkdir -p "$STAGE/runtime/python/licenses"
+cp -a -- "$PYTHON_RUNTIME_PAYLOAD/licenses/." "$STAGE/runtime/python/licenses/"
+cp -- "$PYTHON_RUNTIME_PAYLOAD/rbl-python-runtime.json" "$PYTHON_RUNTIME_PAYLOAD/UPSTREAM.md" "$PYTHON_RUNTIME_PAYLOAD/python-runtime.sha256" "$STAGE/runtime/python/"
+BUNDLED_PYTHON="$STAGE/runtime/python/bin/python3"
+if [[ -n "${RBL_PYTHON:-}" ]]; then PYTHON_COMMAND="$RBL_PYTHON"; else PYTHON_COMMAND="$BUNDLED_PYTHON"; fi
+if [[ "$PYTHON_COMMAND" == */* ]]; then
+  [[ -x "$PYTHON_COMMAND" ]] || { echo "Selected Python interpreter is not executable: $PYTHON_COMMAND" >&2; exit 1; }
+else
+  command -v "$PYTHON_COMMAND" >/dev/null 2>&1 || { echo "Selected Python interpreter was not found: $PYTHON_COMMAND" >&2; exit 1; }
+fi
+"$PYTHON_COMMAND" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' || {
+  echo "Python >=3.9 is required (selected interpreter: $PYTHON_COMMAND)." >&2; exit 1;
+}
 for file in rbl.py VERSION LICENSE README.md RELEASE_MANIFEST.txt; do
   [[ -f "$ROOT/$file" ]] || { echo "Missing required payload file: $ROOT/$file" >&2; exit 1; }
   cp -a -- "$ROOT/$file" "$STAGE/$file"
 done
 cp -- "$BUILD_DIR/THIRD_PARTY_NOTICES.txt" "$STAGE/THIRD_PARTY_NOTICES.txt"
-chmod +x "$STAGE/RBLStudio.sh" "$STAGE/Uninstall-RBLStudio.sh"
-for marker in VERSION rbl.py tools/rbltool.py compiler runtime toolchain tests/run_tests.py benchmarks/run_benchmarks.py licenses/Scintilla/License.txt licenses/Rust/THIRD_PARTY_NOTICES.md source/Rust-worker-source.tar.zst source/Rust-worker-source.sha256; do
+chmod +x "$STAGE/RBLStudio.sh" "$STAGE/rbl"
+if ((PORTABLE == 0)); then chmod +x "$STAGE/Uninstall-RBLStudio.sh"; fi
+for marker in VERSION rbl.py rbl tools/rbltool.py compiler runtime/python/bin/python3 runtime/python/rbl-python-runtime.json runtime/python/UPSTREAM.md runtime/python/python-runtime.sha256 runtime/python/lib/python3.14/LICENSE.txt runtime/python/licenses/LICENSE.cpython.txt runtime/python/licenses/LICENSE.python-build-standalone-MPL-2.0.txt toolchain/linux-x86_64/bin/clang toolchain/linux-x86_64/bin/ld.lld toolchain/linux-x86_64/manifest.json toolchain/linux-x86_64/LICENSE.TXT LINUX_ABI_AUDIT.txt PYTHON_RUNTIME_ELF_AUDIT.txt lib licenses/wxWidgets/License.txt source/wxWidgets-3.2.4.tar.bz2 source/wxWidgets-3.2.4.sha256 source/Python-3.14.10.tar.xz source/Python-3.14.10.tar.xz.sha256 source/python-build-standalone-20261110.tar.gz source/python-build-standalone-20261110.tar.gz.sha256 tests/run_tests.py benchmarks/run_benchmarks.py licenses/Scintilla/License.txt licenses/Rust/THIRD_PARTY_NOTICES.md source/Rust-worker-source.tar.zst source/Rust-worker-source.sha256; do
   [[ -e "$STAGE/$marker" ]] || { echo "Staged application root is missing required marker: $marker" >&2; exit 1; }
 done
 (cd "$STAGE/source" && sha256sum -c Rust-worker-source.sha256)
+for source_name in Python-3.14.10.tar.xz python-build-standalone-20261110.tar.gz; do
+  (cd "$STAGE/source" && sha256sum -c "$source_name.sha256")
+done
 
 PREVIOUS_DEFAULT=""
 HAD_OWN_REGISTRATION=0
@@ -264,11 +338,13 @@ if ((NO_REGISTER == 0)); then
   fi
 fi
 
-FILES_LIST="$STAGE/.rblstudio-install-files"
-(cd "$STAGE" && find . -type f ! -name '.rblstudio-install-files' -printf '%P\n' | LC_ALL=C sort) > "$FILES_LIST"
-printf 'schema=1\nrelease_status=UNRELEASED\nregistered=%s\nprevious_default=%s\ndata_home=%s\nconfig_home=%s\n' \
-  "$(( (1 - NO_REGISTER) || HAD_OWN_REGISTRATION ))" "$PREVIOUS_DEFAULT" \
-  "$STATE_DATA_HOME" "$STATE_CONFIG_HOME" > "$STAGE/.rblstudio-install-state"
+if ((PORTABLE == 0)); then
+  FILES_LIST="$STAGE/.rblstudio-install-files"
+  (cd "$STAGE" && find . \( -type f -o -type l \) ! -name '.rblstudio-install-files' -printf '%P\n' | LC_ALL=C sort) > "$FILES_LIST"
+  printf 'schema=1\nrelease_status=UNRELEASED\nregistered=%s\nprevious_default=%s\ndata_home=%s\nconfig_home=%s\n' \
+    "$(( (1 - NO_REGISTER) || HAD_OWN_REGISTRATION ))" "$PREVIOUS_DEFAULT" \
+    "$STATE_DATA_HOME" "$STATE_CONFIG_HOME" > "$STAGE/.rblstudio-install-state"
+fi
 
 if [[ -e "$INSTALL_DIR" ]]; then
   [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/.rblstudio-install-files" ]] || {
@@ -289,7 +365,7 @@ if [[ "$RESOLVED_INSTALL_ROOT" != "$INSTALL_DIR" ]]; then
   echo "Installed root resolved unexpectedly: $RESOLVED_INSTALL_ROOT" >&2
   exit 1
 fi
-for marker in VERSION rbl.py tools/rbltool.py compiler runtime toolchain tests/run_tests.py benchmarks/run_benchmarks.py; do
+for marker in VERSION rbl.py rbl tools/rbltool.py compiler runtime/python/bin/python3 runtime/python/rbl-python-runtime.json runtime/python/UPSTREAM.md runtime/python/python-runtime.sha256 runtime/python/lib/python3.14/LICENSE.txt runtime/python/licenses/LICENSE.cpython.txt runtime/python/licenses/LICENSE.python-build-standalone-MPL-2.0.txt toolchain tests/run_tests.py benchmarks/run_benchmarks.py licenses/Scintilla/License.txt licenses/Rust/THIRD_PARTY_NOTICES.md source/Rust-worker-source.tar.zst source/Rust-worker-source.sha256; do
   if [[ ! -e "$INSTALL_DIR/$marker" ]]; then
     FAILED_DIR="$INSTALL_DIR.failed-$(date +%Y%m%d-%H%M%S)-$$"
     echo "Installed application root missing marker $marker; rollback requested." >&2
@@ -382,6 +458,10 @@ fi
 
 INSTALL_SUCCESS=1
 echo "RBL Studio wxWidgets installed to: $INSTALL_DIR"
-echo 'Release status: UNRELEASED (no legal-readiness claim or source archive is included).'
-((NO_REGISTER == 0)) || echo 'Desktop/MIME integration was not changed (--no-register).'
+echo 'Release status: 0.8.0 package prepared for publication and NOT YET PUBLISHED. Corresponding-source materials are bundled; formal legal review and delivery approval remain pending.'
+if ((PORTABLE == 1)); then
+  echo 'Portable staging: no install manifest, uninstaller or desktop integration was created.'
+elif ((NO_REGISTER == 1)); then
+  echo 'Desktop/MIME integration was not changed (--no-register).'
+fi
 [[ -z "$BACKUP_DIR" ]] || echo "Previous installation preserved at: $BACKUP_DIR"

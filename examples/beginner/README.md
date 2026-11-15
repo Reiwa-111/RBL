@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | BEGINNER COURSE INDEX RECHECK
+# last verified: v0.8.0 | 2026.11.11 | BEGINNER COURSE INDEX RECHECK
 
 # RBL 0.8.0 — Beginner Course
 

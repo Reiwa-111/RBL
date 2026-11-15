@@ -12,17 +12,27 @@ while [[ -L "$SOURCE" ]]; do
   fi
 done
 APP_ROOT="$(cd -P -- "$(dirname -- "$SOURCE")" >/dev/null 2>&1 && pwd)"
+export RBL_STUDIO_ROOT="$APP_ROOT"
+export PYTHONDONTWRITEBYTECODE=1
+if [[ -x "$APP_ROOT/rbl-studio-worker" ]]; then
+  export RBL_STUDIO_WORKER="$APP_ROOT/rbl-studio-worker"
+fi
+export RBL_BUILD_DIR="${RBL_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/RBLStudio/build}"
+export RBL_LINUX_TOOLCHAIN_ROOT="${RBL_LINUX_TOOLCHAIN_ROOT:-$APP_ROOT/toolchain/linux-x86_64}"
+export RBL_REQUIRE_BUNDLED_LINUX_TOOLCHAIN=1
+export PATH="$RBL_LINUX_TOOLCHAIN_ROOT/bin:$PATH"
+export LD_LIBRARY_PATH="$APP_ROOT/lib:$RBL_LINUX_TOOLCHAIN_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 GUI=""
 WORKER=""
 
-# Portable package: GUI, worker and backend payload are siblings.
-if [[ -x "$APP_ROOT/rbl-studio-wx" && -x "$APP_ROOT/rbl-studio-worker" ]]; then
-  GUI="$APP_ROOT/rbl-studio-wx"
-  WORKER="$APP_ROOT/rbl-studio-worker"
+# Checkout payload: GUI, worker and wx libraries live under bin/linux-x86_64/studio.
+if [[ -x "$APP_ROOT/bin/linux-x86_64/studio/rbl-studio-wx" && -x "$APP_ROOT/bin/linux-x86_64/studio/rbl-studio-worker" ]]; then
+  GUI="$APP_ROOT/bin/linux-x86_64/studio/rbl-studio-wx"
+  WORKER="$APP_ROOT/bin/linux-x86_64/studio/rbl-studio-worker"
 else
   # Developer checkout: the build script atomically updates this pointer.
   unset BUILD_DIR
-  POINTER="$APP_ROOT/build/wx-ui-current-linux.path"
+  POINTER="$APP_ROOT/build/output/wx-ui-current-linux.path"
   if [[ -f "$POINTER" ]]; then
     IFS= read -r BUILD_DIR < "$POINTER" || true
     if [[ -n "${BUILD_DIR:-}" && "$BUILD_DIR" != /* ]]; then BUILD_DIR="$APP_ROOT/$BUILD_DIR"; fi
@@ -34,7 +44,6 @@ else
 fi
 
 if [[ -n "$GUI" ]]; then
-  export RBL_STUDIO_ROOT="$APP_ROOT"
   export RBL_STUDIO_WORKER="$WORKER"
   cd "$APP_ROOT"
   exec "$GUI" "$@"

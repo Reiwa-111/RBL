@@ -18,8 +18,10 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -79,11 +81,93 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _is_reparse_path(path: Path) -> bool:
+    info = path.lstat()
+    return stat.S_ISLNK(info.st_mode) or bool(getattr(info, "st_file_attributes", 0) & 0x400)
+
+
+def _assert_no_reparse_path_components(path: Path) -> Path:
+    """Reject every traversed symlink/junction before resolving ``..``.
+
+    Do not call abspath/resolve first: lexical normalization can erase a
+    symlink component followed by ``..`` even though the OS resolves through
+    that link before applying the parent component.
+    """
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    current = Path(candidate.anchor)
+    try:
+        anchor_info = current.lstat()
+    except OSError as error:
+        raise RuntimeError(f"cannot inspect toolchain bundle path anchor: {current}: {error}") from error
+    if stat.S_ISLNK(anchor_info.st_mode) or bool(getattr(anchor_info, "st_file_attributes", 0) & 0x400):
+        raise RuntimeError(f"toolchain bundle path contains a symlink/reparse anchor: {current}")
+    parts = candidate.parts[1:]
+    for index, part in enumerate(parts):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            current = current.parent
+            continue
+        current = current / part
+        try:
+            info = current.lstat()
+        except OSError as error:
+            raise RuntimeError(f"cannot inspect toolchain bundle path component: {current}: {error}") from error
+        if stat.S_ISLNK(info.st_mode) or bool(getattr(info, "st_file_attributes", 0) & 0x400):
+            raise RuntimeError(f"toolchain bundle path contains a symlink/reparse component: {current}")
+        if index < len(parts) - 1 and not stat.S_ISDIR(info.st_mode):
+            raise RuntimeError(f"toolchain bundle path component is not a directory: {current}")
+    return current
+
+
+def _inventory_regular_payload_files(dest: Path, manifest_path: Path) -> set[str]:
+    """Walk without following links; reject every link/reparse/special entry."""
+    actual: set[str] = set()
+
+    def fail_closed_on_walk_error(error: OSError) -> None:
+        raise RuntimeError(f"cannot inventory toolchain bundle subtree: {error}") from error
+
+    for current, directories, filenames in os.walk(
+        dest, topdown=True, followlinks=False, onerror=fail_closed_on_walk_error
+    ):
+        parent = Path(current)
+        for name in list(directories):
+            entry = parent / name
+            if _is_reparse_path(entry):
+                raise RuntimeError(f"symlink/reparse directory is not allowed: {entry.relative_to(dest).as_posix()}")
+            if not stat.S_ISDIR(entry.lstat().st_mode):
+                raise RuntimeError(f"non-directory entry in directory inventory: {entry.relative_to(dest).as_posix()}")
+        for name in filenames:
+            entry = parent / name
+            relative = entry.relative_to(dest).as_posix()
+            if _is_reparse_path(entry):
+                raise RuntimeError(f"symlink/reparse file is not allowed: {relative}")
+            if not stat.S_ISREG(entry.lstat().st_mode):
+                raise RuntimeError(f"non-regular payload entry is not allowed: {relative}")
+            if entry != manifest_path:
+                actual.add(relative)
+    return actual
+
+
 def verify_manifest(dest: Path) -> dict:
     """Validate the manifest structure and the complete payload inventory."""
-    dest = dest.resolve()
+    dest_input = Path(dest)
+    try:
+        _assert_no_reparse_path_components(dest_input)
+        if not stat.S_ISDIR(dest_input.lstat().st_mode):
+            raise RuntimeError("toolchain bundle root is not a directory")
+        dest = dest_input.resolve(strict=True)
+    except OSError as error:
+        raise RuntimeError(f"toolchain bundle root is unavailable: {dest_input}: {error}") from error
     manifest_path = dest / "rbl-toolchain-manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    try:
+        if _is_reparse_path(manifest_path) or not stat.S_ISREG(manifest_path.lstat().st_mode):
+            raise RuntimeError("toolchain manifest must be a regular, non-reparse file")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise RuntimeError(f"toolchain manifest is unavailable: {manifest_path}: {error}") from error
     if not isinstance(manifest, dict) or manifest.get("schema") != 1:
         raise RuntimeError("unsupported or malformed toolchain manifest schema")
     files = manifest.get("files")
@@ -108,6 +192,7 @@ def verify_manifest(dest: Path) -> dict:
     if set(actual_packages) != set(expected_packages):
         raise RuntimeError("package/source inventory contains missing or unrecognized package IDs")
 
+    actual = _inventory_regular_payload_files(dest, manifest_path)
     errors: list[str] = []
     expected: set[str] = set()
     actual_total = 0
@@ -124,9 +209,6 @@ def verify_manifest(dest: Path) -> dict:
             path.resolve().relative_to(dest)
         except ValueError:
             errors.append(f"manifest path escapes bundle: {name}")
-            continue
-        if path.is_symlink():
-            errors.append(f"symlink payload is not allowed: {name}")
             continue
         if not isinstance(info, dict):
             errors.append(f"invalid file metadata: {name}")
@@ -146,11 +228,6 @@ def verify_manifest(dest: Path) -> dict:
             if path.stat().st_size != size or sha256(path) != digest:
                 errors.append(f"hash/size mismatch: {name}")
 
-    actual = {
-        path.relative_to(dest).as_posix()
-        for path in dest.rglob("*")
-        if path.is_file() and path != manifest_path
-    }
     for name in sorted(actual - expected):
         errors.append(f"unmanifested payload file: {name}")
     for name in sorted(expected - actual):
@@ -208,7 +285,64 @@ def find_file(root: Path, name: str, search_dirs: list[Path]) -> Path:
     raise RuntimeError(f"required MinGW-w64 file not found: {name}")
 
 
+def _validate_source_destination(root: Path, dest: Path) -> tuple[Path, Path]:
+    root = Path(root).resolve(strict=True)
+    dest_input = Path(dest)
+    if dest_input.is_symlink():
+        raise RuntimeError(f"destination must not be a symlink: {dest_input}")
+    dest = dest_input.resolve(strict=False)
+    if dest.name != root.name:
+        raise RuntimeError(f"destination prefix directory must be named {root.name!r}: {dest}")
+    if dest == root or root in dest.parents or dest in root.parents:
+        raise RuntimeError(f"source and destination must be disjoint directories: source={root}, destination={dest}")
+    if dest.exists() and not dest.is_dir():
+        raise RuntimeError(f"destination exists and is not a directory: {dest}")
+    return root, dest
+
+
+def _commit_staged_directory(staging: Path, dest: Path) -> None:
+    """Replace the bundle only after the staged payload has passed verification."""
+    backup = None
+    if dest.exists():
+        backup = Path(tempfile.mkdtemp(prefix=f".{dest.name}.backup-", dir=dest.parent))
+        backup.rmdir()
+        os.replace(dest, backup)
+    try:
+        os.replace(staging, dest)
+    except OSError:
+        if backup is not None and backup.exists():
+            try:
+                os.replace(backup, dest)
+            except OSError as restore_error:
+                raise RuntimeError(
+                    f"could not install staged bundle and could not restore previous destination "
+                    f"{backup}: {restore_error}"
+                )
+        raise
+    if backup is not None:
+        try:
+            shutil.rmtree(backup)
+        except OSError as error:
+            print(f"WARNING: previous bundle retained at {backup}: {error}", file=sys.stderr)
+
+
 def build_manifest(root: Path, dest: Path) -> dict:
+    root, dest = _validate_source_destination(root, dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{dest.name}.staging-", dir=dest.parent))
+    try:
+        manifest = _build_manifest_into(root, staging)
+        manifest_path = staging / "rbl-toolchain-manifest.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        verify_manifest(staging)
+        _commit_staged_directory(staging, dest)
+        return manifest
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
+
+
+def _build_manifest_into(root: Path, dest: Path) -> dict:
     root = root.resolve()
     bin_dir = root / "bin"
     gcc, assembler, objdump = (bin_dir / name for name in
@@ -254,11 +388,8 @@ def build_manifest(root: Path, dest: Path) -> dict:
 
     # Keep the original MinGW prefix layout. GCC's built-in sysroot is relative
     # to bin/../../<prefix-name>, and collect2 is relative to bin/../lib/gcc.
-    if dest.name != root.name:
-        raise RuntimeError(f"destination prefix directory must be named {root.name!r}: {dest}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        shutil.rmtree(dest)
+    # `dest` is a fresh sibling staging directory; the previous bundle is not
+    # touched until the complete staged payload and manifest verify.
     copied: dict[str, str] = {}
     copied_tools = [copy_file(path, root, dest, copied) for path in required_files]
 
@@ -328,7 +459,6 @@ def main() -> int:
             return 0
         manifest = build_manifest(args.source, args.dest)
         path = args.dest / "rbl-toolchain-manifest.json"
-        path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         print(f"Created {args.dest}")
         print(f"Files: {manifest['file_count']}; bytes: {manifest['total_bytes']}")
         print(f"Manifest: {path}")

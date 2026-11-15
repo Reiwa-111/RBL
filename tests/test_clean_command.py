@@ -16,12 +16,15 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="rbl-clean-test-") as temp:
         root = Path(temp)
         build = root / "build"
-        cache = build / "sources"
+        cache_dir = build / "cache"
+        cache = cache_dir / "sources"
         cache.mkdir(parents=True)
         (cache / "compiler-output.bin").write_bytes(b"generated")
         preserved = {
+            "build-output": build / "output" / "wx-ui-win" / "app.exe",
             "verification": build / "verification" / "evidence.log",
             "source-material": build / "source-material" / "sources.tar.zst",
+            "download-cache": build / "cache" / "wxwidgets-3.2.4" / "wxWidgets.tar.bz2",
             "release-candidate": build / "wx-ui-win-rc" / "app.exe",
             "visualizations": build / "visualizations" / "plot.png",
         }
@@ -29,7 +32,7 @@ def main() -> int:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"preserve")
 
-        with mock.patch.object(rbl.rbltool, "BUILD_DIR", build):
+        with mock.patch.object(rbl.rbltool, "CACHE_DIR", cache_dir):
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 rc = rbl.clean(root)
@@ -38,23 +41,24 @@ def main() -> int:
         for label, path in preserved.items():
             if path.read_bytes() != b"preserve":
                 raise SystemExit(f"FAIL: {label} data was modified")
-        print("PASS: clean removes only build/sources and preserves evidence/source/RC/user data")
+        print("PASS: clean removes only build/cache/sources and preserves outputs/evidence/user data")
 
     with tempfile.TemporaryDirectory(prefix="rbl-clean-link-test-") as temp:
         root = Path(temp)
         build = root / "build"
+        cache_dir = build / "cache"
         outside = root / "outside"
         outside.mkdir()
         sentinel = outside / "keep.txt"
         sentinel.write_text("keep", encoding="utf-8")
-        build.mkdir()
-        link = build / "sources"
+        cache_dir.mkdir(parents=True)
+        link = cache_dir / "sources"
         try:
             link.symlink_to(outside, target_is_directory=True)
         except (OSError, NotImplementedError):
             print("SKIP: symlink refusal test unavailable")
             return 0
-        with mock.patch.object(rbl.rbltool, "BUILD_DIR", build):
+        with mock.patch.object(rbl.rbltool, "CACHE_DIR", cache_dir):
             errors = io.StringIO()
             with contextlib.redirect_stderr(errors):
                 rc = rbl.clean(root)

@@ -2,10 +2,10 @@
 import win32gui, win32con, win32process
 
 root = pathlib.Path.cwd()
-exe = root / 'build/wx-ui-win/rbl-studio-wx.exe'
-worker = root / 'build/wx-ui-win/rbl-studio-worker.exe'
-fixture = root / 'gui-project-tree-acceptance'
-fixture.mkdir(exist_ok=True)
+build_dir = pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR', root / 'build/output/wx-ui-win'))
+exe = pathlib.Path(os.environ.get('RBL_STUDIO_GUI', build_dir / 'rbl-studio-wx.exe'))
+worker = pathlib.Path(os.environ.get('RBL_STUDIO_WORKER', build_dir / 'rbl-studio-worker.exe'))
+fixture = pathlib.Path(tempfile.mkdtemp(prefix='gui-project-tree-acceptance-', dir=build_dir))
 
 for d in range(34):
     folder = fixture / f'dir-{d:02d}'

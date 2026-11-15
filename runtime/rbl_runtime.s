@@ -2472,13 +2472,34 @@ rbl_fs_delete:
 rbl_fs_cwd:
     push rbp
     mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    sub rsp, 8
     xor edi, edi
     xor esi, esi
     call getcwd
     test rax, rax
     jz .Lcwd_bad
-    mov rdx, rax
+    mov rbx, rax                 /* getcwd(NULL, 0) returns libc-owned memory */
+    mov rdi, rbx
+    call strlen
+    mov r13, rax
+    lea rdi, [rax + 1]
+    call rbl_string_alloc       /* return a Runtime-managed TAG_STR payload */
+    mov r12, rax
+    mov rdi, r12
+    mov rsi, rbx
+    lea rdx, [r13 + 1]
+    call memcpy
+    mov rdi, rbx
+    call free
+    mov rdx, r12
     mov eax, TAG_STR
+    add rsp, 8
+    pop r13
+    pop r12
+    pop rbx
     pop rbp
     ret
 .Lcwd_bad:

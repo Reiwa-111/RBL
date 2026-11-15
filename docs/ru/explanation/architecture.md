@@ -19,7 +19,7 @@ UTF-8 lexer → parser → AST → static analysis
                     x86-64 assembly output
                               │
                               ▼
-                       GNU assembler
+                  target assembler + linker
                               │
                               ▼
                  linker + platform runtime
@@ -62,7 +62,7 @@ Driver помечает этапы lexer, parser, semantic validation и codegen
 | Linux x86-64 | ELF64 | `runtime/rbl_runtime.s` | `runtime/rbl_containers.c` |
 | Windows x86-64 | PE/COFF | `runtime/rbl_runtime_win.c` | `runtime/rbl_containers.c` |
 
-Frontend и code generator общие. Platform entry/exit glue, системные функции, object format directives, runtime и toolchain различаются. На Linux используются GNU `as` и `ld`, системные библиотеки и runtime objects. На Windows используется MinGW-w64: GNU assembler и GCC как linker driver.
+Frontend и code generator общие. Platform entry/exit glue, системные функции, object format directives, runtime и toolchain различаются. На Linux используются app-local Clang integrated assembler и LLD, системные libc/libm и runtime objects. На Windows используется MinGW-w64: GNU assembler и GCC как linker driver. Linux portable payload также включает shared libraries wxWidgets 3.2.4; Flatpak-вариант получает GTK из GNOME Platform runtime, а native shell installer использует системный GTK 3 runtime.
 
 ## Что компилируется на C
 

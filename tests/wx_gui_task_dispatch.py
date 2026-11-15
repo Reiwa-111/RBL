@@ -1,7 +1,7 @@
 import os,pathlib,subprocess,time,tempfile,shutil,ctypes,psutil
 import win32gui,win32con,win32process
-root=pathlib.Path.cwd();exe=root/'build/wx-ui-win/rbl-studio-wx.exe';worker=root/'build/wx-ui-win/rbl-studio-worker.exe'
-fixture=root/'build/wx-ui-win/gui-acceptance';fixture.mkdir(exist_ok=True)
+root=pathlib.Path.cwd();build_dir=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR',root/'build/output/wx-ui-win'));exe=pathlib.Path(os.environ.get('RBL_STUDIO_GUI',build_dir/'rbl-studio-wx.exe'));worker=pathlib.Path(os.environ.get('RBL_STUDIO_WORKER',build_dir/'rbl-studio-worker.exe'))
+fixture=build_dir/'gui-acceptance';fixture.mkdir(parents=True,exist_ok=True)
 src=fixture/"gui-task-smoke.rbl";src.write_text("func main() ("+chr(10)+"    print("+chr(34)+"GUI_TASK_OK"+chr(34)+")"+chr(10)+")"+chr(10),encoding="utf-8")
 profile=pathlib.Path(tempfile.mkdtemp());env=os.environ.copy();env['RBL_STUDIO_CONFIG_DIR']=str(profile);env['RBL_STUDIO_WORKER']=str(worker);env['RBL_PYTHON']=__import__('sys').executable
 u=ctypes.windll.user32;k=ctypes.windll.kernel32

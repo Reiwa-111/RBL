@@ -1,7 +1,7 @@
 ﻿import os,pathlib,subprocess,time,ctypes,tempfile,shutil,psutil
 import win32con,win32gui,win32process,win32api,win32clipboard
-root=pathlib.Path.cwd();exe=root/'build/wx-ui-win/rbl-studio-wx.exe';worker=root/'build/wx-ui-win/rbl-studio-worker.exe'
-fixture=root/'gui-search-cancel-acceptance';fixture.mkdir(exist_ok=True)
+root=pathlib.Path.cwd();build_dir=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR',root/'build/output/wx-ui-win'));exe=pathlib.Path(os.environ.get('RBL_STUDIO_GUI',build_dir/'rbl-studio-wx.exe'));worker=pathlib.Path(os.environ.get('RBL_STUDIO_WORKER',build_dir/'rbl-studio-worker.exe'))
+fixture=pathlib.Path(tempfile.mkdtemp(prefix='gui-search-close-',dir=build_dir))
 payload=b'RBL_SEARCH_CANCEL_TEST '+b'x'* (256*1024-24)
 for i in range(512): (fixture/f'file-{i:04d}.txt').write_bytes(payload)
 profile=pathlib.Path(tempfile.mkdtemp(prefix='rblstudio-search-cancel-'));(profile/'ui.ini').write_text('[Workspace]\nRoot='+fixture.as_posix()+'\n')

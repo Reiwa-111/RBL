@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | DIAGNOSTICS REFERENCE RECHECK
+# last verified: v0.8.0 | 2026.11.11 | GATE G DIAGNOSTICS RECHECK
 
 ## RBL compiler diagnostics
 

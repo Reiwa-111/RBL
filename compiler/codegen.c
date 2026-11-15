@@ -178,6 +178,10 @@ static unsigned long g_label_seq = 0;
 
  static void emit_fast_call(ACG*g,int fi,ExprVec*args){
     size_t n=args->len, bytes=align16((int)(n*8));
+    /* function_is_fast_int() limits this ABI path to the six SysV integer
+       argument registers. Keep a local guard so a future semantic change
+       cannot turn a missed eligibility check into an out-of-bounds read. */
+    if(n>6) fatal("internal codegen error: fast integer call exceeds six register arguments");
     if(n)fprintf(g->out,"    sub rsp, %zu\n",bytes);
     for(size_t i=0;i<n;i++){emit_int_expr(g,args->data[i]);fprintf(g->out,"    mov QWORD PTR [rsp+%zu], rax\n",i*8);}
     static const char*regs[]={"rdi","rsi","rdx","rcx","r8","r9"};
@@ -679,15 +683,9 @@ static bool stmt_needs_gc_safepoint(ACG*g,Stmt*s){
     for(size_t vi=0;vi<g->vars->len && next_reg<2;vi++){
         if((int)vi==idx) continue;
         if(g->vars->data[vi].type!=ST_INT || !g->vars->data[vi].definitely_bound) continue;
-        bool used=false;
-        /* Allocate only variables participating in the loop body. */
-        for(size_t si=0;si<s->as.fors.body.len;si++){
-            Stmt *bs=s->as.fors.body.data[si];
-            (void)bs;
-            /* The conservative whole-body fast check guarantees reads/writes are integer. */
-            used=true;
-        }
-        if(!used) continue;
+        /* Conservative cache, not liveness analysis: a non-empty integer-safe
+           body may touch this local, so reserve the next available register. */
+        if(s->as.fors.body.len==0) continue;
         loopg.reg_slots[next_reg++]=(int)vi;
     }
     while(next_reg<2) loopg.reg_slots[next_reg++]=-1;
@@ -836,9 +834,23 @@ static bool stmt_needs_gc_safepoint(ACG*g,Stmt*s){
     ACG g={0}; g.out=o; g.prog=p; g.fn=f; g.vars=&vars; g.pool=pool; g.fi=fi; g.label_counter=g_label_seq; g.fast_slots=true; g.reg_slots[0]=g.reg_slots[1]=g.reg_slots[2]=-1;emit_int_expr(&g,f->body.data[0]->as.ret);g_label_seq=g.label_counter+1;fputs("    leave\n    ret\n",o);varvec_free(&vars);
 }
 
+static void emit_source_comment(FILE *o,const char *source){
+    fputs("# RBL direct x86-64 ASM generated from ",o);
+    if(!source) source="(unknown source)";
+    for(const unsigned char *p=(const unsigned char*)source;*p;p++){
+        /* A POSIX filename can contain CR/LF. Never let an input path escape
+           this assembler comment and inject directives into generated code. */
+        if(*p=='\n'||*p=='\r') fputc(' ',o);
+        else if(*p<0x20||*p==0x7f) fputc('?',o);
+        else fputc((int)*p,o);
+    }
+    fprintf(o," (%s)\n",target_windows()?"windows x86-64 / PE":"linux x86-64 / ELF");
+}
+
  void emit_program(FILE*o,Program*p,const char*source){
     StrPool pool={0};int main_id=function_last_index(p,"main");if(main_id<0)fatal("internal codegen error: semantic validation was bypassed (main is missing)");
-    fprintf(o,"# RBL direct x86-64 ASM generated from %s (%s)\n.intel_syntax noprefix\n.text\n",source,target_windows()?"windows x86-64 / PE":"linux x86-64 / ELF");
+    emit_source_comment(o,source);
+    fputs(".intel_syntax noprefix\n.text\n",o);
     fputs(".extern " RBL_STRINGIFY(RBL_RUNTIME_ABI_CHECK_SYMBOL) "\n",o);
     for(size_t i=0;i<p->funcs.len;i++)emit_function_asm(o,p,i,&pool);
     for(size_t i=0;i<p->funcs.len;i++)if(function_is_fast_int(p,(int)i,0))emit_fast_function_asm(o,p,i,&pool);

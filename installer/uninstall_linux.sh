@@ -30,6 +30,10 @@ assert_no_symlink_components() {
     fi
   done
 }
+assert_no_symlink_parent_components() {
+  local path="$1"
+  assert_no_symlink_components "$(dirname -- "$path")"
+}
 [[ "$INSTALL_DIR" == /* ]] || INSTALL_DIR="$PWD/$INSTALL_DIR"
 assert_no_symlink_components "$INSTALL_DIR"
 INSTALL_DIR="$(realpath -m -- "$INSTALL_DIR")"
@@ -113,7 +117,7 @@ for relative in "${MANIFEST_FILES[@]}"; do
     /*|.|./*|../*|*/../*|*/..|*/./*|*/.|*//*|*\\*) echo "Refusing unsafe manifest path: $relative" >&2; exit 1 ;;
   esac
   target="$INSTALL_DIR/$relative"
-  assert_no_symlink_components "$target"
+  assert_no_symlink_parent_components "$target"
   resolved_target="$(realpath -m -- "$target")"
   case "$resolved_target" in "$INSTALL_DIR"/*) ;; *) echo "Manifest path escapes install root: $relative" >&2; exit 1 ;; esac
   parent="$(dirname "$relative")"
@@ -126,8 +130,8 @@ done
 for relative in "${MANIFEST_FILES[@]}"; do
   [[ -n "$relative" ]] || continue
   target="$INSTALL_DIR/$relative"
-  assert_no_symlink_components "$target"
-  [[ ! -f "$target" ]] || rm -f -- "$target"
+  assert_no_symlink_parent_components "$target"
+  [[ ! -e "$target" && ! -L "$target" ]] || rm -f -- "$target"
 done
 rm -f -- "$FILES_LIST" "$STATE_FILE"
 

@@ -10,10 +10,11 @@ import win32gui
 import win32process
 
 ROOT = pathlib.Path.cwd()
-GUI = ROOT / "build/wx-ui-win/rbl-studio-wx.exe"
-WORKER = ROOT / "build/wx-ui-win/rbl-studio-worker.exe"
-FIXTURE = ROOT / "build/wx-ui-win/gui-acceptance/gui-stdin-eof.rbl"
-OUTPUT = ROOT / "build/wx-ui-win/gui-acceptance/gui-stdin-eof-output.txt"
+BUILD_DIR = pathlib.Path(os.environ.get("RBL_STUDIO_GUI_BUILD_DIR", ROOT / "build/output/wx-ui-win"))
+GUI = pathlib.Path(os.environ.get("RBL_STUDIO_GUI", BUILD_DIR / "rbl-studio-wx.exe"))
+WORKER = pathlib.Path(os.environ.get("RBL_STUDIO_WORKER", BUILD_DIR / "rbl-studio-worker.exe"))
+FIXTURE = BUILD_DIR / "gui-acceptance/gui-stdin-eof.rbl"
+OUTPUT = BUILD_DIR / "gui-acceptance/gui-stdin-eof-output.txt"
 STDIN_ID, SEND_ID, EOF_ID = 6009, 6010, 6011
 
 

@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | LANGUAGE CONTRACT RECHECK
+# last verified: v0.8.0 | 2026.11.11 | GATE H CONTAINER CONTRACT UPDATE
 
 ## Reference: RBL 0.8.0 syntax
 
@@ -223,7 +223,7 @@ print("mode" in config)
 print(len(config))
 ```
 
-Tested key types are `int`, `float` and `string`. A missing key returns `Unit` (`()`), not `null`; use `in` to test whether the key exists. Dictionary equality is deep and independent of key order. Printed key order follows the hash-table layout and is not a stable ordering contract.
+Dictionary keys are scalar values; lists, dictionaries and tuples are rejected as keys. Tested key types include `int`, `float` and `string`. Equal floating-point zero values (`0.0` and `-0.0`) address the same key. A NaN key is matched by its exact IEEE-754 payload so that a stored NaN key remains findable and updateable, even though ordinary `NaN == NaN` is false. A missing key returns `Unit` (`()`), not `null`; use `in` to test whether the key exists. Dictionary equality is deep and independent of key order. Printed key order follows the hash-table layout and is not a stable ordering contract. Recursive list/dictionary/tuple values are supported; their string representation marks a repeated reference as `<cycle>` rather than recursing indefinitely.
 
 ## Tuples
 

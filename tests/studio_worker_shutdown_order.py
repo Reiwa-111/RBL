@@ -71,7 +71,6 @@ def main() -> None:
         "task": "run",
         "workspace_root": str(ROOT),
         "source_path": str(source),
-        "snapshot_file": None,
         "is_rbl": True,
         "snapshot": None,
     })

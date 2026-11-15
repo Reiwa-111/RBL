@@ -1,10 +1,14 @@
-import os, pathlib, subprocess, time, ctypes
+import atexit, os, pathlib, shutil, subprocess, tempfile, time, ctypes
 import win32con, win32gui, win32process
 root=pathlib.Path.cwd()
-exe=pathlib.Path(os.environ.get('RBL_STUDIO_GUI',root/'build/wx-ui-win/rbl-studio-wx.exe'))
-worker=pathlib.Path(os.environ.get('RBL_STUDIO_WORKER',root/'build/wx-ui-win/rbl-studio-worker.exe'))
+build_dir=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR',root/'build/output/wx-ui-win'))
+exe=pathlib.Path(os.environ.get('RBL_STUDIO_GUI',build_dir/'rbl-studio-wx.exe'))
+worker=pathlib.Path(os.environ.get('RBL_STUDIO_WORKER',build_dir/'rbl-studio-worker.exe'))
 env=os.environ.copy(); env['RBL_STUDIO_WORKER']=str(worker); env['RBL_PYTHON']=__import__('sys').executable
-fixture=root/'build/wx-ui-win/gui-acceptance'; fixture.mkdir(parents=True,exist_ok=True)
+config=pathlib.Path(tempfile.mkdtemp(prefix='rbl-wx-diagnostics-profile-'))
+atexit.register(shutil.rmtree,config,ignore_errors=True)
+env['RBL_STUDIO_CONFIG_DIR']=str(config)
+fixture=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_FIXTURE_DIR',build_dir/'gui-acceptance')); fixture.mkdir(parents=True,exist_ok=True)
 source='func main() (\n    print("before")\n    break\n)\n'
 u=ctypes.windll.user32; k=ctypes.windll.kernel32
 u.SendMessageA.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_size_t,ctypes.c_ssize_t]; u.SendMessageA.restype=ctypes.c_ssize_t

@@ -8,9 +8,9 @@ import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "native" / "wx-ui" / "src" / "main_frame.cpp"
-METADATA_HEADER = ROOT / "native" / "wx-ui" / "include" / "file_metadata.hpp"
-METADATA_SOURCE = ROOT / "native" / "wx-ui" / "src" / "file_metadata.cpp"
+SOURCE = ROOT / "rbl-ide" / "wx-ui" / "src" / "main_frame.cpp"
+METADATA_HEADER = ROOT / "rbl-ide" / "wx-ui" / "include" / "file_metadata.hpp"
+METADATA_SOURCE = ROOT / "rbl-ide" / "wx-ui" / "src" / "file_metadata.cpp"
 
 
 class SaveDirfdSecurityTests(unittest.TestCase):
@@ -38,7 +38,8 @@ class SaveDirfdSecurityTests(unittest.TestCase):
 
     def test_metadata_at_apis_are_declared_and_used(self) -> None:
         header = METADATA_HEADER.read_text(encoding="utf-8")
-        for api in ("ReadFileAt(", "QueryFileIdentityAt(", "CopyPosixMetadataAt(", "ExchangeFileNamesAt("):
+        for api in ("ReadFileAt(", "QueryFileIdentityAt(", "QueryEntryIdentityAt(",
+                    "CopyPosixMetadataAt(", "ExchangeFileNamesAt("):
             with self.subTest(api=api):
                 self.assertIn(api, header)
         for api in ("ReadFileAt(", "QueryFileIdentityAt(", "CopyPosixMetadataAt("):
@@ -92,6 +93,20 @@ class SaveDirfdSecurityTests(unittest.TestCase):
         self.assertIn("GetFileInformationByHandle(file, &info)", helper)
         self.assertIn("SameFileIdentity(expected, actual)", helper)
         self.assertIn("SetFileInformationByHandle(file, FileDispositionInfo", helper)
+
+    def test_windows_temp_creation_failure_deletes_by_open_handle_before_close(self) -> None:
+        start = self.source.index("bool WriteExclusiveTemporary(")
+        end = self.source.index("#ifndef __WXMSW__\nbool UnlinkLeafIfIdentityAt", start)
+        helper = self.source[start:end]
+        create = helper.index("CreateFileW(temporary.c_str(), GENERIC_WRITE | DELETE")
+        failure = helper.index("if (!ok)", create)
+        mark_delete = helper.index("SetFileInformationByHandle(\n                file, FileDispositionInfo", failure)
+        close = helper.index("const bool closed = ::CloseHandle(file)", mark_delete)
+        no_identity_fallback = helper.index("if (!marked_for_delete && !identity.valid)", close)
+        self.assertLess(create, failure)
+        self.assertLess(mark_delete, close)
+        self.assertGreater(no_identity_fallback, close)
+        self.assertIn("SetFileInformationByHandle", helper[failure:close])
 
     def test_windows_save_pins_each_parent_without_delete_sharing(self) -> None:
         lock_start = self.source.index("bool LockWindowsDirectoryChain(")
@@ -158,10 +173,60 @@ class SaveDirfdSecurityTests(unittest.TestCase):
         self.assertLess(displaced_validation, rollback)
         self.assertIn("HashBytes(displaced_bytes) == disk_hash_at_check", function[displaced_validation:])
         self.assertIn("if (!displaced_read)", function[displaced_read:])
-        self.assertIn("query_save_leaf(temporary_leaf, displaced_identity, identity_error)", function[displaced_read:])
+        self.assertIn("query_save_entry(temporary_leaf, displaced_identity, identity_error)", function[displaced_read:])
+        self.assertIn("query_save_entry(target_leaf, current_target_identity, rollback_error)", function[displaced_validation:])
+        self.assertIn("query_save_entry(temporary_leaf, current_displaced_identity, rollback_error)", function[displaced_validation:])
         self.assertIn("atomic_exchange_used", function)
         self.assertIn("displaced_cleanup_failed", function)
         self.assertIn("renameat2(RENAME_EXCHANGE)", function)
+
+    def test_displaced_symlink_can_be_identified_and_exchanged_back_safely(self) -> None:
+        start = self.metadata_source.index("bool QueryEntryIdentityAt(")
+        end = self.metadata_source.index("\n}", start) + 2
+        helper = self.metadata_source[start:end]
+        self.assertIn("::fstatat(parent_fd, leaf.c_str(), &info, AT_SYMLINK_NOFOLLOW)", helper)
+        self.assertNotIn("S_ISREG", helper)
+        self.assertIn("identity.first = static_cast<std::uint64_t>(info.st_dev)", helper)
+        self.assertIn("identity.second = static_cast<std::uint64_t>(info.st_ino)", helper)
+
+        function = self.save_document
+        displaced_read = function.index("const bool displaced_read = ReadFileAt")
+        rollback = function.index("if (!displaced_is_original)", displaced_read)
+        self.assertIn("query_save_entry(temporary_leaf, displaced_identity, identity_error)",
+                      function[displaced_read:rollback])
+        rollback_end = function.index("replace_error = displaced_error", rollback)
+        rollback_block = function[rollback:rollback_end]
+        self.assertIn("query_save_entry(target_leaf, current_target_identity, rollback_error)",
+                      rollback_block)
+        self.assertIn("query_save_entry(temporary_leaf, current_displaced_identity, rollback_error)",
+                      rollback_block)
+        self.assertIn("SameFileIdentity(temporary_identity, current_target_identity)", rollback_block)
+        self.assertIn("SameFileIdentity(displaced_identity, current_displaced_identity)", rollback_block)
+
+    def test_only_explicit_unsupported_exchange_errnos_are_classified_as_unsupported(self) -> None:
+        start = self.metadata_source.index("const int code = PosixErrorOrIoError();", self.metadata_source.index("bool ExchangeFileNamesAt("))
+        end = self.metadata_source.index("return false;", start)
+        classification = self.metadata_source[start:end]
+        for supported_unsupported_errno in ("ENOSYS", "EOPNOTSUPP", "ENOTSUP"):
+            with self.subTest(errno=supported_unsupported_errno):
+                self.assertIn(f"code == {supported_unsupported_errno}", classification)
+        for unrelated_errno in ("EINVAL", "EIO", "ENXIO", "EACCES", "EPERM"):
+            with self.subTest(errno=unrelated_errno):
+                self.assertNotIn(f"code == {unrelated_errno}", classification)
+
+        test_file = pathlib.Path(__file__).read_text(encoding="utf-8")
+        parent_test_start = test_file.rindex(
+            "def test_pinned_parent_survives_rename_and_symlink_replacement"
+        )
+        unsupported_start = test_file.index("unsupported = {", parent_test_start)
+        python_test = test_file[unsupported_start:]
+        self.assertIn("errno.ENOTSUP", python_test)
+        self.assertIn("errno.EOPNOTSUPP", python_test)
+        self.assertIn("errno.ENOSYS", python_test)
+        for unrelated_errno in ("errno.EIO", "errno.ENXIO", "errno.EPERM"):
+            self.assertNotIn(unrelated_errno, python_test)
+        cpp_tests = (ROOT / "tests" / "posix_file_metadata.cpp").read_text(encoding="utf-8")
+        self.assertNotIn("code == EPERM", cpp_tests)
 
     def test_failed_posix_syscalls_never_return_success_error_code(self) -> None:
         for source in (self.source, self.metadata_source):
@@ -249,12 +314,11 @@ class SaveDirfdSecurityTests(unittest.TestCase):
                 except OSError as exc:
                     # DrvFS may invalidate relative operations through an
                     # already-open directory after its pathname is renamed.
-                    # Treat only known unsupported/fail-closed errors as a
-                    # filesystem limitation; verify the replacement symlink
-                    # target was not modified before reporting the SKIP.
+                    # Treat only explicit unsupported-operation errors as a
+                    # filesystem limitation. I/O, permission and device errors
+                    # must fail the test rather than being hidden as SKIPs.
                     unsupported = {
-                        errno.EIO, errno.ENXIO, errno.ENOTSUP,
-                        errno.EOPNOTSUPP, errno.EPERM, errno.ENOSYS,
+                        errno.ENOTSUP, errno.EOPNOTSUPP, errno.ENOSYS,
                     }
                     if exc.errno not in unsupported:
                         raise

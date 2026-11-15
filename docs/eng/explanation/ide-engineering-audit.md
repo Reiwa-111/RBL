@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.10 | IDE ENGINEERING AUDIT
+# last verified: v0.8.0 | 2026.11.11 | IDE ENGINEERING AUDIT
 
 # RBL Studio 0.8.0 — engineering audit and readiness status
 
@@ -6,14 +6,16 @@ Record date: 2026-11-10. This is an engineering status report, not authorization
 
 ## Overall status
 
-**IDE 0.8.0: NOT RELEASE-READY / UNRELEASED.** The primary launcher/install path selects the C++20/wxWidgets 3.2 + Scintilla frontend with a separate Rust worker. Windows SaveDocument byte-roundtrip acceptance is 27/27 PASS on the current GUI candidate. The preliminary 480-second resource run passed resource/UI thresholds but used the earlier harness and did not verify graceful shutdown. The second 7,200-second attempt failed early after task #45 without a CSV. A subsequent strengthened 480-second run exited 1 after the initial Run Tests dispatch; its retained log contains only startup output and no CSV/verdict. No current-RC two-hour soak PASS is claimed. Windows registered install/upgrade/uninstall acceptance passes in an isolated HKCU GUID subtree. DPI static checks pass 12/12, but live 125-200% multi-monitor and interactive Linux GUI acceptance remain unverified. MSYS2 corresponding-source/legal review, rebuilding RCs with the Rust source payload, and Binutils CVE-2026-90801 remain release blockers.
+**IDE 0.8.0: NOT RELEASE-READY / UNRELEASED.** The primary launcher/install path selects the C++20/wxWidgets 3.2 + Scintilla frontend with a separate Rust worker. Current Windows SaveDocument byte-roundtrip acceptance is 27/27 PASS. Path-backed resource smoke runs passed at 60/120/300 seconds with 32 documents, all four task types and graceful GUI/worker shutdown; the 300-second run completed 84 task cycles and 316 samples. The latest 7,200-second attempt failed before sampling because the harness could not acquire notebook focus. It was not retried after the user's explicit request to stop further IDE launches; the two-hour soak is NOT PASSED. Windows registered install/upgrade/uninstall acceptance passed earlier in an isolated HKCU GUID subtree, but fresh acceptance after the final source-archive revision remains open. DPI static checks pass 12/12, but live 125-200% multi-monitor and interactive Linux GUI acceptance remain unverified. The Windows replacement race, Binutils CVE-2026-90801 and corresponding-source legal/public delivery remain release blockers.
+
+**Gate I update ? 2026-11-12:** Windows registered installer and installed-CLI acceptance passed in isolated test roots, including upgrade/uninstall, rollback, user-data preservation and CLI `version`/`doctor`/`check`/`run`/`clean`; Linux installer and installed-CLI acceptance also passed. Evidence: `../verification/2026-11-11-Gate-I/GATE_I_REVIEW.md`. These are host-isolated tests, not pristine clean-VM acceptance. GUI startup, GUI-launched backend action and the two-hour soak remain NOT RUN / NOT PASSED. Gate D remains PARTIAL.
 
 This report deliberately separates evidence from assumptions. A successful compile, unit-test suite or `--self-test` does not prove real GUI behavior or whole-application memory compliance under load.
 
 ## Architecture
 
-- The primary UI is C++20 + wxWidgets 3.2 + `wxStyledTextCtrl`/Scintilla in `native/wx-ui/`, with a separate Rust `rbl-studio-worker` process.
-- The previous Rust + `eframe/egui` UI remains in `src/app.rs` and `src/editor.rs` as rollback/reference and is selected only by `RBL_STUDIO_ALLOW_LEGACY=1`.
+- The primary UI is C++20 + wxWidgets 3.2 + `wxStyledTextCtrl`/Scintilla in `rbl-ide/wx-ui/`, with a separate Rust `rbl-studio-worker` process.
+- The previous Rust + `eframe/egui` UI remains in `rbl-ide/legacy-egui/app.rs` and `rbl-ide/legacy-egui/editor.rs` as rollback/reference and is selected only by `RBL_STUDIO_ALLOW_LEGACY=1`.
 - The Python/Tkinter GUI was removed. `tools/rbltool.py` remains the compiler/toolchain backend driver and does not render the UI.
 - Earlier Cargo dependency scans found no Wry/WebView/CEF/Chromium/Electron/WebKit engine packages. External links may be opened in the system browser; that does not embed a browser engine.
 - The IDE edits ordinary text files regardless of extension. Compiler operations are restricted to `.rbl` and checked again at the backend boundary.
@@ -21,9 +23,9 @@ This report deliberately separates evidence from assumptions. A successful compi
 
 ### Initial native frontend transition snapshot (2026-11-09; historical)
 
-At this initial snapshot, the wx frontend was still parallel to the Cargo/egui application. It is now the primary launcher/install target; the previous Rust/egui UI remains available for rollback and comparison. The wx frontend provides Run/Build/Check/ASM/Tests/Benchmarks/Doctor, streamed stdin/EOF/cancel, tabs and a project tree, UTF-8/BOM and UTF-16 LE/BE, find/replace, Find in Files, a Problems list with source navigation, editor settings, a command palette and quick reference. Search traversal is bounded by entry/byte/result limits; the project tree does not follow symlinks. The worker uses a bounded NDJSON protocol and reuses `src/process.rs`.
+At this initial snapshot, the wx frontend was still parallel to the Cargo/egui application. It is now the primary launcher/install target; the previous Rust/egui UI remains available for rollback and comparison. The wx frontend provides Run/Build/Check/ASM/Tests/Benchmarks/Doctor, streamed stdin/EOF/cancel, tabs and a project tree, UTF-8/BOM and UTF-16 LE/BE, find/replace, Find in Files, a Problems list with source navigation, editor settings, a command palette and quick reference. Search traversal is bounded by entry/byte/result limits; the project tree does not follow symlinks. The worker uses a bounded NDJSON protocol and reuses `rbl-ide/worker/process.rs`.
 
-Initial verification at that point: Windows UCRT64 and Linux/WSL CMake Release builds; worker unit tests (20 Windows / 21 Linux), Clippy `-D warnings`, and the interactive two-`input()` `unit_converter.rbl` smoke test on both platforms. One Windows idle sample measured ~30.5 MiB GUI Working Set + ~9.8 MiB worker Working Set. These are historical baseline figures, not the final acceptance evidence; current tests and remaining gaps are recorded below. See [`native/wx-ui/README.md`](../../../native/wx-ui/README.md) for implementation and build details.
+Initial verification at that point: Windows UCRT64 and Linux/WSL CMake Release builds; worker unit tests (20 Windows / 21 Linux), Clippy `-D warnings`, and the interactive two-`input()` `unit_converter.rbl` smoke test on both platforms. One Windows idle sample measured ~30.5 MiB GUI Working Set + ~9.8 MiB worker Working Set. These are historical baseline figures, not the final acceptance evidence; current tests and remaining gaps are recorded below. See [`rbl-ide/wx-ui/README.md`](../../../rbl-ide/wx-ui/README.md) for implementation and build details.
 
 ### Legacy egui frontend architecture review (historical)
 
@@ -101,7 +103,7 @@ Until these criteria are met, status remains **NOT RELEASE-READY**. Commit, push
 
 ## Native wxWidgets IDE — primary frontend (2026-11-09 onward)
 
-This section applies to the new `native/wx-ui/` implementation using wxWidgets
+This section applies to the new `rbl-ide/wx-ui/` implementation using wxWidgets
 3.2, `wxStyledTextCtrl`/Scintilla and the Rust worker. The resource tables and
 interactive checks above describe the older egui frontend; they are not
 measurements or readiness evidence for the wx candidate.
@@ -221,6 +223,10 @@ Independent wx frontend review (read-only, worker-19) additionally identified:
   removed. First-time saves still use exclusive linkat creation. DrvFS can also
   reject relative operations through a pinned directory FD after a parent
   directory rename; those operations fail closed rather than switching paths.
+  If a raced symlink is displaced by exchange, `QueryEntryIdentityAt` records
+  its inode through `fstatat(AT_SYMLINK_NOFOLLOW)`; rollback proceeds only
+  while both names still match their observed identities. The Linux integration
+  test exercises this case.
   Windows holds no-delete handles for the parent chain, but the destination leaf
   can still change before path-based ReplaceFileW; its backup path and identity
   validation preserve the displaced object on mismatch but do not provide
@@ -238,7 +244,13 @@ Independent wx frontend review (read-only, worker-19) additionally identified:
   other hard-link names retain the previous bytes if the user confirms.
 - Temp-file creation is exclusive (`CREATE_NEW` on Windows, `O_EXCL` on POSIX),
   not the old non-exclusive `ofstream` mode. POSIX file opens use `O_NONBLOCK` so
-  a raced FIFO cannot block the GUI before regular-file validation.
+  a raced FIFO cannot block the GUI before regular-file validation. On Windows,
+  the exclusive temporary handle includes `DELETE` access; if a write, flush or
+  metadata query fails, cleanup first marks that exact still-open file object
+  delete-pending with `SetFileInformationByHandle` before closing it. Identity-
+  checked pathname cleanup is only a fallback when a file ID was obtained. If
+  the OS rejects both safe cleanup paths, the retained temporary pathname is
+  included in the Save failure message.
 - POSIX save fsyncs the same pinned directory descriptor before replacement
   (making recovery links durable), after replacement and before cleanup, and
   again after cleanup. A failed pre-replacement sync aborts the save; a failed
@@ -263,7 +275,7 @@ but does not prove cancellation can interrupt a blocking OS filesystem read.
 The latest independent worker/backend read-only audit (worker-17) found the
 output high-water pause/resume, bounded writer batching, control-event flush,
 snapshot cleanup and Finished ordering coherent in source. The final pending
-UTF-8 fragment's ignored send failure was fixed in `src/process.rs` and covered
+UTF-8 fragment's ignored send failure was fixed in `rbl-ide/worker/process.rs` and covered
 by `output_reader_reports_disconnected_receiver_for_final_utf8_fragment`.
 Current WSL worker tests pass 23/23; Windows GNU worker tests pass 22/22 (one
 platform-specific test is absent). Windows and WSL stdin/EOF smoke and 6.1 MB
@@ -282,7 +294,7 @@ Remaining backend lifecycle risks from that audit:
   explicit in the protocol contract.
 
 The first worker-20 report described a stale coordinator snapshot. Re-reading
-current src/bin/rbl-studio-worker.rs and exercising a fresh Linux build confirmed
+current rbl-ide/worker/rbl-studio-worker.rs and exercising a fresh Linux build confirmed
 that the normal shutdown path drains pending output and enqueues bye on the same
 FIFO channel; the shutdown-order test passed (385 output events, Finished before
 bye, exit 0).
@@ -417,11 +429,19 @@ Tests dispatch and produced no CSV/verdict. No current-RC long-duration soak
 PASS is available.
 
 POSIX existing-target saves fail closed when RENAME_EXCHANGE is unavailable;
-the unconditional renameat fallback is removed. First-time saves use exclusive
-linkat. Windows retains a path-based ReplaceFileW leaf race and a LOW cleanup
-edge that may leave an orphan temp if handle metadata retrieval fails directly
-after exclusive creation. A fresh package build is required to include the new
-Rust worker license payload and installer marker checks.
+the unconditional renameat fallback is removed. This is an intentional
+capability restriction, not a data-loss/security defect: first-time saves use
+exclusive linkat, while existing-target saves require exchange support on the
+actual destination filesystem. A displaced symlink is now identified without
+following it, and guarded exchange-back restores the original symlink only
+while both names still match their observed inode identities. The Linux C++
+integration test exercises this exact case. Windows retains a path-based
+ReplaceFileW leaf race: the preflight and recovery hard links preserve the
+displaced/original bytes on mismatch, but do not provide compare-and-swap on the
+destination name. The previously reported LOW orphan-temp edge after an
+immediate file-metadata failure is fixed by marking the exact exclusive
+temporary handle for deletion before close; static source checks and the
+Windows handle-cleanup API test pass.
 
 The 20 exact-version source archives for the compiler toolchain and wx/runtime
 dependency closure have been collected and signature-verified. Upstream hashes
@@ -429,8 +449,8 @@ and Git source commits were checked; see
 toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md. The Rust worker dependency
 closure is separately inventoried as 28 exact active default-feature crates;
 legacy eframe/rfd dependencies are opt-in and excluded from the worker build.
-The complete worker source bundle is build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261110-1955.tar.zst
-(8,099,357 bytes; SHA-256 df5881aa72dc556d9fff6217fd436cec9ad9cb345ac899058a12d23bbdf40da5).
+The complete worker source bundle is build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261114-release-recheck-r4.tar.zst
+(8,255,104 bytes; SHA-256 0ddd19ba6b4c049fcbef95d32462f6f8b9ebf5788a9077f389c5a1c53ec4340c).
 Both build scripts now copy it into source/Rust-worker-source.tar.zst, and both
 installers require, verify and retain it in the installed application tree.
 Existing RC output directories predate this change and must be rebuilt. The
@@ -445,9 +465,18 @@ of the exact signed archive confirmed that `cache_bwrite` is reachable during
 ordinary PE output writes through the COFF final-link foreign-section path. The
 default RBL build links compiler-generated COFF objects and does not accept
 arbitrary object inputs or pass `--gc-sections -w`; this narrows exposure but
-does not prove the vulnerable write-size condition unreachable. CVE-2026-90801
+does not prove the vulnerable read-size condition unreachable. CVE-2026-90801
 remains unresolved and release-blocking, not a claimed upstream fix.
 
 **Current status: ENGINEERING TESTS PASS / GUI ACCEPTANCE SUBSTANTIAL WITH
-REMAINING GAPS / RELEASE BLOCKED / UNRELEASED.** No commit, push, tag or
-publication was performed.
+REMAINING GAPS / RELEASE BLOCKED / UNRELEASED.** No new commit, push or tag was created
+during this verification; the existing `v0.8.0` tag remains at HEAD. No release publication was
+performed.
+
+## Current acceptance status - 2026-11-11
+
+The latest Windows SaveDocument suite passed 27/27 with an isolated fixture. Path-backed resource smoke passed at 60/120/300 seconds with 32 documents and all four task types; the 300-second run completed 84 cycles and 316 samples. The GUI exited with code 0 and the worker shut down gracefully. The 7,200-second attempt failed before sampling due to notebook-focus acquisition and was not retried after the user's explicit request to stop further IDE launches. Gate D remains PARTIAL; live DPI, interactive Linux desktop and remaining manual workflows are NOT RUN.
+
+The Windows orphan-temp cleanup edge is fixed by marking the exact exclusive temporary-file handle delete-pending before close. The path-based `ReplaceFileW` destination-leaf race remains. Binutils 2.47-4 / CVE-2026-90801 remains unresolved and release-blocking. Gate E is therefore BLOCKED for stable/binary distribution. Full security evidence: `verification/2026-11-11-Gate-E/GATE_E_REVIEW.md`.
+
+Gate F's final-reviewed Windows corresponding-source bundle is locally verified (331,187,540 bytes; SHA-256 `2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066`). At archive creation, all four embedded audit snapshots matched the live repository. Gate G later corrected the dead MSYS2 security-index URL in the live `SOURCE_ARCHIVE_AUDIT.md`; the frozen archive therefore retains the earlier URL and is no longer byte-identical on that one file (the other three snapshots still match). Its checksums and signatures remain valid, but a new final-reviewed revision must be rebuilt and reverified before any public source delivery. The embedded Rust notice also omits the live-only line naming its own archive/hash, avoiding a circular self-digest; the 60 copied upstream license/notice files remain byte-identical. The archive is not attached to the public pre-release; legal delivery review and installer retention acceptance remain open.

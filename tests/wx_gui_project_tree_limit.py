@@ -1,7 +1,7 @@
 ﻿import os,pathlib,subprocess,time,tempfile,shutil
 import win32gui,win32con,win32process
-root=pathlib.Path.cwd();exe=root/'build/wx-ui-win/rbl-studio-wx.exe';worker=root/'build/wx-ui-win/rbl-studio-worker.exe'
-fixture=root/'gui-project-dir-limit';fixture.mkdir(exist_ok=True)
+root=pathlib.Path.cwd();build_dir=pathlib.Path(os.environ.get('RBL_STUDIO_GUI_BUILD_DIR',root/'build/output/wx-ui-win'));exe=pathlib.Path(os.environ.get('RBL_STUDIO_GUI',build_dir/'rbl-studio-wx.exe'));worker=pathlib.Path(os.environ.get('RBL_STUDIO_WORKER',build_dir/'rbl-studio-worker.exe'))
+fixture=pathlib.Path(tempfile.mkdtemp(prefix='gui-project-dir-limit-',dir=build_dir))
 for i in range(1501):(fixture/f'entry-{i:04d}.txt').touch()
 profile=pathlib.Path(tempfile.mkdtemp());(profile/'ui.ini').write_text('[Workspace]\nRoot='+fixture.as_posix()+'\n')
 env=os.environ.copy();env['RBL_STUDIO_CONFIG_DIR']=str(profile);env['RBL_STUDIO_WORKER']=str(worker);env['RBL_PYTHON']=__import__('sys').executable

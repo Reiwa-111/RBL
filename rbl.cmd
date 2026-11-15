@@ -1,9 +1,9 @@
 @echo off
 setlocal
-set ROOT=%~dp0
-if exist "%ROOT%.venv\Scripts\python.exe" (
-  "%ROOT%.venv\Scripts\python.exe" "%ROOT%rbl.py" %*
-) else (
-  python.exe "%ROOT%rbl.py" %*
-)
-exit /b %errorlevel%
+if defined RBL_PYTHON goto run
+set "RBL_PYTHON=%~dp0runtime\python\python.exe"
+if exist "%RBL_PYTHON%" goto run
+set "RBL_PYTHON=python"
+:run
+"%RBL_PYTHON%" "%~dp0rbl.py" %*
+exit /b %ERRORLEVEL%

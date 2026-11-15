@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.10 | WINDOWS TOOLCHAIN SOURCE INVENTORY
+# last verified: v0.8.0 | 2026.11.12 | WINDOWS TOOLCHAIN SOURCE INVENTORY
 
 # Windows toolchain corresponding-source inventory
 
@@ -34,7 +34,7 @@ signature and installed DLL hash were checked.
 
 - Exact-version source-only archives for the 9 compiler/toolchain package sources
   and 11 wx/runtime dependency sources were downloaded to
-  build/toolchain-source-audit-20261110/. All 20 current detached archive
+  build/toolchain-source-audit-20261111/. All 20 current detached archive
   signatures verify with the MSYS2 keyring; the 1.4-2 zlib binary package and
   the keyring package signatures also verify. Binutils 2.47-4 source and binary
   package signatures were independently verified. The signer fingerprint is
@@ -48,17 +48,27 @@ signature and installed DLL hash were checked.
 - Exact archive sizes, SHA-256 values, signer fingerprint, package metadata and
   verification evidence are recorded in
   [SOURCE_ARCHIVE_AUDIT.md](SOURCE_ARCHIVE_AUDIT.md).
-- The downloaded archives are not included in the 43-file runtime bundle or in
-  the Git repository snapshot. A separate 330,067,308-byte source-material
-  archive has been assembled locally at
-  build/source-material/RBL-0.8.0-Windows-Source-Materials-20261110.tar.zst
-  (SHA-256 6bc84404a077bcc438bafd0b6add5436bb8d1058f339aa5d1ebd988529c7fa57).
-  It still must accompany any binary distribution (or be replaced by another
-  legally sufficient source-distribution method).
-- A written offer has not been completed or legally reviewed. The project must
-  not claim that redistribution obligations are closed until the source bundle
-  is actually supplied with the binaries or an applicable offer is reviewed.
+- The downloaded archives are not embedded in the 43-file runtime toolchain
+  subtree or in the Git repository snapshot. The original 2026-11-10 archive
+  was lost and superseded by a new verified archive assembled 2026-11-11:
+  build/source-material/RBL-0.8.0-Windows-Source-Materials-20261111-final-reviewed.tar.zst
+  (the archive SHA-256 is recorded in the external Gate F report and
+  `bundle_sha256.txt`; it is omitted here to avoid a self-referential digest).
+  Its 55 SHA256SUMS records cover every other file: 20 source archives and
+  detached signatures, five signed binary packages and audit/manifest material.
+- Fresh Windows build payloads now copy that exact archive to
+  `source/Windows-toolchain-source.tar.zst` with a SHA-256 sidecar. The Windows
+  installer requires the archive, verifies its hash before staging, installs it
+  beside the application and verifies it again after installation. It must
+  remain beside every binary distribution; do not detach it from the installer
+  or portable package.
+- No written offer is needed for a distribution that actually includes the
+  complete corresponding-source archive as a sibling download/installed source
+  item, but the distribution process must preserve that pairing. Any alternative
+  source-offer route still requires legal review.
 
 These results establish archive integrity and source correspondence, not a legal
-certification. The links above are source-location references and do not
-guarantee that third-party mirrors will retain every historical archive.
+certification. The current local Windows payload now contains the corresponding
+source archive; the public pre-release still has no binary/source assets attached.
+The links above are source-location references and do not guarantee that
+third-party mirrors will retain every historical archive.

@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import sys
+import os
+import shlex
+import stat
+import subprocess
 import tempfile
 import unicodedata
 from pathlib import Path
@@ -146,6 +150,140 @@ def run_raw_utf8_case(path: Path, name: str, prefix: bytes, invalid: bytes) -> i
     return 0
 
 
+def run_codegen_output_preservation(directory: Path) -> int:
+    settings = rbltool.load_settings()
+    rbltool.ensure_toolchain(settings)
+    source = directory / "codegen_output_failure.rbl"
+    source.write_text("func main() (\n    len(1, 2)\n)\n", encoding="utf-8")
+
+    existing = directory / "existing-assembly.s"
+    original = b"previous valid assembly must survive\n"
+    existing.write_bytes(original)
+    missing = directory / "new-assembly.s"
+
+    for output in (existing, missing):
+        command = rbltool.compiler_cmd(source, output, settings)
+        if isinstance(command, str):
+            code, stdout, stderr = rbltool.run_wsl(command, settings)
+        else:
+            code, stdout, stderr = rbltool.run_native(command)
+        if code != 1 or "error [codegen]" not in stderr or "len() expects 1 argument" not in stderr:
+            print(f"FAIL: codegen_output_preservation: expected codegen failure for {output.name}")
+            print(f"  exit code: {code}; stdout: {stdout!r}; stderr: {stderr!r}")
+            return 1
+        if output == existing:
+            if existing.read_bytes() != original:
+                print("FAIL: codegen_output_preservation: failed codegen replaced an existing assembly file")
+                return 1
+        elif missing.exists():
+            print("FAIL: codegen_output_preservation: failed codegen left a partial new assembly file")
+            return 1
+
+    valid_source = directory / "valid_output_source.rbl"
+    valid_source.write_text("func main() (\n)\n", encoding="utf-8")
+    expected_mode = None
+    if os.name != "nt":
+        existing.chmod(0o640)
+        expected_mode = stat.S_IMODE(existing.stat().st_mode)
+    replace_command = rbltool.compiler_cmd(valid_source, existing, settings)
+    if isinstance(replace_command, str):
+        replace_code, replace_stdout, replace_stderr = rbltool.run_wsl(replace_command, settings)
+    else:
+        replace_code, replace_stdout, replace_stderr = rbltool.run_native(replace_command)
+    if replace_code != 0 or existing.read_bytes() == original or b".intel_syntax noprefix" not in existing.read_bytes():
+        print("FAIL: codegen_output_preservation: successful atomic replacement did not publish the generated assembly")
+        print(f"  exit code: {replace_code}; stdout: {replace_stdout!r}; stderr: {replace_stderr!r}")
+        return 1
+    if expected_mode == 0o640 and stat.S_IMODE(existing.stat().st_mode) != expected_mode:
+        print("FAIL: codegen_output_preservation: atomic replacement did not preserve the existing POSIX mode")
+        return 1
+    if os.name != "nt" and expected_mode != 0o640:
+        print("SKIP: codegen_output_preservation POSIX mode check (host filesystem does not expose chmod metadata)")
+    if list(directory.glob("existing-assembly.s.rbltmp.*")):
+        print("FAIL: codegen_output_preservation: successful replacement left a temporary sibling")
+        return 1
+
+    blocked_output = directory / "blocked-output.s"
+    blocked_output.mkdir()
+    command = rbltool.compiler_cmd(valid_source, blocked_output, settings)
+    if isinstance(command, str):
+        code, stdout, stderr = rbltool.run_wsl(command, settings)
+    else:
+        code, stdout, stderr = rbltool.run_native(command)
+    if code == 0 or not blocked_output.is_dir() or any(blocked_output.iterdir()):
+        print("FAIL: codegen_output_preservation: failed atomic promotion damaged the destination directory")
+        print(f"  exit code: {code}; stdout: {stdout!r}; stderr: {stderr!r}")
+        return 1
+    if list(directory.glob("blocked-output.s.rbltmp.*")):
+        print("FAIL: codegen_output_preservation: failed atomic promotion left a temporary sibling")
+        return 1
+
+    if os.name != "nt" or rbltool.use_wsl(settings):
+        link_target = directory / "symlink-target.s"
+        link_target.write_bytes(b"symlink target must remain unchanged\n")
+        symlink_output = directory / "symlink-output.s"
+        if os.name != "nt":
+            symlink_output.symlink_to(link_target)
+        if rbltool.use_wsl(settings):
+            output_wsl = rbltool.wsl_path(directory, settings).rstrip("/") + "/symlink-output.s"
+            target_wsl = rbltool.wsl_path(link_target, settings)
+            link_code, link_stdout, link_stderr = rbltool.run_wsl(
+                f"ln -s -- {shlex.quote(target_wsl)} {shlex.quote(output_wsl)}", settings
+            ) if os.name == "nt" else (0, "", "")
+            if link_code != 0:
+                print(f"SKIP: WSL symlink-output check (host filesystem refused symlink creation: {link_stderr or link_stdout})")
+                output_wsl = None
+            if output_wsl is None:
+                symlink_code = 0
+                symlink_stdout = ""
+                symlink_stderr = ""
+            else:
+                symlink_command = (
+                    f"{shlex.quote(rbltool.wsl_path(rbltool.COMPILER_BIN, settings))} "
+                    f"{shlex.quote(rbltool.wsl_path(valid_source, settings))} -S {shlex.quote(output_wsl)}"
+                )
+                symlink_code, symlink_stdout, symlink_stderr = rbltool.run_wsl(symlink_command, settings)
+                verify_code, verify_stdout, verify_stderr = rbltool.run_wsl(
+                    f"test -L {shlex.quote(output_wsl)} && cat {shlex.quote(output_wsl)}", settings
+                )
+                if symlink_code == 0 or "symbolic-link output path" not in symlink_stderr or verify_code != 0 or verify_stdout != "symlink target must remain unchanged\n":
+                    print("FAIL: codegen_output_preservation: WSL symbolic-link output was followed or replaced")
+                    print(f"  compiler: {symlink_code}; verify: {verify_code}; stdout: {verify_stdout!r}; stderr: {symlink_stderr or verify_stderr!r}")
+                    return 1
+        else:
+            symlink_command = rbltool.compiler_cmd(valid_source, symlink_output, settings)
+            symlink_code, symlink_stdout, symlink_stderr = rbltool.run_native(symlink_command)
+            if symlink_code == 0 or not symlink_output.is_symlink() or link_target.read_bytes() != b"symlink target must remain unchanged\n":
+                print("FAIL: codegen_output_preservation: symbolic-link output was followed or replaced")
+                print(f"  exit code: {symlink_code}; stdout: {symlink_stdout!r}; stderr: {symlink_stderr!r}")
+                return 1
+    elif os.name == "nt":
+        junction_target = directory / "junction-target"
+        junction_target.mkdir()
+        junction_output = directory / "junction-output.s"
+        junction_result = subprocess.run(
+            ["cmd.exe", "/d", "/c", "mklink", "/J", str(junction_output), str(junction_target)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if junction_result.returncode:
+            print(f"SKIP: Windows reparse-output check (junction creation unavailable: {junction_result.stderr or junction_result.stdout})")
+        else:
+            try:
+                junction_command = rbltool.compiler_cmd(valid_source, junction_output, settings)
+                junction_code, junction_stdout, junction_stderr = rbltool.run_native(junction_command)
+                if junction_code == 0 or "reparse-point output path" not in junction_stderr or not junction_output.is_dir() or any(junction_target.iterdir()):
+                    print("FAIL: codegen_output_preservation: Windows junction output was replaced or written through")
+                    print(f"  exit code: {junction_code}; stdout: {junction_stdout!r}; stderr: {junction_stderr!r}")
+                    return 1
+            finally:
+                subprocess.run(["cmd.exe", "/d", "/c", "rmdir", str(junction_output)], capture_output=True, check=False)
+
+    print("PASS: codegen_output_preservation (codegen failure preserves output; failed promotion cleans temporary sibling)")
+    return 0
+
+
 def main() -> int:
     build_dir = ROOT / "build"
     build_dir.mkdir(exist_ok=True)
@@ -198,8 +336,9 @@ def main() -> int:
         ("parser_unknown_constant", "func main() (\n    print(rbl.math.tau)\n)\n", "parser", "rbl", "unknown constant", 0, False, False),
     ]
 
-    with tempfile.TemporaryDirectory(prefix="rbl-diagnostics-", dir=build_dir) as temp:
+    with tempfile.TemporaryDirectory(prefix="rbl-diagnostics-") as temp:
         temp_dir = Path(temp)
+        failures += run_codegen_output_preservation(temp_dir)
         for name, source, stage, marker, message, occurrence, eof, crlf in cases:
             failures += run_case(temp_dir / f"{name}.rbl", name, source, stage,
                                  marker, message, occurrence, eof, crlf)

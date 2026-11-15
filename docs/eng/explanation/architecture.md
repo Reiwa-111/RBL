@@ -19,7 +19,7 @@ UTF-8 lexer → parser → AST → static analysis
                     x86-64 assembly output
                               │
                               ▼
-                       GNU assembler
+                  target assembler + linker
                               │
                               ▼
                  linker + platform runtime
@@ -62,7 +62,7 @@ The compiler split is not a source-language module system. RBL 0.8.0 programs st
 | Linux x86-64 | ELF64 | `runtime/rbl_runtime.s` | `runtime/rbl_containers.c` |
 | Windows x86-64 | PE/COFF | `runtime/rbl_runtime_win.c` | `runtime/rbl_containers.c` |
 
-The frontend and code generator are shared. Platform entry/exit glue, system calls, object-format directives, runtime and toolchain differ. Linux uses GNU `as`, GNU `ld`, system libraries and runtime objects. Windows uses MinGW-w64: GNU assembler and GCC as the linker driver.
+The frontend and code generator are shared. Platform entry/exit glue, system calls, object-format directives, runtime and toolchain differ. Linux uses the app-local Clang integrated assembler and LLD, system libc/libm and runtime objects. Windows uses MinGW-w64: GNU assembler and GCC as the linker driver. The Linux portable payload also includes wxWidgets 3.2.4 shared libraries; its Flatpak variant receives GTK from the GNOME Platform runtime, while the native shell installer uses the host GTK 3 runtime.
 
 ## What is compiled with C
 

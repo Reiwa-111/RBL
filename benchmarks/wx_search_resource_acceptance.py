@@ -13,9 +13,10 @@ import win32api
 import win32clipboard
 
 ROOT = pathlib.Path.cwd()
-GUI = pathlib.Path(os.environ.get("RBL_STUDIO_GUI", ROOT / "build/wx-ui-win/rbl-studio-wx.exe"))
-WORKER = pathlib.Path(os.environ.get("RBL_STUDIO_WORKER", ROOT / "build/wx-ui-win/rbl-studio-worker.exe"))
-FIXTURE = ROOT / "build/wx-ui-win/search-result-stress"
+BUILD_DIR = pathlib.Path(os.environ.get("RBL_STUDIO_GUI_BUILD_DIR", ROOT / "build/output/wx-ui-win"))
+GUI = pathlib.Path(os.environ.get("RBL_STUDIO_GUI", BUILD_DIR / "rbl-studio-wx.exe"))
+WORKER = pathlib.Path(os.environ.get("RBL_STUDIO_WORKER", BUILD_DIR / "rbl-studio-worker.exe"))
+FIXTURE = pathlib.Path(tempfile.mkdtemp(prefix="search-result-stress-", dir=BUILD_DIR))
 QUERY = "SEARCH_RESULT_SENTINEL"
 
 

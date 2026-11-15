@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | LANGUAGE CONTRACT RECHECK
+# last verified: v0.8.0 | 2026.11.11 | GATE G CLI WORDING RECHECK
 
 ## Reference: ограничения RBL 0.8.0
 
@@ -35,7 +35,7 @@
 ## Проекты и tooling
 
 - Нет dependency/package manager и package registry.
-- Команда `rbl test` запускает тесты самого checkout RBL, а не универсальный тестовый runner проекта.
+- Команда `rbl.py test` запускает тесты самого checkout RBL, а не универсальный тестовый runner проекта.
 - `rbl doc` генерирует простую таблицу функций по текстовому шаблону, не API reference.
 - Форматтер нормализует отступы блоков и не пытается выполнять полный semantic formatting.
 

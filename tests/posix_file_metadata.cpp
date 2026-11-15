@@ -430,14 +430,14 @@ int main() {
                 std::cout << "fifo-paths-rejected-without-blocking: PASS\n";
             } else {
                 const int code = errno != 0 ? errno : EIO;
-                Require(code == ENOTSUP || code == EOPNOTSUPP || code == EPERM || code == ENOSYS,
+            Require(code == ENOTSUP || code == EOPNOTSUPP || code == ENOSYS,
                         "create temporary FIFO failed: " + std::error_code(code, std::generic_category()).message());
                 std::cout << "fifo-temporary-path: SKIP (filesystem does not support FIFO creation)\n";
             }
             fs::remove(source_fifo);
         } else {
             const int code = errno != 0 ? errno : EIO;
-            Require(code == ENOTSUP || code == EOPNOTSUPP || code == EPERM || code == ENOSYS,
+            Require(code == ENOTSUP || code == EOPNOTSUPP || code == ENOSYS,
                     "create source FIFO failed: " + std::error_code(code, std::generic_category()).message());
             std::cout << "fifo-paths-rejected-without-blocking: SKIP (filesystem does not support FIFO creation)\n";
         }
@@ -522,7 +522,7 @@ int main() {
             std::cout << "linkat-first-save-exclusive-no-replace: PASS\n";
         } else {
             const int code = errno != 0 ? errno : EIO;
-            Require(code == ENOTSUP || code == EOPNOTSUPP || code == EPERM || code == ENOSYS,
+            Require(code == ENOTSUP || code == EOPNOTSUPP || code == ENOSYS,
                     "linkat first-save failed: " + std::error_code(code, std::generic_category()).message());
             Require(!fs::exists(first_save_target),
                     "unsupported linkat first-save unexpectedly created a destination");
@@ -566,6 +566,67 @@ int main() {
             throw std::system_error(exchange_error, "ExchangeFileNamesAt failed");
         }
         ::close(exchange_dir_fd);
+
+        // Simulate a symlink substituted at the destination after the final
+        // preflight. RENAME_EXCHANGE installs the temporary file but preserves
+        // the displaced symlink under the temporary name. The generic
+        // no-follow identity query must identify that non-regular entry so
+        // SaveDocument's guarded exchange-back can restore the original names.
+        const auto symlink_exchange_target = directory / "symlink-exchange-target.rbl";
+        const auto symlink_exchange_temporary = directory / "symlink-exchange-temporary.rbl";
+        const auto symlink_exchange_referent = directory / "symlink-exchange-referent.rbl";
+        Require(WriteFile(symlink_exchange_referent, "referent must remain unchanged\n"),
+                "create symlink exchange referent failed");
+        Require(WriteFile(symlink_exchange_temporary, "new symlink exchange bytes\n"),
+                "create symlink exchange temporary failed");
+        Require(::symlink(symlink_exchange_referent.c_str(), symlink_exchange_target.c_str()) == 0,
+                "create raced destination symlink failed");
+        const auto symlink_exchange_new_identity = IdentityOf(symlink_exchange_temporary);
+        std::error_code symlink_exchange_error;
+        const int symlink_exchange_dir_fd =
+            rbl::wxui::OpenDirectoryNoFollow(directory, symlink_exchange_error);
+        Require(symlink_exchange_dir_fd >= 0,
+                "open symlink exchange directory failed: " + symlink_exchange_error.message());
+        rbl::wxui::FileIdentity displaced_symlink_identity;
+        Require(rbl::wxui::QueryEntryIdentityAt(symlink_exchange_dir_fd,
+                    "symlink-exchange-target.rbl", displaced_symlink_identity,
+                    symlink_exchange_error),
+                "no-follow identity query rejected a symlink: " + symlink_exchange_error.message());
+        rbl::wxui::FileIdentity rejected_regular_identity;
+        Require(!rbl::wxui::QueryFileIdentityAt(symlink_exchange_dir_fd,
+                    "symlink-exchange-target.rbl", rejected_regular_identity,
+                    symlink_exchange_error),
+                "regular-file identity query accepted a symlink");
+        Require(rbl::wxui::ExchangeFileNamesAt(symlink_exchange_dir_fd,
+                    "symlink-exchange-temporary.rbl", "symlink-exchange-target.rbl",
+                    symlink_exchange_error),
+                "exchange with raced symlink failed: " + symlink_exchange_error.message());
+        rbl::wxui::FileIdentity installed_symlink_race_target;
+        rbl::wxui::FileIdentity displaced_symlink_after_exchange;
+        Require(rbl::wxui::QueryEntryIdentityAt(symlink_exchange_dir_fd,
+                    "symlink-exchange-target.rbl", installed_symlink_race_target,
+                    symlink_exchange_error) &&
+                rbl::wxui::SameFileIdentity(symlink_exchange_new_identity,
+                    installed_symlink_race_target),
+                "exchange did not install the expected temporary inode");
+        Require(rbl::wxui::QueryEntryIdentityAt(symlink_exchange_dir_fd,
+                    "symlink-exchange-temporary.rbl", displaced_symlink_after_exchange,
+                    symlink_exchange_error) &&
+                rbl::wxui::SameFileIdentity(displaced_symlink_identity,
+                    displaced_symlink_after_exchange),
+                "exchange did not preserve the displaced symlink identity");
+        Require(rbl::wxui::ExchangeFileNamesAt(symlink_exchange_dir_fd,
+                    "symlink-exchange-temporary.rbl", "symlink-exchange-target.rbl",
+                    symlink_exchange_error),
+                "guarded exchange-back for symlink failed: " + symlink_exchange_error.message());
+        ::close(symlink_exchange_dir_fd);
+        Require(fs::is_symlink(fs::symlink_status(symlink_exchange_target)),
+                "rollback did not restore the raced destination symlink");
+        Require(ReadFileEquals(symlink_exchange_referent, "referent must remain unchanged\n"),
+                "symlink exchange or rollback modified the referent");
+        Require(ReadFileEquals(symlink_exchange_temporary, "new symlink exchange bytes\n"),
+                "rollback did not restore the new output under its temporary name");
+        std::cout << "atomic-exchange-symlink-displacement-identity-and-rollback: PASS\n";
     } catch (const std::exception& exception) {
         std::cerr << "posix-file-metadata: FAIL: " << exception.what() << '\n';
         fs::remove_all(directory, cleanup_error);

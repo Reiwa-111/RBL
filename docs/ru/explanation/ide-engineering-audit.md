@@ -1,19 +1,21 @@
-# last verified: v0.8.0 | 2026.11.10 | IDE ENGINEERING AUDIT
+# last verified: v0.8.0 | 2026.11.11 | IDE ENGINEERING AUDIT
 
 # RBL Studio 0.8.0 — инженерный аудит и статус готовности
 
-Дата фиксации: 2026-11-10. Статус документа: промежуточный инженерный отчёт, не разрешение на публикацию.
+Дата фиксации: 2026-11-11. Статус документа: промежуточный инженерный отчёт, не разрешение на публикацию.
 
 ## Итоговый статус
 
-**IDE 0.8.0: NOT RELEASE-READY / UNRELEASED.** Основной launcher/install path использует C++20/wxWidgets 3.2 + Scintilla и отдельный Rust worker. Windows SaveDocument byte-roundtrip acceptance — 27/27 PASS на текущем GUI candidate. Предварительный resource run на 480 секунд прошёл resource/UI thresholds, но использовал старый harness и не проверял graceful shutdown. Вторая попытка 7 200 секунд завершилась досрочно после task #45 без CSV. Следующий запуск на 480 секунд с усиленным harness завершился с кодом 1 после начального dispatch Run Tests; сохранённый log содержит только startup output и не содержит CSV/verdict. PASS для двухчасового soak текущего RC не заявляется. Windows registered install/upgrade/uninstall acceptance проходит в изолированном HKCU GUID subtree. DPI static checks проходят 12/12, но live 125-200% multi-monitor и интерактивная Linux GUI-приёмка остаются непроверенными. MSYS2 corresponding-source/legal review, пересборка RC с Rust source payload и Binutils CVE-2026-90801 остаются release blockers.
+**IDE 0.8.0: NOT RELEASE-READY / UNRELEASED.** Основной launcher/install path использует C++20/wxWidgets 3.2 + Scintilla и отдельный Rust worker. Текущий Windows SaveDocument byte-roundtrip acceptance — 27/27 PASS. Path-backed resource smoke прошёл на 60/120/300 секундах с 32 документами, всеми четырьмя типами задач и штатным завершением GUI/worker; 300-секундный запуск завершил 84 task cycles и собрал 316 samples. Последняя попытка 7 200 секунд завершилась до sampling: harness не получил notebook focus. Повторного запуска не было после прямой просьбы пользователя больше не запускать IDE; двухчасовой soak НЕ ПРОЙДЕН. Windows registered install/upgrade/uninstall acceptance проходила ранее в изолированном HKCU GUID subtree, но повторная приёмка после финальной версии source archive остаётся открытой. DPI static checks проходят 12/12, но live 125-200% multi-monitor и интерактивная Linux GUI-приёмка остаются непроверенными. Windows replacement race, Binutils CVE-2026-90801 и юридическая/публичная доставка corresponding sources остаются release blockers.
+
+**?????????? Gate I ? 2026-11-12:** Windows registered installer ? installed-CLI acceptance ?????? ? ????????????? ???????? ?????????: install/upgrade/uninstall, rollback, ?????????? ???????????????? ?????? ? ??????? CLI `version`/`doctor`/`check`/`run`/`clean`. Linux installer ? installed-CLI acceptance ????? ??????. ???????????: `../verification/2026-11-11-Gate-I/GATE_I_REVIEW.md`. ??? ???????? ?? dev-host ? ????????????? ??????, ? ?? ????????? ? pristine clean VM. ?????? GUI, backend-?????? ?? GUI ? ??????????? soak ?? ?????????; Gate D ???????? PARTIAL.
 
 Этот документ намеренно отделяет проверенное от непроверенного. Успешная компиляция, unit-тесты и `--self-test` не доказывают корректность реального GUI-сценария или соблюдение общего лимита памяти под нагрузкой.
 
 ## Архитектура
 
-- Основной UI реализован на C++20 + wxWidgets 3.2 + `wxStyledTextCtrl`/Scintilla в `native/wx-ui/`; отдельный Rust `rbl-studio-worker` запускает backend-задачи.
-- Прежний Rust + `eframe/egui` UI сохранён в `src/app.rs` и `src/editor.rs` как rollback/reference и выбирается только при `RBL_STUDIO_ALLOW_LEGACY=1`.
+- Основной UI реализован на C++20 + wxWidgets 3.2 + `wxStyledTextCtrl`/Scintilla в `rbl-ide/wx-ui/`; отдельный Rust `rbl-studio-worker` запускает backend-задачи.
+- Прежний Rust + `eframe/egui` UI сохранён в `rbl-ide/legacy-egui/app.rs` и `rbl-ide/legacy-egui/editor.rs` как rollback/reference и выбирается только при `RBL_STUDIO_ALLOW_LEGACY=1`.
 - Python/Tkinter GUI удалён. `tools/rbltool.py` остаётся backend-драйвером компилятора и не отвечает за отображение интерфейса.
 - В Cargo dependency scan ранее не обнаруживались Wry/WebView/CEF/Chromium/Electron/WebKit engine packages. Внешние ссылки могут открываться системным браузером; это не встраивает браузерный движок.
 - IDE поддерживает обычные текстовые файлы независимо от расширения. Компиляторные операции ограничены `.rbl` и дополнительно проверяются на границе backend.
@@ -21,9 +23,9 @@
 
 ### Начальный snapshot перехода на нативный интерфейс (2026-11-09; исторический)
 
-На этом начальном snapshot wx frontend существовал параллельно Cargo/egui приложению. Сейчас он является основным launcher/install target; прежний Rust/egui UI сохранён для отката и сравнения. wx frontend предоставляет Run/Build/Check/ASM/Tests/Benchmarks/Doctor, потоковый stdin/EOF/cancel, вкладки и проектное дерево, UTF-8/BOM и UTF-16 LE/BE, поиск/замену, Find in Files, список Problems с переходом к позиции, настройки редактора, командную палитру и quick reference. Обход поиска ограничен по числу entries/bytes/results; дерево не следует по symlink. Worker использует ограниченный NDJSON протокол и повторно использует `src/process.rs`.
+На этом начальном snapshot wx frontend существовал параллельно Cargo/egui приложению. Сейчас он является основным launcher/install target; прежний Rust/egui UI сохранён для отката и сравнения. wx frontend предоставляет Run/Build/Check/ASM/Tests/Benchmarks/Doctor, потоковый stdin/EOF/cancel, вкладки и проектное дерево, UTF-8/BOM и UTF-16 LE/BE, поиск/замену, Find in Files, список Problems с переходом к позиции, настройки редактора, командную палитру и quick reference. Обход поиска ограничен по числу entries/bytes/results; дерево не следует по symlink. Worker использует ограниченный NDJSON протокол и повторно использует `rbl-ide/worker/process.rs`.
 
-Начальная проверка на тот момент: Windows UCRT64 и Linux/WSL CMake Release сборки; worker unit tests (20 Windows / 21 Linux), Clippy `-D warnings`, интерактивный smoke `unit_converter.rbl` с двумя `input()` на обеих платформах. Один Windows idle sample: GUI ~30.5 MiB Working Set + worker ~9.8 MiB. Это историческая базовая точка, а не текущая приёмка; актуальные проверки и остаточные gaps приведены ниже. Подробности и команды сборки находятся в [`native/wx-ui/README.md`](../../../native/wx-ui/README.md).
+Начальная проверка на тот момент: Windows UCRT64 и Linux/WSL CMake Release сборки; worker unit tests (20 Windows / 21 Linux), Clippy `-D warnings`, интерактивный smoke `unit_converter.rbl` с двумя `input()` на обеих платформах. Один Windows idle sample: GUI ~30.5 MiB Working Set + worker ~9.8 MiB. Это историческая базовая точка, а не текущая приёмка; актуальные проверки и остаточные gaps приведены ниже. Подробности и команды сборки находятся в [`rbl-ide/wx-ui/README.md`](../../../rbl-ide/wx-ui/README.md).
 
 ### Архитектурный обзор legacy egui frontend (исторический)
 
@@ -101,7 +103,7 @@
 
 ## Native wxWidgets IDE — основной frontend (с 2026-11-09)
 
-Этот раздел относится к новой реализации `native/wx-ui/` на wxWidgets 3.2 и
+Этот раздел относится к новой реализации `rbl-ide/wx-ui/` на wxWidgets 3.2 и
 `wxStyledTextCtrl`/Scintilla с Rust worker. Предыдущие таблицы ресурсов и
 интерактивные проверки выше относятся к старому egui frontend и не являются
 измерениями или доказательством готовности wx-кандидата.
@@ -259,7 +261,7 @@ Cyrillic/non-BMP текста и Cyrillic filenames; сохранение изм
 согласованными по исходнику high-water pause/resume очереди вывода, bounded
 writer batching, немедленный flush control events, очистку snapshot и порядок
 Finished. Игнорирование ошибки отправки последнего неполного UTF-8 фрагмента
-исправлено в `src/process.rs` и покрыто тестом
+исправлено в `rbl-ide/worker/process.rs` и покрыто тестом
 `output_reader_reports_disconnected_receiver_for_final_utf8_fragment`.
 Текущие WSL worker tests: 23/23; Windows GNU worker tests: 22/22 (один
 platform-specific тест отсутствует). Windows и WSL stdin/EOF smoke и
@@ -278,7 +280,7 @@ backpressure integration на 6.1 MB вывода прошли.
   поведением протокола.
 
 Первый отчёт worker-20 описывал устаревший snapshot coordinator. Повторная
-проверка актуального src/bin/rbl-studio-worker.rs и свежая Linux-сборка подтвердили,
+проверка актуального rbl-ide/worker/rbl-studio-worker.rs и свежая Linux-сборка подтвердили,
 что обычный shutdown дренирует pending output и отправляет bye через тот же FIFO
 channel. Shutdown-order test прошёл: 385 output events, Finished перед bye, exit 0.
 
@@ -412,25 +414,44 @@ soak, длительный compiler/search stress с реальными доче
 не создал CSV/verdict. PASS для длительного soak текущего RC не заявляется.
 
 POSIX existing-target Save завершается fail-closed без RENAME_EXCHANGE;
-unconditional renameat fallback удалён. Первое сохранение использует exclusive
-linkat. Windows сохраняет path-based ReplaceFileW leaf race и LOW cleanup edge,
-который может оставить orphan temp при ошибке получения handle metadata сразу
-после exclusive creation. Для включения нового Rust worker license payload и
-installer marker checks требуется новая package build.
+unconditional renameat fallback удалён. Это намеренное ограничение доступности,
+а не дефект безопасности: первое сохранение использует exclusive linkat, а
+перезапись существующего файла требует поддержки exchange реальной файловой
+системой. Исправлена отдельная гонка с подменой destination symlink: новый
+`QueryEntryIdentityAt` получает inode через
+`fstatat(AT_SYMLINK_NOFOLLOW)`, после чего rollback разрешён только при
+совпадении идентичности обеих записей. Linux C++ integration test проверяет
+этот сценарий. Windows сохраняет path-based ReplaceFileW leaf race: recovery
+артефакты сохраняют вытесненный объект, но Win32 API не предоставляет
+destination-identity compare-and-swap. LOW orphan-temp cleanup edge исправлен
+удалением точного открытого handle до закрытия; если cleanup не удаётся,
+путь остатка сообщается пользователю.
 
 20 exact-version source archives для compiler toolchain и wx/runtime dependency
 closure собраны и signature-verified; upstream hashes и Git source commits
 проверены. Rust worker dependency closure отдельно описан как 28 активных
 default-feature crates; legacy eframe/rfd dependencies включаются только opt-in
 и не входят в worker build. Полный worker source bundle:
-build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261110-1955.tar.zst
-(8 099 357 bytes; SHA-256 df5881aa72dc556d9fff6217fd436cec9ad9cb345ac899058a12d23bbdf40da5).
-Оба build scripts копируют его в source/Rust-worker-source.tar.zst; оба installers
+`build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261114-release-recheck-r4.tar.zst`
+(8 255 104 bytes; SHA-256 `0ddd19ba6b4c049fcbef95d32462f6f8b9ebf5788a9077f389c5a1c53ec4340c`).
+Оба build scripts копируют его в `source/Rust-worker-source.tar.zst`; оба installers
 требуют архив, проверяют SHA-256 и сохраняют его в установленном приложении.
 Существующие RC-каталоги созданы до этого изменения и должны быть пересобраны.
-Отдельный 330 067 308-byte MSYS2 toolchain/wx source bundle не входит в runtime
-package. Юридическая проверка способа распространения исходников или written
-offer не завершена.
+
+Отдельный Windows MSYS2/wx corresponding-source bundle:
+`build/source-material/RBL-0.8.0-Windows-Source-Materials-20261111-final-reviewed.tar.zst`
+(331 187 540 bytes; SHA-256 `2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066`).
+Он остаётся локальным и не входит в runtime/installer payload. При создании все
+четыре встроенных audit snapshots совпадали с live-файлами. После Gate G live
+`SOURCE_ARCHIVE_AUDIT.md` получил исправленную ссылку на индекс безопасности MSYS2;
+замороженный архив сохраняет старый URL, поэтому один из четырёх snapshots теперь
+отличается. Checksums и GPG signatures остаются валидными, но перед публичной
+раздачей требуется пересобрать и повторно проверить новую final-reviewed revision.
+Embedded Rust notice не содержит live-only строку с именем и SHA-256 собственного
+архива, чтобы избежать circular self-digest; 60 скопированных upstream license/notice
+files остаются byte-identical.
+Юридическая проверка способа распространения исходников или written offer не
+завершена; архив не загружен в GitHub Release.
 
 Bundled Binutils обновлён до подписанного MSYS2 2.47-4. Shipped linker формирует
 PE/COFF (i386pep/i386pe), readelf не входит в bundle, но BFD input target vector
@@ -439,9 +460,23 @@ PE/COFF (i386pep/i386pe), readelf не входит в bundle, но BFD input ta
 foreign-section path в COFF final-link. Default RBL build линкует
 compiler-generated COFF objects и не принимает произвольные object inputs и не
 передаёт `--gc-sections -w`; это сужает exposure, но не доказывает, что уязвимое
-условие размера записи недостижимо. CVE-2026-90801 остаётся unresolved и
+условие чтения за границами буфера недостижимо. CVE-2026-90801 остаётся unresolved и
 release-blocking; это не заявление об upstream fix.
 
 **Текущий статус: ENGINEERING TESTS PASS / GUI ACCEPTANCE SUBSTANTIAL WITH
-REMAINING GAPS / RELEASE BLOCKED / UNRELEASED.** Commit, push, tag и публикация
-не выполнялись.
+REMAINING GAPS / RELEASE BLOCKED / UNRELEASED.** В ходе этой проверки новый commit, push или tag
+не создавался; существующий tag `v0.8.0` остаётся на HEAD. Публикация релиза не выполнялась.
+
+## Актуальное состояние приёмки — 2026-11-11
+
+Текущие Windows результаты: SaveDocument 27/27; resource smoke 60/120/300 секунд
+на path-backed `resource-task.rbl`, 32 документа, все четыре task types, штатный
+GUI/worker shutdown. 300 секунд: 316 samples, 84 task cycles, Working Set peak
+282.7 MiB, Private Bytes peak 208.0 MiB, handles 1,243, GDI/USER 441/132,
+UI ping max 0.9 ms.
+
+7200-секундный запуск завершился до sampling из-за отсутствия notebook focus;
+повторного запуска не было по прямой просьбе пользователя. Live DPI, Linux
+interactive desktop и оставшиеся ручные GUI workflows не выполнены. Gate D —
+PARTIAL. Windows orphan-temp edge исправлен удалением по открытому handle;
+`ReplaceFileW` leaf race и CVE-2026-90801 остаются release blockers.

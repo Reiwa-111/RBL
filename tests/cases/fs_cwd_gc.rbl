@@ -1,0 +1,9 @@
+// Repeated cwd() calls exercise Runtime-managed string ownership across GC
+// safe points; no libc-owned getcwd buffer may escape as a TAG_STR.
+func main() (
+    set cwd = ""
+    for (i in 0..2000) (
+        let cwd = rbl.fs.cwd()
+    )
+    print(len(cwd) > 0)
+)

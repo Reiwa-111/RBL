@@ -32,4 +32,54 @@ func main() (
 
     print({"x": 1} == {"x": 1})
     print({"x": 1} == {"x": 2})
+
+    // Equal IEEE-754 zero values must hash to the same dictionary slot even
+    // after growth changes the table mask beyond the sign-bit position.
+    set signed_zero = {}
+    for (i in 0..200) (
+        let signed_zero[i] = i
+    )
+    let signed_zero[0.0] = "positive-zero"
+    print(0.0 == -0.0)
+    print(-0.0 in signed_zero)
+    print(signed_zero[-0.0])
+    let signed_zero[-0.0] = "negative-zero"
+    print(len(signed_zero))
+    print(signed_zero[0.0])
+
+    // NaN is not equal to itself under IEEE ==, but dictionary key matching
+    // must be reflexive so a stored key remains findable and updateable.
+    set nan_key = 0.0 / 0.0
+    set nan_dict = {}
+    let nan_dict[nan_key] = 42
+    print(nan_key in nan_dict)
+    print(nan_dict[nan_key])
+    let nan_dict[nan_key] = 43
+    print(len(nan_dict))
+    print(nan_dict[nan_key])
+
+    set cycle_list = list_new()
+    let cycle_list = list_push(cycle_list, cycle_list)
+    print(cycle_list)
+    set other_cycle_list = list_new()
+    let other_cycle_list = list_push(other_cycle_list, other_cycle_list)
+    print(cycle_list == other_cycle_list)
+
+    set cycle_dict = {}
+    let cycle_dict["self"] = cycle_dict
+    print(cycle_dict)
+    set other_cycle_dict = {}
+    let other_cycle_dict["self"] = other_cycle_dict
+    print(cycle_dict == other_cycle_dict)
+    let other_cycle_dict["different"] = 1
+    print(cycle_dict == other_cycle_dict)
+
+    set tuple_cycle_list = list_new()
+    set tuple_cycle_value = tuple_push(tuple_new(), tuple_cycle_list)
+    let tuple_cycle_list = list_push(tuple_cycle_list, tuple_cycle_value)
+    print(tuple_cycle_list)
+    set other_tuple_cycle_list = list_new()
+    set other_tuple_cycle_value = tuple_push(tuple_new(), other_tuple_cycle_list)
+    let other_tuple_cycle_list = list_push(other_tuple_cycle_list, other_tuple_cycle_value)
+    print(tuple_cycle_list == other_tuple_cycle_list)
 )

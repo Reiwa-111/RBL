@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | COMPILER EXAMPLE
+# last verified: v0.8.0 | 2026.11.11 | COMPILER EXAMPLE
 
 # Compiler implementation example
 

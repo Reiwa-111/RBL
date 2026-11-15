@@ -11,7 +11,8 @@ Run from the repository root after `tools/build_wx_ide.ps1`:
 
     python benchmarks/wx_resource_acceptance.py --duration 180
 
-Fixtures and CSV output are kept under build/wx-ui-win/resource-acceptance/.
+Fixtures and CSV output are kept beside the selected GUI binary under
+resource-acceptance/; set RBL_STUDIO_GUI to target a specific clean build.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ import subprocess
 import sys
 import time
 import ctypes
+from ctypes import wintypes
 import tempfile
 import shutil
 import traceback
@@ -34,13 +36,14 @@ try:
     import win32con
     import win32gui
     import win32process
+    import win32api
 except ImportError as exc:  # pragma: no cover - Windows desktop dependency
     raise SystemExit("Install psutil and pywin32 to run this benchmark.") from exc
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 GUI = pathlib.Path(os.environ.get(
-    "RBL_STUDIO_GUI", ROOT / "build" / "wx-ui-win" / "rbl-studio-wx.exe"
+    "RBL_STUDIO_GUI", ROOT / "build" / "output" / "wx-ui-win" / "rbl-studio-wx.exe"
 )).resolve()
 WORKER = pathlib.Path(os.environ.get(
     "RBL_STUDIO_WORKER", GUI.with_name("rbl-studio-worker.exe")
@@ -105,7 +108,7 @@ def editor_hwnds(frame: int) -> list[int]:
 
 def status_text(pid: int, frame: int, part: int = 2) -> str:
     user32 = ctypes.windll.user32
-    kernel32 = ctypes.windll.kernel32
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.OpenProcess.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_uint]
     kernel32.OpenProcess.restype = ctypes.c_void_p
     kernel32.VirtualAllocEx.argtypes = [
@@ -145,10 +148,24 @@ def status_text(pid: int, frame: int, part: int = 2) -> str:
         raise RuntimeError("could not allocate status text buffer")
     try:
         result = ctypes.c_size_t()
-        if not user32.SendMessageTimeoutW(
-            bars[0], 0x040D, part, remote, 0x0002, 1000, ctypes.byref(result)
-        ):
-            raise RuntimeError("timed out reading wx status text")
+        delivered = False
+        last_error = 0
+        for attempt in range(3):
+            if user32.SendMessageTimeoutW(
+                bars[0], 0x040D, part, remote, 0x0002, 1000, ctypes.byref(result)
+            ):
+                delivered = True
+                break
+            last_error = ctypes.get_last_error()
+            if last_error not in (0, 1460):  # ERROR_TIMEOUT
+                break
+            if attempt < 2:
+                time.sleep(0.05)
+        if not delivered:
+            raise RuntimeError(
+                f"wx status text request failed after {attempt + 1} attempts "
+                f"(Win32 error {last_error})"
+            )
         buffer = ctypes.create_string_buffer(512)
         copied = ctypes.c_size_t()
         if not kernel32.ReadProcessMemory(
@@ -171,7 +188,7 @@ def dispatch_task_command(pid: int, frame: int, command_id: int,
     first status read, while still bounding a stuck UI thread.
     """
     before = status_text(pid, frame)
-    user32 = ctypes.windll.user32
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
     user32.SendMessageTimeoutW.argtypes = [
         ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t,
         ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_size_t)
@@ -347,8 +364,13 @@ def main() -> int:
 
     output_dir = GUI.parent / "resource-acceptance"
     output_dir.mkdir(parents=True, exist_ok=True)
+    # wxCmdLineParser exposes a bounded positional-parameter list on the
+    # Windows build. Open 24 large fixtures plus the real RBL task source at
+    # startup, then create seven additional text documents through New Text.
+    # Activate the path-backed RBL tab through the actual wxAuiNotebook keyboard
+    # navigation before dispatching compiler tasks.
     paths: list[pathlib.Path] = []
-    for index in range(31):
+    for index in range(24):
         path = output_dir / f"resource-tab-{index:02d}.txt"
         write_fixture(path, 2 * 1024 * 1024, f"TAB{index:02d}_RBL_RESOURCE".encode())
         paths.append(path)
@@ -400,13 +422,143 @@ def main() -> int:
             raise RuntimeError(
                 f"expected {len(paths)} open Scintilla documents, found {len(editors)}"
             )
+        additional_document_bytes = 2 * 1024 * 1024
+        additional_line = b"RBL_RESOURCE_EXTRA_TAB\n"
+        additional_document = (additional_line *
+            ((additional_document_bytes + len(additional_line) - 1) // len(additional_line)))[:additional_document_bytes]
+        for _ in range(7):
+            result = ctypes.c_size_t()
+            if not ctypes.windll.user32.SendMessageTimeoutW(
+                frame, win32con.WM_COMMAND, 6041, 0, 0x0002, 5000, ctypes.byref(result)
+            ):
+                raise RuntimeError("New Text command timed out while preparing the 32-tab workload")
+            current_editors = editor_hwnds(frame)
+            if len(current_editors) != len(editors) + 1:
+                raise RuntimeError(
+                    f"New Text command did not create exactly one editor: {len(current_editors)}"
+                )
+            editor_hwnd = next(hwnd for hwnd in current_editors if hwnd not in editors)
+            remote_scintilla_message(process.pid, editor_hwnd, SCI_APPENDTEXT, additional_document)
+            if remote_scintilla_message(process.pid, editor_hwnd, SCI_GETLENGTH) != len(additional_document):
+                raise RuntimeError("additional 32-tab document content length mismatch")
+            # The synthetic document content is fixture state, not a user edit.
+            # Mark each page clean so Close All Tabs does not wait on 7 modal
+            # unsaved-document prompts at the end of the acceptance run.
+            remote_scintilla_message(process.pid, editor_hwnd, SCI_SETSAVEPOINT)
+            editors = current_editors
+        if len(editors) != 32:
+            raise RuntimeError(f"expected 32 open Scintilla documents, found {len(editors)}")
+
+        # New Text selects each newly-created tab. Focus the wxAuiNotebook tab
+        # strip, then navigate back to the path-backed RBL task document. This
+        # avoids sending Ctrl+Shift+Tab to Scintilla, where it inserts tabs.
+        frame_rect = win32gui.GetWindowRect(frame)
+        tab_controls: list[int] = []
+        def collect_tab_control(hwnd: int, _data) -> None:
+            try:
+                if win32gui.GetClassName(hwnd) != "wxWindowNR" or not win32gui.IsWindowVisible(hwnd):
+                    return
+                rect = win32gui.GetWindowRect(hwnd)
+                width = rect[2] - rect[0]
+                height = rect[3] - rect[1]
+                top_offset = rect[1] - frame_rect[1]
+                if width >= (frame_rect[2] - frame_rect[0]) // 2 and 20 <= height <= 40 and 90 <= top_offset <= 160:
+                    tab_controls.append(hwnd)
+            except Exception:
+                return
+        win32gui.EnumChildWindows(frame, collect_tab_control, None)
+        if len(tab_controls) != 1:
+            raise RuntimeError(f"expected one wxAuiNotebook tab strip, found {len(tab_controls)}")
+        tab_control = tab_controls[0]
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        current_thread = kernel32.GetCurrentThreadId()
+        target_thread = win32process.GetWindowThreadProcessId(frame)[0]
+        foreground = user32.GetForegroundWindow()
+        foreground_thread = win32process.GetWindowThreadProcessId(foreground)[0] if foreground else 0
+        attached_threads = []
+        for thread_id in {target_thread, foreground_thread}:
+            if thread_id and thread_id != current_thread and user32.AttachThreadInput(current_thread, thread_id, True):
+                attached_threads.append(thread_id)
+        try:
+            win32gui.ShowWindow(frame, win32con.SW_RESTORE)
+            win32gui.BringWindowToTop(frame)
+            user32.SetForegroundWindow(frame)
+            if user32.GetForegroundWindow() != frame:
+                raise RuntimeError("GUI did not receive foreground activation for RBL tab selection")
+
+            class GuiThreadInfo(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", ctypes.c_uint), ("flags", ctypes.c_uint),
+                    ("hwndActive", ctypes.c_void_p), ("hwndFocus", ctypes.c_void_p),
+                    ("hwndCapture", ctypes.c_void_p), ("hwndMenuOwner", ctypes.c_void_p),
+                    ("hwndMoveSize", ctypes.c_void_p), ("hwndCaret", ctypes.c_void_p),
+                    ("rcCaret", wintypes.RECT),
+                ]
+            user32.GetGUIThreadInfo.argtypes = [ctypes.c_uint, ctypes.POINTER(GuiThreadInfo)]
+            user32.GetGUIThreadInfo.restype = ctypes.c_int
+            focused = False
+            focus_deadline = time.monotonic() + 3.0
+            while time.monotonic() < focus_deadline:
+                user32.SetActiveWindow(frame)
+                user32.SetFocus(tab_control)
+                time.sleep(0.05)
+                gui_info = GuiThreadInfo()
+                gui_info.cbSize = ctypes.sizeof(gui_info)
+                if user32.GetGUIThreadInfo(target_thread, ctypes.byref(gui_info)) and gui_info.hwndFocus == tab_control:
+                    focused = True
+                    break
+            if not focused:
+                gui_info = GuiThreadInfo()
+                gui_info.cbSize = ctypes.sizeof(gui_info)
+                user32.GetGUIThreadInfo(target_thread, ctypes.byref(gui_info))
+                focus_hwnd = int(gui_info.hwndFocus or 0)
+                focus_class = win32gui.GetClassName(focus_hwnd) if focus_hwnd and win32gui.IsWindow(focus_hwnd) else "<none>"
+                raise RuntimeError(
+                    "wxAuiNotebook tab strip did not receive keyboard focus after retries: "
+                    f"focus HWND={focus_hwnd} ({focus_class}), tab HWND={tab_control}"
+                )
+
+            focused_editor = None
+            focused_length = -1
+            for selection_attempt in range(32):
+                for key in (win32con.VK_CONTROL, win32con.VK_SHIFT, win32con.VK_TAB):
+                    win32api.keybd_event(key, 0, 0, 0)
+                for key in (win32con.VK_TAB, win32con.VK_SHIFT, win32con.VK_CONTROL):
+                    win32api.keybd_event(key, 0, win32con.KEYEVENTF_KEYUP, 0)
+                time.sleep(0.05)
+                gui_info = GuiThreadInfo()
+                gui_info.cbSize = ctypes.sizeof(gui_info)
+                if not user32.GetGUIThreadInfo(target_thread, ctypes.byref(gui_info)):
+                    raise RuntimeError("could not inspect GUI keyboard focus during RBL tab selection")
+                focused_editor = int(gui_info.hwndFocus or 0)
+                if focused_editor and win32gui.GetClassName(focused_editor) == "Scintilla":
+                    focused_length = remote_scintilla_message(
+                        process.pid, focused_editor, SCI_GETLENGTH
+                    )
+                    if focused_length == source.stat().st_size:
+                        break
+            else:
+                raise RuntimeError(
+                    "resource-task.rbl was not selected after cycling all tabs: "
+                    f"focused Scintilla length={focused_length}, expected={source.stat().st_size}"
+                )
+            print(
+                "Active task document: resource-task.rbl "
+                f"(verified focused editor after {selection_attempt + 1} tab steps)"
+            )
+        finally:
+            for thread_id in reversed(attached_threads):
+                user32.AttachThreadInput(current_thread, thread_id, False)
+
         document_lengths = [
             remote_scintilla_message(process.pid, hwnd, SCI_GETLENGTH) for hwnd in editors
         ]
         for path, actual_length in zip(paths, document_lengths):
-            source_bytes = path.read_bytes()
-            expected_length = len(source_bytes)
-            normalized_eol_length = len(source_bytes.replace(b"\r\n", b"\n"))
+            file_bytes = path.read_bytes()
+            expected_length = len(file_bytes)
+            normalized_eol_length = len(file_bytes.replace(b"\r\n", b"\n"))
             if actual_length not in (expected_length, normalized_eol_length):
                 raise RuntimeError(
                     f"open document length mismatch for {path.name}: "
@@ -414,7 +566,7 @@ def main() -> int:
                     f"got {actual_length}"
                 )
         aggregate_length = sum(document_lengths)
-        expected_aggregate = sum(path.stat().st_size for path in paths)
+        expected_aggregate = sum(path.stat().st_size for path in paths) + additional_document_bytes * 7
         if aggregate_length != expected_aggregate:
             raise RuntimeError(
                 f"open document byte count mismatch: expected {expected_aggregate}, got {aggregate_length}"
@@ -491,7 +643,9 @@ def main() -> int:
 
             now = time.monotonic()
             if not active_task and now >= next_task_at:
-                task_name, command_id = task_sequence[(task_cycle - 1) % len(task_sequence)]
+                # task_cycle counts commands already dispatched, so zero must
+                # select Check (not the final Tests entry via Python's -1 index).
+                task_name, command_id = task_sequence[task_cycle % len(task_sequence)]
                 before, after, dispatched = dispatch_task_command(
                     process.pid, frame, command_id
                 )
@@ -537,7 +691,11 @@ def main() -> int:
 
         sampled_duration = max(0.0, time.monotonic() - sample_started)
         if failure_reason is None and process.poll() is not None and sampled_duration < args.duration:
-            failure_reason = f"GUI process exited after {sampled_duration:.1f}s before requested {args.duration}s"
+            gui_exit_code = process.returncode
+            failure_reason = (
+                f"GUI process exited with code {gui_exit_code} after {sampled_duration:.1f}s "
+                f"before requested {args.duration}s"
+            )
         if failure_reason is None and sampled_duration + args.interval < args.duration:
             failure_reason = (
                 f"sampling ended after {sampled_duration:.1f}s; requested {args.duration}s"
@@ -572,22 +730,41 @@ def main() -> int:
 
         # Close all source tabs and record the post-close footprint for 20 s.
         if failure_reason is None and process.poll() is None:
+            dirty_editors = [
+                (index, remote_scintilla_message(process.pid, hwnd, SCI_GETLENGTH))
+                for index, hwnd in enumerate(editor_hwnds(frame))
+                if remote_scintilla_message(process.pid, hwnd, 2159)
+            ]
+            print(f"Pre-close dirty editor indexes/lengths: {dirty_editors}", flush=True)
             win32gui.PostMessage(frame, win32con.WM_COMMAND, ID_CLOSE_ALL_TABS, 0)
-            time.sleep(1)
+            close_deadline = time.monotonic() + 5.0
             remaining_editors = editor_hwnds(frame)
+            while process.poll() is None and len(remaining_editors) != 1 and time.monotonic() < close_deadline:
+                time.sleep(0.1)
+                remaining_editors = editor_hwnds(frame)
             if len(remaining_editors) != 1 or remote_scintilla_message(
                 process.pid, remaining_editors[0], SCI_GETLENGTH
             ) != 0:
+                top_level_windows: list[tuple[int, str, str]] = []
+                def collect_top_level(hwnd: int, _data) -> None:
+                    try:
+                        if win32gui.IsWindowVisible(hwnd) and win32process.GetWindowThreadProcessId(hwnd)[1] == process.pid:
+                            top_level_windows.append((hwnd, win32gui.GetClassName(hwnd), win32gui.GetWindowText(hwnd)))
+                    except Exception:
+                        return
+                win32gui.EnumWindows(collect_top_level, None)
                 failure_reason = (
                     "Close All Tabs did not leave exactly one empty new document; "
-                    f"remaining Scintilla controls: {len(remaining_editors)}"
+                    f"remaining Scintilla controls: {len(remaining_editors)}; "
+                    f"pre-close dirty editors: {dirty_editors}; top-level windows: {top_level_windows}"
                 )
                 print(f"CLOSE_FAIL: {failure_reason}", flush=True)
-            for _ in range(20):
-                if process.poll() is not None:
-                    break
+            post_close_deadline = time.monotonic() + 20.0
+            while process.poll() is None and time.monotonic() < post_close_deadline:
                 samples.append(process_tree_sample(process.pid, frame, "post-close", task_cycle, ping_timeout_ms))
-                time.sleep(args.interval)
+                remaining = post_close_deadline - time.monotonic()
+                if remaining > 0:
+                    time.sleep(min(args.interval, remaining))
 
         # Verify a normal GUI shutdown and that the worker exits with it. The
         # force-kill in finally is emergency cleanup only, never a PASS path.

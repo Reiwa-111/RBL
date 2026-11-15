@@ -1,0 +1,62 @@
+﻿RBL Studio portable build - third-party runtime notices
+
+This directory redistributes wxWidgets and the runtime/dependency DLLs listed
+by the exact MSYS2 UCRT64 package versions below. Corresponding license texts
+are preserved in the licenses subdirectory, organized by package/component.
+wxWidgets uses the wxWindows Library Licence 3.1. Each bundled dependency
+retains its own upstream terms; the copied license texts are not a legal review.
+
+Package inventory (captured from pacman -Q during this build):
+mingw-w64-ucrt-x86_64-wxwidgets3.2-common 3.2.11-1
+mingw-w64-ucrt-x86_64-wxwidgets3.2-common-libs 3.2.11-1
+mingw-w64-ucrt-x86_64-wxwidgets3.2-msw 3.2.11-1
+mingw-w64-ucrt-x86_64-wxwidgets3.2-msw-libs 3.2.11-1
+mingw-w64-ucrt-x86_64-gcc 16.2.0-4
+mingw-w64-ucrt-x86_64-libgcc 16.2.0-4
+mingw-w64-ucrt-x86_64-libstdc++ 16.2.0-4
+mingw-w64-ucrt-x86_64-crt 14.0.0.r426.g4564ee4b5-1
+mingw-w64-ucrt-x86_64-libwinpthread 14.0.0.r426.g4564ee4b5-1
+mingw-w64-ucrt-x86_64-winpthreads 14.0.0.r426.g4564ee4b5-1
+mingw-w64-ucrt-x86_64-brotli 1.2.0-1
+mingw-w64-ucrt-x86_64-jbigkit 2.1-6
+mingw-w64-ucrt-x86_64-lerc 4.1.1-1
+mingw-w64-ucrt-x86_64-libdeflate 1.26-1
+mingw-w64-ucrt-x86_64-libjpeg-turbo 3.2.0-1
+mingw-w64-ucrt-x86_64-libpng 1.6.59-1
+mingw-w64-ucrt-x86_64-libtiff 4.7.2-1
+mingw-w64-ucrt-x86_64-libwebp 1.6.0-1
+mingw-w64-ucrt-x86_64-pcre2 10.49-1
+mingw-w64-ucrt-x86_64-xz 5.8.4-1
+mingw-w64-ucrt-x86_64-zstd 1.5.7-2
+mingw-w64-ucrt-x86_64-zlib 1.4-2 (repository-pinned runtime DLL)
+
+The editor uses wxStyledTextCtrl, wxWidgets' Scintilla integration. Scintilla's
+upstream copyright and permission notice is preserved at
+licenses/Scintilla/License.txt. No Riverbank QScintilla component is included.
+
+The Rust worker dependency closure is listed in licenses/Rust/THIRD_PARTY_NOTICES.md;
+package-specific license texts are preserved under licenses/Rust/<crate>-<version>/.
+
+The mingw-w64-ucrt-x86_64-libstdc++ split package is covered by the same
+mingw-w64-gcc source archive listed below. The libwinpthread and winpthreads
+license directories are copied separately; their COPYING files are byte-identical.
+
+The exact corresponding source materials for the redistributed Windows
+MinGW-w64/GCC/Binutils/wxWidgets/runtime package closure are included at
+source/Windows-toolchain-source.tar.zst (SHA-256: 2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066). The archive contains
+the exact upstream source archives and signature/audit material for the
+20 redistributed MSYS2 package families. Verify the archive with
+source/Windows-toolchain-source.sha256. Keep this archive beside any binary
+installer or portable package; do not distribute the binaries without it.
+Rust worker corresponding-source archive is included at
+source/Rust-worker-source.tar.zst (SHA-256: 7f814086a67a007b5fcbf7d871ae45a5fb990f644d884215eaf00ce6541d393f).
+The archive contains worker source, Cargo manifests and exact active crate
+source archives; verify it with source/Rust-worker-source.sha256.
+App-local CPython 3.14.10 embeddable runtime is included under runtime/python.
+The verified official Python.org package SHA-256 is
+90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159.
+The upstream LICENSE.txt and full CPython/third-party license inventory under
+runtime/python/licenses are retained. See runtime/python/UPSTREAM.md.
+Corresponding CPython and python-build-standalone source archives are included
+under source/ with SHA-256 sidecars.
+This inventory is not legal certification.

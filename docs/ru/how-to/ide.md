@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.10 | IDE INTERACTION AND FOLDING
+# last verified: v0.8.0 | 2026.11.12 | IDE WORKFLOW AND RELEASE STATUS
 
 ## RBL Studio — нативная IDE
 
-Основная desktop IDE RBL Studio — приложение на C++20, wxWidgets 3.2 и `wxStyledTextCtrl`/Scintilla. Отдельный Rust `rbl-studio-worker` управляет compiler/toolchain-процессами через ограниченный NDJSON-протокол. Chromium, Electron и встроенный WebView не используются. Python 3.9+ нужен для backend-действий, но не для отрисовки или запуска GUI.
+Основная desktop IDE RBL Studio — приложение на C++20, wxWidgets 3.2 и `wxStyledTextCtrl`/Scintilla. Отдельный Rust `rbl-studio-worker` управляет compiler/toolchain-процессами через ограниченный NDJSON-протокол. Chromium, Electron и встроенный WebView не используются. Свежие Windows/Linux portable build payloads включают app-local CPython 3.14.10 для backend-действий; явный `RBL_PYTHON` имеет приоритет. Для разработки из исходного checkout по-прежнему нужен Python 3.9+. Linux payload включает Clang integrated assembler, LLD и shared libraries wxWidgets 3.2.4; GNU Binutils и системный wxWidgets не требуются. Native shell installer использует host GTK 3 runtime, а Flatpak-вариант получает GTK внутри GNOME Platform 51.
 
 Рабочий цикл включает многооконный Scintilla editor, дерево проекта, Find/Replace, Find in Files, палитру команд, Quick Open, навигацию по диагностике, вывод задач и интерактивный stdin/EOF. Полноценный language server, семантическое автодополнение, рефакторинги и встроенный debugger пока не реализованы.
 
@@ -21,6 +21,8 @@ Windows PowerShell:
 ```
 
 Основные CMD/VBS/SH launchers выбирают wx GUI и соседний Rust worker из portable-каталога либо по указателю последней успешной сборки. Если wx недоступен, `RBL_STUDIO_ALLOW_LEGACY=1` разрешает переход на отдельно собранный Rust/egui executable из developer checkout; этот binary не входит в installer. В Linux нужны wxWidgets/GTK и рабочая графическая среда X11 или Wayland.
+
+Для Linux-установки без зависимости от host GTK используй [инструкцию Flatpak](linux-packaging.md). В ней объявлен GNOME Platform runtime, поэтому Flatpak устанавливает GTK внутрь sandbox приложения. Native shell installer по-прежнему требует host GTK 3 runtime.
 
 **Сборка для разработки в Windows:** используется MSYS2 UCRT64 wxWidgets 3.2 и закреплённый в репозитории Binutils overlay. `tools/build_wx_ide.ps1` собирает C++ GUI и Rust worker, затем копирует необходимые runtime DLL. При использовании готового portable payload MSYS2 не требуется в `PATH`.
 
@@ -83,7 +85,7 @@ Scintilla предоставляет нативное выделение, undo/r
 
 Команда **Stop** отменяет активную задачу. Worker остаётся запущенным между задачами и перезапускается только при необходимости по lifecycle.
 
-Перед перезаписью приложение проверяет внешние изменения файла и предупреждает, если сохранение разделит файл с несколькими hard links. Project Tree, Find in Files и Save используют ограниченный обход и проверки файловой идентичности. На Linux сохранение существующего файла использует `renameat2(RENAME_EXCHANGE)`; если exchange не поддерживается, операция завершается fail-closed с `operation_not_supported`, без безусловного fallback через `renameat`. Первое сохранение нового файла использует эксклюзивный `linkat`. Windows применяет `ReplaceFileW` с recovery artifacts и проверками identity, но path-based замена target не является полноценным compare-and-swap. Подробности и ограничения — в инженерном аудите.
+Перед перезаписью приложение проверяет внешние изменения файла и предупреждает, если сохранение разделит файл с несколькими hard links. Project Tree, Find in Files и Save используют ограниченный обход и проверки файловой идентичности. На Linux сохранение существующего файла требует `renameat2(RENAME_EXCHANGE)`; файловые системы без поддержки завершают операцию fail-closed с `operation_not_supported`, без безусловного fallback через `renameat`. Это намеренное ограничение доступности ради безопасности; первое сохранение нового файла по-прежнему использует эксклюзивный `linkat`. Подмена destination symlink во время exchange теперь определяется без следования по ссылке, что позволяет безопасно выполнить rollback при совпадении идентичности обеих записей. Windows применяет `ReplaceFileW` с recovery artifacts и проверками identity, но path-based замена target не является полноценным compare-and-swap. Подробности и ограничения — в инженерном аудите.
 
 ## Проверка и измерения
 
@@ -101,7 +103,9 @@ Scintilla предоставляет нативное выделение, undo/r
 
 Двухчасовой Windows resource acceptance запускается командой `python benchmarks/wx_resource_acceptance.py --duration 7200 --interval 1 --cycle-interval 60 --max-ui-ping-ms 500`. CSV содержит метрики дерева процессов, handles, GDI/USER objects и отзывчивости UI. Методика и контекст измерений приведены в [отчёте по ресурсам IDE](../../../benchmarks/IDE_RESOURCE_USAGE.md). Для диагностики backend используйте `python3 rbl.py doctor` или **Run → Toolchain doctor**.
 
-wx frontend является основной целью launchers/installers, но остаётся **UNRELEASED / RELEASE BLOCKED**. Предварительный resource run на 480 секунд прошёл пороги, но использовал старую ревизию harness; вторая попытка 7 200 секунд завершилась досрочно после task #45 без CSV. Следующий запуск на 480 секунд с усиленным harness завершился с кодом 1 после начального dispatch Run Tests и не создал CSV/verdict. PASS для двухчасового soak текущего RC не заявляется. Acceptance зарегистрированной Windows install/upgrade/uninstall проходит в изолированном HKCU GUID-подразделе. DPI static checks проходят 12/12, но live 125-200% multi-monitor и интерактивная Linux GUI-приёмка остаются непроверенными. Rust worker corresponding-source archive теперь копируется в новые build payloads и устанавливается обновлённым installer; существующие RC-каталоги созданы до этого изменения. Отдельный MSYS2 source bundle остаётся локальным и не включён в runtime package. Written offer или альтернативный способ распространения исходников не прошёл юридическую проверку. cache_bwrite Binutils достижим при обычной записи PE output; CVE-2026-90801 остаётся unresolved. POSIX Save существующего файла завершается fail-closed без atomic exchange; Windows сохраняет path-based replacement race и LOW edge с возможным orphan temp. Актуальные evidence: [инженерный аудит](../explanation/ide-engineering-audit.md) и [release manifest](../../../RELEASE_MANIFEST.txt).
+GitHub `v0.8.0` опубликован как **pre-release без assets**, а не как stable-релиз. wx frontend остаётся **RELEASE BLOCKED для stable/binary distribution**. Windows SaveDocument suite прошёл 27/27 с изолированным fixture. Resource smoke на 60/120/300 секундах прошёл с 32 документами, path-backed `resource-task.rbl`, всеми четырьмя типами задач и штатным завершением GUI/worker; 300-секундный запуск завершил 84 цикла и собрал 316 samples. Попытка 7 200 секунд завершилась до sampling из-за отсутствия notebook focus; повторный запуск не выполнялся по прямой просьбе пользователя больше не запускать IDE. Двухчасовой soak остаётся NOT PASSED. 2026-11-12 свежие Windows/Linux payloads получили app-local CPython 3.14.10; installer acceptance прошёл в изолированных каталогах, включая rollback и сохранение пользовательских данных. Установленные CLI и headless worker backend прошли без системного Python. Windows wrapper проверен с PATH, содержащим только System32 и bundled MinGW toolchain; Linux backend — с очищенным PATH, где доступны `as`, `ld`, `bash`, `dirname`, но нет Python и `cc`. Полные Windows/Linux `python rbl.py test` прошли; package safety tests прошли 9/9 на Ubuntu и 8/9 на Windows (POSIX-only symlink test пропущен). Pristine-VM acceptance и запуск GUI/backend через GUI остаются NOT RUN. Linux Binutils остаются внешними prerequisites. DPI static checks 12/12, но live 125-200% multi-monitor acceptance остаётся открытой. Linux GUI собирается и headless CTest проходит, однако интерактивная Linux desktop-приёмка не выполнялась. Rust worker и Windows MSYS2 source bundles собраны локально; Windows bundle теперь final-reviewed, но ни один bundle не приложен к публичному pre-release, а юридическая проверка условий распространения не завершена. Binutils 2.47-4 отмечен в CVE-2026-90801; применимость уязвимого условия к стандартному RBL link path остаётся unresolved и release-blocking. Windows destination-leaf replacement race и POSIX-файловые системы без atomic exchange отложены до RBL 0.9; POSIX save остаётся fail-closed. Отдельный LOW orphan-temp cleanup edge исправлен удалением по ещё открытому handle. Актуальные evidence: [инженерный аудит](../explanation/ide-engineering-audit.md) и [release manifest](../../../RELEASE_MANIFEST.txt).
+
+**Актуальный Gate I (2026-11-12):** свежие Windows/Linux payload builds включают app-local CPython 3.14.10; headless CTest и полные `python rbl.py test` прошли на обеих платформах. Installer acceptance проверил install/upgrade/uninstall/rollback, installed CLI — `version`, `doctor`, `check`, `run`, `clean`, а также headless worker backend без системного Python. Linux backend проверен без Python и `cc` в PATH; остались `as`, `ld` и shell utilities. Pristine clean VM и запуск GUI не выполнялись. Подробности — в `RELEASE_MANIFEST.txt`.
 
 ## Известные ограничения
 
@@ -112,13 +116,35 @@ wx frontend является основной целью launchers/installers, �
 
 ## Legacy Rust/egui frontend
 
-Старая Rust/egui реализация сохранена в `src/app.rs` и `src/editor.rs` для
+Старая Rust/egui реализация сохранена в `rbl-ide/legacy-egui/app.rs` и `rbl-ide/legacy-egui/editor.rs` для
 rollback/reference. Если wx executable недоступен, `RBL_STUDIO_ALLOW_LEGACY=1`
 разрешает переход на отдельно собранный executable из developer checkout; он
 не входит в wx installer payload и не является основным frontend RBL Studio 0.8.0.
 
 Реализация wx frontend, инструкции сборки, исторические записи тестов и
-оставшиеся критерии приёмки описаны в [`native/wx-ui/README.md`](../../../native/wx-ui/README.md).
+оставшиеся критерии приёмки описаны в [`rbl-ide/wx-ui/README.md`](../../../rbl-ide/wx-ui/README.md).
 Не распространяйте portable Windows bundle, пока exact corresponding sources
 не будут приложены к нему либо применимый source-offer process не пройдёт
-юридическую проверку; см. [`wx third-party inventory`](../../../native/wx-ui/THIRD_PARTY_NOTICES.md).
+юридическую проверку; см. [`wx third-party inventory`](../../../rbl-ide/wx-ui/THIRD_PARTY_NOTICES.md).
+
+## Актуальная приёмка IDE — 2026-11-11
+
+Windows SaveDocument прошёл 27/27 с изолированным fixture. Resource smoke на
+60/120/300 секундах прошёл с 32 документами и настоящим path-backed
+`resource-task.rbl`; проверялись Check, Build, Run и Tests. Результаты: 85/16,
+142/32 и 316/84 samples/task cycles соответственно. В 300-секундном запуске
+GUI завершился с кодом 0, worker завершился штатно, максимум Working Set —
+282.7 MiB, Private Bytes — 208.0 MiB, UI ping max — 0.9 ms.
+
+Попытка 7 200 секунд завершилась до sampling из-за того, что harness не получил
+фокус notebook. Повторный запуск не выполнялся после прямой просьбы пользователя
+не запускать IDE снова. Поэтому двухчасовой soak не пройден. Live DPI 125–200%,
+интерактивная Linux desktop-приёмка и оставшиеся ручные GUI workflows остаются
+NOT RUN. Gate D — PARTIAL, а не PASS.
+
+В Windows Save исправлен отдельный LOW edge с orphan temp: при ошибке записи,
+flush или получения metadata временный файл помечается на удаление через его
+ещё открытый handle. Если безопасное удаление не удаётся, путь остаточного файла
+выводится пользователю. Path-based `ReplaceFileW` race и CVE-2026-90801 остаются
+release blockers. См. актуальный `verification/2026-11-11-Gate-E/GATE_E_REVIEW.md`
+и `RELEASE_MANIFEST.txt`.

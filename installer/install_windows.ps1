@@ -1,12 +1,16 @@
 param(
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\RBLStudio'),
     [switch]$NoRegister,
+    [switch]$Portable,
     [string]$BuildDir,
     [string]$RegistryClassesRoot = 'HKCU:\Software\Classes'
 )
 
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+# Portable staging produces the archive payload, not an installation: no
+# install manifest, no uninstaller, no registration and no user-specific paths.
+if ($Portable) { $NoRegister = $true }
 function Assert-RustWorkerSourceBundle {
     param([Parameter(Mandatory = $true)][string]$Directory)
     $sourcePath = Join-Path $Directory 'source/Rust-worker-source.tar.zst'
@@ -20,6 +24,37 @@ function Assert-RustWorkerSourceBundle {
     }
     $actual = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash
     if ($actual -ine $Matches[1]) { throw "Rust worker source checksum mismatch in $Directory" }
+}
+function Assert-WindowsToolchainSourceBundle {
+    param([Parameter(Mandatory = $true)][string]$Directory)
+    $sourcePath = Join-Path $Directory 'source/Windows-toolchain-source.tar.zst'
+    $checksumPath = Join-Path $Directory 'source/Windows-toolchain-source.sha256'
+    if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf) -or -not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
+        throw "Windows MinGW corresponding-source bundle is missing from $Directory"
+    }
+    $line = (Get-Content -LiteralPath $checksumPath -Raw).Trim()
+    if ($line -notmatch '^([0-9a-fA-F]{64})  Windows-toolchain-source\.tar\.zst$') {
+        throw "Windows toolchain source checksum manifest is malformed: $checksumPath"
+    }
+    $actual = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash
+    if ($actual -ine $Matches[1]) { throw "Windows toolchain source checksum mismatch in $Directory" }
+}
+function Assert-PythonRuntimeSourceBundle {
+    param([Parameter(Mandatory = $true)][string]$Directory)
+    foreach ($filename in @('Python-3.14.10.tar.xz', 'python-build-standalone-20261110.tar.gz')) {
+        $sourcePath = Join-Path $Directory ("source/" + $filename)
+        $checksumPath = Join-Path $Directory ("source/" + $filename + '.sha256')
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf) -or -not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
+            throw "CPython corresponding-source archive is missing from ${Directory}: $filename"
+        }
+        $line = (Get-Content -LiteralPath $checksumPath -Raw).Trim()
+        $escapedName = [regex]::Escape($filename)
+        if ($line -notmatch ('^([0-9a-fA-F]{64})  ' + $escapedName + '$')) {
+            throw "CPython source checksum manifest is malformed: $checksumPath"
+        }
+        $actual = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash
+        if ($actual -ine $Matches[1]) { throw "CPython corresponding-source checksum mismatch: $sourcePath" }
+    }
 }
 . (Join-Path $PSScriptRoot 'windows_registry_policy.ps1')
 $RegistryRoot = Resolve-RblRegistryClassesRoot $RegistryClassesRoot
@@ -79,7 +114,7 @@ function Copy-Tree([string]$Source, [string]$Destination) {
 }
 
 if (-not $BuildDir) {
-    $Pointer = Join-Path $Root 'build\wx-ui-current-win.path'
+    $Pointer = Join-Path $Root 'build\output\wx-ui-current-win.path'
     if (Test-Path -LiteralPath $Pointer -PathType Leaf) {
         $BuildDir = (Get-Content -LiteralPath $Pointer -Raw).Trim()
     }
@@ -91,23 +126,30 @@ if (-not $BuildDir -or -not (Test-Path -LiteralPath $BuildDir -PathType Containe
     $BuildScript = Join-Path $Root 'tools\build_wx_ide.ps1'
     & $BuildScript
     if ($LASTEXITCODE -ne 0) { throw "wx build failed ($LASTEXITCODE)" }
-    $BuildDir = (Get-Content -LiteralPath (Join-Path $Root 'build\wx-ui-current-win.path') -Raw).Trim()
+    $BuildDir = (Get-Content -LiteralPath (Join-Path $Root 'build\output\wx-ui-current-win.path') -Raw).Trim()
     if ($BuildDir -and -not [System.IO.Path]::IsPathRooted($BuildDir)) { $BuildDir = Join-Path $Root $BuildDir }
 }
 $BuildDir = (Resolve-Path -LiteralPath $BuildDir).Path
-foreach ($required in @('rbl-studio-wx.exe', 'rbl-studio-worker.exe', 'THIRD_PARTY_NOTICES.txt', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'source/Rust-worker-source.tar.zst', 'source/Rust-worker-source.sha256')) {
+foreach ($required in @('rbl-studio-wx.exe', 'rbl-studio-worker.exe', 'THIRD_PARTY_NOTICES.txt', 'runtime/python/python.exe', 'runtime/python/rbl-python-runtime.json', 'runtime/python/UPSTREAM.md', 'runtime/python/LICENSE.txt', 'runtime/python/licenses/LICENSE.cpython.txt', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'source/Rust-worker-source.tar.zst', 'source/Rust-worker-source.sha256', 'source/Windows-toolchain-source.tar.zst', 'source/Windows-toolchain-source.sha256', 'source/Python-3.14.10.tar.xz', 'source/Python-3.14.10.tar.xz.sha256', 'source/python-build-standalone-20261110.tar.gz', 'source/python-build-standalone-20261110.tar.gz.sha256')) {
     if (-not (Test-Path -LiteralPath (Join-Path $BuildDir $required) -PathType Leaf)) {
         throw "wx build payload is incomplete: $BuildDir\$required"
     }
 }
 Assert-RustWorkerSourceBundle -Directory $BuildDir
+Assert-WindowsToolchainSourceBundle -Directory $BuildDir
+Assert-PythonRuntimeSourceBundle -Directory $BuildDir
 
-$PythonCommand = if ($env:RBL_PYTHON) { $env:RBL_PYTHON } else { 'python.exe' }
+$PythonManifestPath = Join-Path $BuildDir 'runtime\python\rbl-python-runtime.json'
+$PythonManifest = Get-Content -LiteralPath $PythonManifestPath -Raw | ConvertFrom-Json
+if ($PythonManifest.python_version -ne '3.14.10' -or $PythonManifest.platform -ne 'windows-x86_64' -or $PythonManifest.archive_sha256 -ne '90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159') {
+    throw 'The staged app-local CPython manifest does not match the pinned Windows 3.14.10 runtime.'
+}$BundledPython = Join-Path $BuildDir 'runtime\python\python.exe'
+$PythonCommand = if ($env:RBL_PYTHON) { $env:RBL_PYTHON } else { $BundledPython }
 $PythonPath = if (Test-Path -LiteralPath $PythonCommand -PathType Leaf) { $PythonCommand } else {
     $resolvedPython = Get-Command $PythonCommand -ErrorAction SilentlyContinue
     if ($resolvedPython) { $resolvedPython.Source } else { $null }
 }
-if (-not $PythonPath) { throw 'Python >=3.9 is required for RBL backend actions. Install Python or set RBL_PYTHON.' }
+if (-not $PythonPath) { throw 'The build payload must include app-local CPython 3.14.10; rebuild the wx payload or set RBL_PYTHON explicitly.' }
 & $PythonPath -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)'
 if ($LASTEXITCODE -ne 0) { throw "Python >=3.9 is required (selected interpreter: $PythonPath)" }
 
@@ -121,15 +163,26 @@ try {
     Copy-Item -LiteralPath (Join-Path $BuildDir 'rbl-studio-wx.exe') -Destination $Stage
     Copy-Item -LiteralPath (Join-Path $BuildDir 'rbl-studio-worker.exe') -Destination $Stage
     Copy-Item -LiteralPath (Join-Path $Root 'RBLStudio.cmd') -Destination $Stage
+    Copy-Item -LiteralPath (Join-Path $Root 'rbl.cmd') -Destination $Stage
     Copy-Item -LiteralPath (Join-Path $Root 'RBLStudio.vbs') -Destination $Stage
-    Copy-Item -LiteralPath (Join-Path $Root 'installer/uninstall_windows.ps1') -Destination (Join-Path $Stage 'Uninstall-RBLStudio.ps1')
-    Copy-Item -LiteralPath (Join-Path $Root 'installer/windows_registry_policy.ps1') -Destination $Stage
+    if (-not $Portable) {
+        Copy-Item -LiteralPath (Join-Path $Root 'installer/uninstall_windows.ps1') -Destination (Join-Path $Stage 'Uninstall-RBLStudio.ps1')
+        Copy-Item -LiteralPath (Join-Path $Root 'installer/windows_registry_policy.ps1') -Destination $Stage
+    }
     Get-ChildItem -LiteralPath $BuildDir -Filter '*.dll' -File | Copy-Item -Destination $Stage -Force
     Copy-Tree (Join-Path $Root 'tools') (Join-Path $Stage 'tools')
     Copy-Tree (Join-Path $Root 'compiler') (Join-Path $Stage 'compiler')
     Copy-Tree (Join-Path $Root 'runtime') (Join-Path $Stage 'runtime')
+    Copy-Tree (Join-Path $BuildDir 'runtime/python') (Join-Path $Stage 'runtime/python')
     Copy-Tree (Join-Path $Root 'bin') (Join-Path $Stage 'bin')
-    Copy-Tree (Join-Path $Root 'toolchain/windows-x86_64') (Join-Path $Stage 'toolchain/windows-x86_64')
+    # A fresh payload stages its own runtime toolchain from the host MSYS2
+    # install. Keep the repository bundle as a fallback for older payloads.
+    $PayloadToolchain = Join-Path $BuildDir 'toolchain\windows-x86_64'
+    if (Test-Path -LiteralPath (Join-Path $PayloadToolchain 'msys64\ucrt64\bin\as.exe') -PathType Leaf) {
+        Copy-Tree $PayloadToolchain (Join-Path $Stage 'toolchain/windows-x86_64')
+    } else {
+        Copy-Tree (Join-Path $Root 'toolchain/windows-x86_64') (Join-Path $Stage 'toolchain/windows-x86_64')
+    }
     Copy-Tree (Join-Path $Root 'tests') (Join-Path $Stage 'tests')
     Copy-Tree (Join-Path $Root 'benchmarks') (Join-Path $Stage 'benchmarks')
     Copy-Tree (Join-Path $Root 'examples') (Join-Path $Stage 'examples')
@@ -143,10 +196,12 @@ try {
         Copy-Tree (Join-Path $BuildDir 'licenses') (Join-Path $Stage 'licenses')
     }
     Copy-Tree (Join-Path $BuildDir 'source') (Join-Path $Stage 'source')
-    foreach ($marker in @('VERSION', 'rbl.py', 'tools/rbltool.py', 'compiler', 'runtime', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'source/Rust-worker-source.tar.zst', 'source/Rust-worker-source.sha256', 'toolchain/windows-x86_64/SOURCE_CODE.md', 'toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md', 'toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md', 'toolchain/windows-x86_64/msys64/ucrt64/rbl-toolchain-manifest.json', 'toolchain/windows-x86_64/msys64/ucrt64/bin/as.exe', 'toolchain/windows-x86_64/msys64/ucrt64/x86_64-w64-mingw32/bin/ld.exe', 'tests/run_tests.py', 'benchmarks/run_benchmarks.py')) {
+    foreach ($marker in @('VERSION', 'rbl.py', 'rbl.cmd', 'tools/rbltool.py', 'compiler', 'runtime/python/python.exe', 'runtime/python/rbl-python-runtime.json', 'runtime/python/UPSTREAM.md', 'runtime/python/LICENSE.txt', 'runtime/python/licenses/LICENSE.cpython.txt', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'source/Rust-worker-source.tar.zst', 'source/Rust-worker-source.sha256', 'source/Windows-toolchain-source.tar.zst', 'source/Windows-toolchain-source.sha256', 'source/Python-3.14.10.tar.xz', 'source/Python-3.14.10.tar.xz.sha256', 'source/python-build-standalone-20261110.tar.gz', 'source/python-build-standalone-20261110.tar.gz.sha256', 'toolchain/windows-x86_64/SOURCE_CODE.md', 'toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md', 'toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md', 'toolchain/windows-x86_64/msys64/ucrt64/rbl-toolchain-manifest.json', 'toolchain/windows-x86_64/msys64/ucrt64/bin/as.exe', 'toolchain/windows-x86_64/msys64/ucrt64/x86_64-w64-mingw32/bin/ld.exe', 'tests/run_tests.py', 'benchmarks/run_benchmarks.py')) {
         if (-not (Test-Path -LiteralPath (Join-Path $Stage $marker))) { throw "Staged application root is missing required marker: $marker" }
     }
     Assert-RustWorkerSourceBundle -Directory $Stage
+    Assert-WindowsToolchainSourceBundle -Directory $Stage
+    Assert-PythonRuntimeSourceBundle -Directory $Stage
 
     $Previous = $null
     $ExtensionKey = "$RegistryClassesRoot\.rbl"
@@ -217,20 +272,22 @@ try {
     } elseif (-not $NoRegister -and ($ExistingProgIdKey -or $ExistingOpenWithValue)) {
         throw 'A registry entry for the RBL Studio ProgID already exists but is not owned by this installation; refusing to overwrite it.'
     }
-    $Manifest = [ordered]@{
-        schema = 1
-        app = 'RBL Studio wxWidgets'
-        release_status = 'UNRELEASED'
-        registered = ((-not $NoRegister) -or $HadOwnedRegistration)
-        registry_classes_root = $RegistryClassesRoot
-        prog_id = $ProgId
-        extension_key_existed = $ExtensionExisted
-        previous_extension_default = $Previous
-        openwith_key_existed = $OpenWithKeyExisted
-        shortcut_path = $ShortcutPath
-        files = $Files
+    if (-not $Portable) {
+        $Manifest = [ordered]@{
+            schema = 1
+            app = 'RBL Studio wxWidgets'
+            release_status = 'UNRELEASED'
+            registered = ((-not $NoRegister) -or $HadOwnedRegistration)
+            registry_classes_root = $RegistryClassesRoot
+            prog_id = $ProgId
+            extension_key_existed = $ExtensionExisted
+            previous_extension_default = $Previous
+            openwith_key_existed = $OpenWithKeyExisted
+            shortcut_path = $ShortcutPath
+            files = $Files
+        }
+        $Manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Stage $ManifestName) -Encoding UTF8
     }
-    $Manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Stage $ManifestName) -Encoding UTF8
 
     $BackupDir = $null
     if (Test-Path -LiteralPath $InstallDir -PathType Container) {
@@ -242,10 +299,12 @@ try {
         Move-Item -LiteralPath $Stage -Destination $InstallDir
         $ResolvedInstallRoot = (Resolve-Path -LiteralPath $InstallDir).Path
         if ($ResolvedInstallRoot -ine $InstallDir) { throw "Installed root resolved unexpectedly: $ResolvedInstallRoot" }
-        foreach ($marker in @('VERSION', 'rbl.py', 'tools/rbltool.py', 'compiler', 'runtime', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'source/Rust-worker-source.tar.zst', 'source/Rust-worker-source.sha256', 'toolchain/windows-x86_64/SOURCE_CODE.md', 'toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md', 'toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md', 'toolchain/windows-x86_64/msys64/ucrt64/rbl-toolchain-manifest.json', 'toolchain/windows-x86_64/msys64/ucrt64/bin/as.exe', 'toolchain/windows-x86_64/msys64/ucrt64/x86_64-w64-mingw32/bin/ld.exe', 'tests/run_tests.py', 'benchmarks/run_benchmarks.py')) {
+        foreach ($marker in @('VERSION', 'rbl.py', 'rbl.cmd', 'tools/rbltool.py', 'compiler', 'runtime/python/python.exe', 'runtime/python/rbl-python-runtime.json', 'runtime/python/UPSTREAM.md', 'runtime/python/LICENSE.txt', 'runtime/python/licenses/LICENSE.cpython.txt', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'source/Rust-worker-source.tar.zst', 'source/Rust-worker-source.sha256', 'toolchain/windows-x86_64/SOURCE_CODE.md', 'toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md', 'toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md', 'toolchain/windows-x86_64/msys64/ucrt64/rbl-toolchain-manifest.json', 'toolchain/windows-x86_64/msys64/ucrt64/bin/as.exe', 'toolchain/windows-x86_64/msys64/ucrt64/x86_64-w64-mingw32/bin/ld.exe', 'tests/run_tests.py', 'benchmarks/run_benchmarks.py')) {
             if (-not (Test-Path -LiteralPath (Join-Path $InstallDir $marker))) { throw "Installed application root is missing required marker: $marker" }
         }
         Assert-RustWorkerSourceBundle -Directory $InstallDir
+        Assert-WindowsToolchainSourceBundle -Directory $InstallDir
+        Assert-PythonRuntimeSourceBundle -Directory $InstallDir
     } catch {
         if (Test-Path -LiteralPath $InstallDir -PathType Container) {
             $failedInstall = "$InstallDir.failed-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
@@ -396,7 +455,8 @@ try {
 }
 
 Write-Host "RBL Studio wxWidgets installed to: $InstallDir"
-Write-Host 'Release status: UNRELEASED (no legal-readiness claim or source archive is included).'
-if ($NoRegister) { Write-Host 'File association was not changed (-NoRegister).' }
+Write-Host 'Release status: 0.8.0 package prepared for publication and NOT YET PUBLISHED. Corresponding-source archives and notices are included; formal legal sign-off remains pending.'
+if ($Portable) { Write-Host 'Portable staging: no install manifest, uninstaller or file association was created.' }
+elseif ($NoRegister) { Write-Host 'File association was not changed (-NoRegister).' }
 else { Write-Host 'ProgID/OpenWithProgids registered for .rbl. Windows UserChoice is untouched; select RBL Studio in Default Apps if Windows keeps another default.' }
 if ($BackupDir) { Write-Host "Previous installation preserved at: $BackupDir" }

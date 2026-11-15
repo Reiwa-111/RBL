@@ -1,0 +1,149 @@
+{
+  "schema": "rbl-toolchain-requirements/1",
+  "project": "RBL Studio",
+  "version": "0.8.0",
+  "description": "Maintainer build requirements and pinned build/runtime inputs. IDE and Rust-worker build tools are installed on the maintainer machine, not bundled with the source checkout or prebuilt application. Separate pruned/app-local compiler backends are product runtime dependencies shipped so users can compile RBL programs on a clean PC.",
+  "output_layout": {
+    "cache_root": "build/cache",
+    "compiled_program_cache": "build/cache/sources",
+    "downloaded_sources": "build/cache/<component>",
+    "build_outputs": "build/output",
+    "environment_overrides": ["RBL_BUILD_DIR", "RBL_CACHE_DIR", "RBL_OUTPUT_DIR"]
+  },
+  "host_tools": {
+    "windows": {
+      "os": "Windows 10/11 x86-64",
+      "msys2_ucrt64": "rolling",
+      "msys2_url": "https://www.msys2.org/",
+      "cmake": "4.4.4",
+      "rust_stable_verified": "1.97.1",
+      "rust_target": "x86_64-pc-windows-gnu",
+      "rust_msrv": "1.85",
+      "python": "3.12",
+      "python_min": "3.9",
+      "git": "2.48"
+    },
+    "linux": {
+      "os": "Ubuntu 24.04 LTS x86-64",
+      "cmake": "4.4.4",
+      "rust_stable_verified": "1.99.1",
+      "rust_msrv": "1.85",
+      "python": "3.12",
+      "python_min": "3.9",
+      "wxwidgets_dev": "3.2.4",
+      "gtk": "3",
+      "flatpak_platform": "org.gnome.Platform//51"
+    }
+  },
+  "msys2_ucrt64_packages": [
+    {"id": "mingw-w64-ucrt-x86_64-gcc", "version": "16.2.0-4", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-libgcc", "version": "16.2.0-4", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-libstdc++", "version": "16.2.0-4", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-binutils", "version": "2.47-4", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-binutils-2.47-4.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-crt", "version": "14.0.0.r426.g4564ee4b5-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-crt-14.0.0.r426.g4564ee4b5-1.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-libwinpthread", "version": "14.0.0.r426.g4564ee4b5-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-winpthreads-14.0.0.r426.g4564ee4b5-1.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-winpthreads", "version": "14.0.0.r426.g4564ee4b5-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-winpthreads-14.0.0.r426.g4564ee4b5-1.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-gettext-runtime", "version": "1.0-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gettext-1.0-1.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-libiconv", "version": "1.19-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-libiconv-1.19-1.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-zlib", "version": "1.4-2", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-zlib-1.4-2.src.tar.zst", "note": "Release zlib1.dll is additionally hash-pinned to aa658771fb152b095eda1614d8bde798efb92324b6f4a0c99c743cd96b67ac90 by tools/build_wx_ide.ps1."},
+    {"id": "mingw-w64-ucrt-x86_64-zstd", "version": "1.5.7-2", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-zstd-1.5.7-2.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-windows-default-manifest", "version": "20260815-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-windows-default-manifest-20260815-1.src.tar.zst"},
+    {"id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-common", "version": "3.2.11-1"},
+    {"id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-common-libs", "version": "3.2.11-1"},
+    {"id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-msw", "version": "3.2.11-1"},
+    {"id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-msw-libs", "version": "3.2.11-1"},
+    {"id": "mingw-w64-ucrt-x86_64-brotli", "version": "1.2.0-1"},
+    {"id": "mingw-w64-ucrt-x86_64-jbigkit", "version": "2.1-6"},
+    {"id": "mingw-w64-ucrt-x86_64-lerc", "version": "4.1.1-1"},
+    {"id": "mingw-w64-ucrt-x86_64-libdeflate", "version": "1.26-1"},
+    {"id": "mingw-w64-ucrt-x86_64-libjpeg-turbo", "version": "3.2.0-1"},
+    {"id": "mingw-w64-ucrt-x86_64-libpng", "version": "1.6.59-1"},
+    {"id": "mingw-w64-ucrt-x86_64-libtiff", "version": "4.7.2-1"},
+    {"id": "mingw-w64-ucrt-x86_64-libwebp", "version": "1.6.0-1"},
+    {"id": "mingw-w64-ucrt-x86_64-pcre2", "version": "10.49-1"},
+    {"id": "mingw-w64-ucrt-x86_64-xz", "version": "5.8.4-1"}
+  ],
+  "msys2_verification": {
+    "method": "pacman package signatures verified against the MSYS2 keyring; exact installed versions captured with pacman -Q during packaging",
+    "keyring": "https://www.msys2.org/dev/keyring/",
+    "fingerprint": "5F944B027F7FE2091985AA2EFA11531AA0AA7F57",
+    "note": "Per-file SHA-256 values for the legacy pruned bundle are recorded in windows-x86_64/msys64/ucrt64/rbl-toolchain-manifest.json. New host-toolchain builds rely on pacman signature verification plus the pinned source archives."
+  },
+  "pinned_downloads": [
+    {
+      "id": "llvm",
+      "version": "23.1.5",
+      "platform": "linux-x86-64",
+      "url": "https://cdn.kernel.org/pub/tools/llvm/files/llvm-23.1.5-x86_64.tar.xz",
+      "sha256": "b69433120ad62420d789f601c58a5472873c724be088c99a70b72fd30ca4af3c",
+      "size": 86722684,
+      "gpg": {
+        "signature_url": "https://cdn.kernel.org/pub/tools/llvm/files/llvm-23.1.5-x86_64.tar.sign",
+        "checksums_url": "https://cdn.kernel.org/pub/tools/llvm/files/sha256sums.asc",
+        "key_url": "https://keys.openpgp.org/vks/v1/by-fingerprint/7BE325C731319CCD01D8CA921D6B269171C01A96",
+        "key_fingerprint": "2437CB76E544CB6AB3D9DFD399739260CB6CB716"
+      }
+    },
+    {
+      "id": "wxwidgets-source",
+      "version": "3.2.4",
+      "url": "https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.4/wxWidgets-3.2.4.tar.bz2",
+      "sha256": "0640e1ab716db5af2ecb7389dbef6138d7679261fbff730d23845ba838ca133e"
+    },
+    {
+      "id": "cpython-windows-embeddable",
+      "version": "3.14.10",
+      "platform": "windows-x86-64",
+      "url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip",
+      "sha256": "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159",
+      "size": 12619664
+    },
+    {
+      "id": "cpython-source",
+      "version": "3.14.10",
+      "url": "https://www.python.org/ftp/python/3.14.10/Python-3.14.10.tar.xz",
+      "sha256": "de414a57119abef52784d8993e341d53aed635fc2b05c2607d9f98a2c5b72032",
+      "size": 24240392
+    },
+    {
+      "id": "python-build-standalone-linux-runtime",
+      "version": "20261110",
+      "platform": "linux-x86-64-gnu",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "c2ff2e97422f5d3896a16e0317fd212ba977bbf2688d93a6f7a03d817506bd30",
+      "size": 36875876
+    },
+    {
+      "id": "python-build-standalone-source",
+      "version": "20261110",
+      "url": "https://github.com/astral-sh/python-build-standalone/archive/refs/tags/20261110.tar.gz",
+      "sha256": "63b8166347616283ee6d3ed449e957bc71b65368bc60945d21ab957e6fcaee49",
+      "size": 470059
+    }
+  ],
+  "rust": {
+    "msrv": "1.85",
+    "verified_windows": "1.97.1",
+    "verified_linux": "1.99.1",
+    "targets": ["x86_64-pc-windows-gnu", "x86_64-unknown-linux-gnu"],
+    "lockfile": "Cargo.lock",
+    "note": "The worker builds with --locked; crate sources and checksums come from Cargo.lock and are mirrored in the Rust corresponding-source bundle."
+  },
+  "python": {
+    "build_scripts": "3.9+ (3.12 used)",
+    "app_local_runtime": "3.14.10",
+    "note": "End users use the bundled runtime; a system Python is not required for installed execution."
+  },
+  "prebuilt_policy": {
+    "repository_contains_maintainer_build_toolchain": false,
+    "repository_contains_prebuilt_product": true,
+    "repository_contains_user_program_backend": true,
+    "distribution_contains_prebuilt_user_program_backend": true,
+    "distribution_requires_external_maintainer_compiler": false,
+    "clean_user_rbl_compilation_requires_external_toolchain": false,
+    "assembly_rule": "Explicit installer allowlist only; never archive a CMake/wxWidgets build tree.",
+    "portable_staging": "install_windows.ps1 -Portable and install_linux.sh --portable omit the install manifest, uninstaller and registry/XDG integration so archives contain no machine-specific state.",
+    "release_packaging": "tools/package_release.py validates a portable staging tree and writes the archive, SHA256SUMS, per-archive JSON metadata and a LOCAL_CANDIDATE note. It never publishes or uploads.",
+    "windows_user_program_backend": "toolchain/windows-x86_64 contains a 43-file pruned MinGW runtime bundle (44 files on disk including its manifest; 47 tracked files including notices/audits) used to assemble/link RBL programs in a source checkout and staged into the prebuilt Windows app. It is not sufficient to rebuild RBL Studio itself; full MSYS2/CMake/Rust/wx build dependencies remain external. Keep this separate from maintainer build requirements until a replacement passes clean-install compile acceptance."
+  }
+}

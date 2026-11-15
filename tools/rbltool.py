@@ -3,7 +3,7 @@
 
 Two user-program backends produce the same generated assembly:
 
-  linux   : RBL -> x86-64 ASM (ELF) -> GNU as --64 -> ld + libc/libm  -> ELF
+  linux   : RBL -> x86-64 ASM (ELF) -> Clang integrated assembler -> ld.lld + libc/libm -> ELF
   windows : RBL -> x86-64 ASM (PE)  -> GNU as --64 -> gcc + MSVCRT/UCRT -> .exe
 
 The backend only changes the object format, the process entry/exit glue and the
@@ -28,6 +28,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 IDE_CONFIG = Path(os.environ.get("APPDATA", Path.home() / ".config")) / "RBLStudio" / "settings.json" if os.name == "nt" else Path.home()/".config"/"RBLStudio"/"settings.json"
 LINUX_BIN_DIR = ROOT / "bin" / "linux-x86_64"
+LINUX_TOOLCHAIN_ROOT = Path(os.environ.get("RBL_LINUX_TOOLCHAIN_ROOT", ROOT / "toolchain" / "linux-x86_64")).expanduser()
+LINUX_TOOLCHAIN_BIN = LINUX_TOOLCHAIN_ROOT / "bin"
+LINUX_TOOLCHAIN_LIB = LINUX_TOOLCHAIN_ROOT / "lib"
+LINUX_CLANG = LINUX_TOOLCHAIN_BIN / "clang"
+LINUX_LLD = LINUX_TOOLCHAIN_BIN / "ld.lld"
+LINUX_SYSTEM_LIB_DIRS = (
+    "/lib/x86_64-linux-gnu",
+    "/usr/lib/x86_64-linux-gnu",
+    "/lib64",
+    "/usr/lib64",
+    "/lib",
+    "/usr/lib",
+)
 WIN_BIN_DIR = ROOT / "bin" / "win-x86_64"
 COMPILER_SOURCES = [ROOT / "compiler" / name for name in (
     "common.c", "lexer.c", "ast.c", "parser.c", "sema.c", "codegen.c", "driver.c"
@@ -41,7 +54,29 @@ RUNTIME_WIN_SRC = ROOT / "runtime" / "rbl_runtime_win.c"
 CONTAINERS_SRC = ROOT / "runtime" / "rbl_containers.c"
 RUNTIME_ABI_SRC = ROOT / "runtime" / "rbl_abi.c"
 RUNTIME_FORMAT_SRC = ROOT / "runtime" / "rbl_format.c"
-BUILD_DIR = ROOT / "build"
+if os.environ.get("RBL_BUILD_DIR"):
+    BUILD_DIR = Path(os.environ["RBL_BUILD_DIR"]).expanduser()
+elif os.environ.get("FLATPAK_ID"):
+    BUILD_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "RBLStudio" / "build"
+else:
+    BUILD_DIR = ROOT / "build"
+
+# Disposable artifacts are split by purpose so cleaning one area cannot destroy
+# the other:
+#   CACHE_DIR  - compiled user programs and downloaded upstream sources
+#                (safe to delete, expensive to rebuild);
+#   OUTPUT_DIR - IDE, worker, bootstrap and packaging outputs produced from the
+#                current checkout (safe to delete, cheap to rebuild).
+# `bin/` holds the ready-to-use product objects shipped with the project.
+if os.environ.get("RBL_CACHE_DIR"):
+    CACHE_DIR = Path(os.environ["RBL_CACHE_DIR"]).expanduser()
+else:
+    CACHE_DIR = BUILD_DIR / "cache"
+
+if os.environ.get("RBL_OUTPUT_DIR"):
+    OUTPUT_DIR = Path(os.environ["RBL_OUTPUT_DIR"]).expanduser()
+else:
+    OUTPUT_DIR = BUILD_DIR / "output"
 
 # Backwards-compatible names: the Linux backend is the historical default.
 BIN_DIR = LINUX_BIN_DIR
@@ -101,8 +136,154 @@ def is_windows():
     return os.name == "nt"
 
 
+def windows_short_path(path: str | Path) -> str:
+    """Return an ASCII 8.3 path for native Windows GNU tools when possible.
+
+    MinGW's argv conversion can replace non-ASCII characters before GNU as/ld
+    sees them. Python and Win32 accept Unicode paths, but the bundled GNU tools
+    may not. Keep Python-side paths canonical; shorten only paths crossing the
+    native-tool process boundary.
+    """
+    value = os.path.abspath(os.fspath(path))
+    if not is_windows() or value.isascii():
+        return value
+    try:
+        import ctypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        get_short_path = kernel32.GetShortPathNameW
+        get_short_path.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+        get_short_path.restype = ctypes.c_uint32
+        required = get_short_path(value, None, 0)
+        if required:
+            buffer = ctypes.create_unicode_buffer(required + 1)
+            copied = get_short_path(value, buffer, len(buffer))
+            if copied and buffer.value.isascii():
+                return buffer.value
+    except (AttributeError, OSError, ValueError):
+        pass
+    raise RuntimeError(
+        "The native Windows GNU toolchain cannot safely receive this non-ASCII path, "
+        f"and Windows did not provide an ASCII 8.3 alias: {value!r}. "
+        "Enable short file names for this volume, move the project/installation to an ASCII path, "
+        "or select the WSL backend with RBL_TOOLCHAIN=wsl."
+    )
+
+
+def windows_native_path_argument(value):
+    """Shorten absolute path arguments passed to native Windows tools."""
+    if not is_windows() or not isinstance(value, (str, os.PathLike)):
+        return value
+    text = os.fspath(value)
+    if not os.path.isabs(text):
+        return value
+    if os.path.exists(text):
+        return windows_short_path(text)
+    parent, leaf = os.path.split(os.path.abspath(text))
+    if not leaf.isascii():
+        raise RuntimeError(
+            f"Native Windows build output filename must be ASCII when its parent path is non-ASCII: {text!r}"
+        )
+    return os.path.join(windows_short_path(parent), leaf)
+
+
+def windows_link_search_args(tc):
+    """Provide short, explicit MinGW linker/startup/library search prefixes."""
+    root = Path(tc["bin"]).parent
+    gcc_root = root / "lib" / "gcc" / "x86_64-w64-mingw32"
+    version_dirs = sorted((p for p in gcc_root.iterdir() if p.is_dir()), reverse=True) if gcc_root.is_dir() else []
+    program_dirs = [Path(tc["bin"]), root / "x86_64-w64-mingw32" / "bin", root / "lib", *version_dirs]
+    library_dirs = [*version_dirs, root / "x86_64-w64-mingw32" / "lib", root / "lib"]
+    args = []
+    for directory in program_dirs:
+        if directory.is_dir():
+            args.append("-B" + windows_short_path(directory) + os.sep)
+    for directory in library_dirs:
+        if directory.is_dir():
+            args.append("-L" + windows_short_path(directory))
+    return args
+
+
 def have(cmd: str) -> bool:
     return shutil.which(cmd) is not None
+
+
+def linux_assembler_label() -> str:
+    return str(LINUX_CLANG) if LINUX_CLANG.is_file() else "as"
+
+
+def linux_linker_label() -> str:
+    return str(LINUX_LLD) if LINUX_LLD.is_file() else "ld"
+
+
+def _linux_tool_env() -> dict[str, str]:
+    env = os.environ.copy()
+    if LINUX_TOOLCHAIN_LIB.is_dir():
+        current = env.get("LD_LIBRARY_PATH", "")
+        env["LD_LIBRARY_PATH"] = str(LINUX_TOOLCHAIN_LIB) + (os.pathsep + current if current else "")
+    return env
+
+
+def _linux_tool_env_wsl(settings) -> str:
+    if not LINUX_TOOLCHAIN_LIB.is_dir():
+        return ""
+    lib = shlex.quote(wsl_path(LINUX_TOOLCHAIN_LIB, settings))
+    return f"LD_LIBRARY_PATH={lib}:${{LD_LIBRARY_PATH:-}} "
+
+
+def _linux_assemble_native(source: Path, output: Path):
+    if LINUX_CLANG.is_file():
+        return run_native([
+            str(LINUX_CLANG), "-target", "x86_64-pc-linux-gnu", "-c", "-x", "assembler",
+            str(source), "-o", str(output),
+        ], env=_linux_tool_env())
+    if os.environ.get("RBL_REQUIRE_BUNDLED_LINUX_TOOLCHAIN") == "1":
+        raise RuntimeError(f"Required app-local Clang assembler is missing: {LINUX_CLANG}")
+    if not have("as"):
+        raise RuntimeError("No Linux assembler is available (bundled Clang integrated assembler or system GNU as).")
+    return run_native(["as", "--64", str(source), "-o", str(output)], env=_linux_tool_env())
+
+
+def _linux_link_native(obj: Path, exe: Path):
+    linker = str(LINUX_LLD) if LINUX_LLD.is_file() else "ld"
+    if linker == "ld" and os.environ.get("RBL_REQUIRE_BUNDLED_LINUX_TOOLCHAIN") == "1":
+        raise RuntimeError(f"Required app-local LLD linker is missing: {LINUX_LLD}")
+    if linker == "ld" and not have("ld"):
+        raise RuntimeError("No Linux linker is available (bundled ld.lld or system GNU ld).")
+    library_search = [arg for directory in LINUX_SYSTEM_LIB_DIRS for arg in ("-L", directory)]
+    return run_native([
+        linker, *library_search, str(obj), str(RUNTIME_OBJ), str(CONTAINERS_OBJ),
+        str(RUNTIME_ABI_OBJ), str(RUNTIME_FORMAT_OBJ), "-o", str(exe),
+        "-dynamic-linker", "/lib64/ld-linux-x86-64.so.2", "-l:libc.so.6", "-l:libm.so.6",
+    ], env=_linux_tool_env())
+
+
+def _linux_assemble_wsl(source: Path, output: Path, settings) -> str:
+    src = shlex.quote(wsl_path(source, settings))
+    out = shlex.quote(wsl_path(output, settings))
+    if LINUX_CLANG.is_file():
+        tool = shlex.quote(wsl_path(LINUX_CLANG, settings))
+        return _linux_tool_env_wsl(settings) + f"{tool} -target x86_64-pc-linux-gnu -c -x assembler {src} -o {out}"
+    if os.environ.get("RBL_REQUIRE_BUNDLED_LINUX_TOOLCHAIN") == "1":
+        raise RuntimeError(f"Required app-local Clang assembler is missing: {LINUX_CLANG}")
+    return _linux_tool_env_wsl(settings) + f"as --64 {src} -o {out}"
+
+
+def _linux_link_wsl(obj: Path, exe: Path, settings) -> str:
+    if not LINUX_LLD.is_file() and os.environ.get("RBL_REQUIRE_BUNDLED_LINUX_TOOLCHAIN") == "1":
+        raise RuntimeError(f"Required app-local LLD linker is missing: {LINUX_LLD}")
+    linker = shlex.quote(wsl_path(LINUX_LLD, settings)) if LINUX_LLD.is_file() else "ld"
+    objp = shlex.quote(wsl_path(obj, settings))
+    rt = shlex.quote(wsl_path(RUNTIME_OBJ, settings))
+    ct = shlex.quote(wsl_path(CONTAINERS_OBJ, settings))
+    at = shlex.quote(wsl_path(RUNTIME_ABI_OBJ, settings))
+    ft = shlex.quote(wsl_path(RUNTIME_FORMAT_OBJ, settings))
+    exep = shlex.quote(wsl_path(exe, settings))
+    library_search = " ".join(f"-L{shlex.quote(directory)}" for directory in LINUX_SYSTEM_LIB_DIRS)
+    return (
+        _linux_tool_env_wsl(settings) + f"{linker} {library_search} {objp} {rt} {ct} {at} {ft} -o {exep} "
+        "-dynamic-linker /lib64/ld-linux-x86-64.so.2 -l:libc.so.6 -l:libm.so.6"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -194,9 +375,10 @@ _WSL_AVAILABLE_CACHE = {}
 
 def native_toolchain_version(tc):
     try:
-        p = subprocess.run([str(tc["gcc"]), "--version"], text=True, capture_output=True,
+        gcc = windows_short_path(tc["gcc"]) if is_windows() else str(tc["gcc"])
+        p = subprocess.run([gcc, "--version"], text=True, capture_output=True,
                            encoding="utf-8", errors="replace", timeout=30,
-                           **_hidden_subprocess_kwargs())
+                           env=toolchain_env(tc), **_hidden_subprocess_kwargs())
         return (p.stdout or "").splitlines()[0].strip()
     except Exception as exc:                                   # pragma: no cover
         return f"unavailable ({exc})"
@@ -307,11 +489,31 @@ def toolchain_env(tc):
     env = os.environ.copy()
     if tc is None:
         return env
-    bindir = str(tc["bin"])
+    bindir = windows_short_path(tc["bin"]) if is_windows() else str(tc["bin"])
     path = env.get("PATH", "")
     entries = [p.lower() for p in path.split(os.pathsep) if p]
     if bindir.lower() not in entries:
         env["PATH"] = (bindir + os.pathsep + path) if path else bindir
+    if is_windows():
+        root = Path(tc["bin"]).parent
+        gcc_root = root / "lib" / "gcc"
+        gcc_target = gcc_root / "x86_64-w64-mingw32"
+        version_dirs = sorted((p for p in gcc_target.iterdir() if p.is_dir()), reverse=True) if gcc_target.is_dir() else []
+        target_bin = root / "x86_64-w64-mingw32" / "bin"
+        target_lib = root / "x86_64-w64-mingw32" / "lib"
+        compiler_dirs = [*version_dirs, gcc_target, gcc_root, Path(tc["bin"]), target_bin]
+        library_dirs = [*version_dirs, target_lib, root / "lib"]
+        for key, directories in (("COMPILER_PATH", compiler_dirs), ("LIBRARY_PATH", library_dirs)):
+            values = []
+            for directory in directories:
+                if directory.is_dir():
+                    value = windows_short_path(directory)
+                    if value not in values:
+                        values.append(value)
+            existing = env.get(key, "")
+            env[key] = os.pathsep.join(values + ([existing] if existing else []))
+        if gcc_root.is_dir():
+            env["GCC_EXEC_PREFIX"] = windows_short_path(gcc_root) + os.sep
     return env
 
 
@@ -428,6 +630,9 @@ def _streaming_subprocess(cmd, cwd, input_text, env):
 
 
 def run_native(cmd, cwd=ROOT, capture=True, input_text=None, env=None):
+    if is_windows():
+        cmd = [windows_native_path_argument(arg) for arg in cmd]
+        cwd = windows_short_path(cwd) if cwd is not None else None
     try:
         if capture and os.environ.get("RBL_STREAM_OUTPUT") == "1":
             return _streaming_subprocess(cmd, cwd, input_text, env)
@@ -501,7 +706,16 @@ def build_output_dir(source: Path, settings=None) -> Path:
     resolved = Path(source).resolve()
     identity = hashlib.sha256(os.path.normcase(str(resolved)).encode("utf-8")).hexdigest()[:12]
     backend = "windows" if use_native_windows(settings or load_settings()) else "linux"
-    return BUILD_DIR / "sources" / backend / f"{resolved.stem}-{identity}"
+    stem = native_build_stem(resolved, settings) if backend == "windows" else resolved.stem
+    return CACHE_DIR / "sources" / backend / f"{stem}-{identity}"
+
+
+def native_build_stem(source: Path, settings=None) -> str:
+    stem = Path(source).stem
+    if is_windows() and use_native_windows(settings or load_settings()) and not stem.isascii():
+        safe = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_")
+        return (safe or "source")[:48]
+    return stem
 
 
 def _force_bootstrap() -> bool:
@@ -574,7 +788,7 @@ def ensure_toolchain(settings):
             code, out, err = run_wsl(f"cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -Wredundant-decls -Werror=missing-prototypes -Werror=redundant-decls -Werror=implicit-function-declaration {version_define} {compiler_sources} -o {compiler_b}", settings)
             if code: raise RuntimeError(err or out)
         if force_bootstrap or _stale(RUNTIME_OBJ, RUNTIME_SRC):
-            code, out, err = run_wsl(f"as --64 {runtime_s} -o {runtime_o}", settings)
+            code, out, err = run_wsl(_linux_assemble_wsl(RUNTIME_SRC, RUNTIME_OBJ, settings), settings)
             if code: raise RuntimeError(err or out)
         containers_c = shlex.quote(wsl_path(CONTAINERS_SRC, settings))
         containers_o = shlex.quote(wsl_path(CONTAINERS_OBJ, settings))
@@ -659,7 +873,13 @@ def ensure_toolchain(settings):
 
     # Native Linux
     ensure_dir(LINUX_BIN_DIR)
-    if force_bootstrap or _stale(COMPILER_BIN, *COMPILER_DEPENDENCIES):
+    # Release payloads ship all compiler/runtime artifacts prebuilt. Do not use
+    # mtimes to trigger a developer bootstrap after extraction/install: archive
+    # tools and installers may legitimately rewrite timestamps. A normal user
+    # machine needs only the runtime assembler/linker for program builds, not cc.
+    # Rebuilding is explicit (`RBL_REBUILD_COMPILER=1`) or a recovery from a
+    # missing artifact.
+    if force_bootstrap or not COMPILER_BIN.is_file():
         if not have("cc"):
             raise RuntimeError("C compiler 'cc' is needed only to bootstrap rblc-asm itself.")
         code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
@@ -667,12 +887,10 @@ def ensure_toolchain(settings):
                                      "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
                                      compiler_version_define(), *compiler_sources_for_host(), "-o", str(COMPILER_BIN)])
         if code: raise RuntimeError(err or out)
-    if force_bootstrap or _stale(RUNTIME_OBJ, RUNTIME_SRC):
-        if not have("as"):
-            raise RuntimeError("GNU assembler 'as' not found.")
-        code, out, err = run_native(["as", "--64", str(RUNTIME_SRC), "-o", str(RUNTIME_OBJ)])
+    if force_bootstrap or not RUNTIME_OBJ.is_file():
+        code, out, err = _linux_assemble_native(RUNTIME_SRC, RUNTIME_OBJ)
         if code: raise RuntimeError(err or out)
-    if force_bootstrap or _stale(CONTAINERS_OBJ, CONTAINERS_SRC, RUNTIME_ABI_HEADER):
+    if force_bootstrap or not CONTAINERS_OBJ.is_file():
         if not have("cc"):
             raise RuntimeError("C compiler 'cc' is needed to build the container runtime.")
         code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
@@ -680,19 +898,18 @@ def ensure_toolchain(settings):
                                      "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
                                      "-c", str(CONTAINERS_SRC), "-o", str(CONTAINERS_OBJ)])
         if code: raise RuntimeError(err or out)
-    if force_bootstrap or _stale(RUNTIME_ABI_OBJ, RUNTIME_ABI_SRC, RUNTIME_ABI_HEADER):
+    if force_bootstrap or not RUNTIME_ABI_OBJ.is_file():
         code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
                                      "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
                                      "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
                                      "-c", str(RUNTIME_ABI_SRC), "-o", str(RUNTIME_ABI_OBJ)])
         if code: raise RuntimeError(err or out)
-    if force_bootstrap or _stale(RUNTIME_FORMAT_OBJ, RUNTIME_FORMAT_SRC, RUNTIME_ABI_HEADER):
+    if force_bootstrap or not RUNTIME_FORMAT_OBJ.is_file():
         code, out, err = run_native(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Wpedantic",
                                      "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wredundant-decls",
                                      "-Werror=missing-prototypes", "-Werror=redundant-decls", "-Werror=implicit-function-declaration",
                                      "-c", str(RUNTIME_FORMAT_SRC), "-o", str(RUNTIME_FORMAT_OBJ)])
         if code: raise RuntimeError(err or out)
-
 
 def compiler_cmd(source: Path, asm: Path, settings):
     if use_wsl(settings):
@@ -768,12 +985,7 @@ def _build_wsl(source: Path, settings):
     at = shlex.quote(wsl_path(RUNTIME_ABI_OBJ, settings))
     ft = shlex.quote(wsl_path(RUNTIME_FORMAT_OBJ, settings))
     exep = shlex.quote(wsl_path(exe, settings))
-    command = (
-        f"{cs} {ss} -S {asmp} && "
-        f"as --64 {asmp} -o {objp} && "
-        f"ld {objp} {rt} {ct} {at} {ft} -o {exep} "
-        f"-dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lm"
-    )
+    command = f"{cs} {ss} -S {asmp} && " + _linux_assemble_wsl(asm, obj, settings) + " && " + _linux_link_wsl(obj, exe, settings)
     code, out, err = run_wsl(command, settings)
     if code:
         return _link_failure(code, out + err, "build failed")
@@ -793,9 +1005,9 @@ def _build_native_linux(source: Path, settings):
         return 0, "build cache: up to date\n", str(exe)
     c1=run_native([str(COMPILER_BIN),str(source),"-S",str(asm)])
     if c1[0]:return c1
-    c2=run_native(["as","--64",str(asm),"-o",str(obj)])
+    c2=_linux_assemble_native(asm, obj)
     if c2[0]:return c2
-    c3=run_native(["ld",str(obj),str(RUNTIME_OBJ),str(CONTAINERS_OBJ),str(RUNTIME_ABI_OBJ),str(RUNTIME_FORMAT_OBJ),"-o",str(exe),"-dynamic-linker","/lib64/ld-linux-x86-64.so.2","-lc","-lm"])
+    c3=_linux_link_native(obj, exe)
     if c3[0]:
         return _link_failure(c3[0], c1[1]+c1[2]+c2[1]+c2[2]+c3[1]+c3[2], "link failed")
     return c3[0], c1[1]+c1[2]+c2[1]+c2[2]+c3[1]+c3[2], str(exe)
@@ -807,9 +1019,10 @@ def _build_native_windows(source: Path, settings):
         raise RuntimeError("No native Windows GNU toolchain was found (see 'rbl doctor').")
     out_dir = build_output_dir(source, settings)
     ensure_dir(out_dir)
-    asm = out_dir / (source.stem + ".s")
-    obj = out_dir / (source.stem + ".o")
-    exe = out_dir / (source.stem + ".exe")
+    stem = native_build_stem(source, settings)
+    asm = out_dir / (stem + ".s")
+    obj = out_dir / (stem + ".o")
+    exe = out_dir / (stem + ".exe")
     if _build_cache_valid(
         exe, source,
         [WIN_COMPILER_BIN, WIN_RUNTIME_OBJ, WIN_CONTAINERS_OBJ, WIN_RUNTIME_ABI_OBJ, WIN_RUNTIME_FORMAT_OBJ],
@@ -822,7 +1035,7 @@ def _build_native_windows(source: Path, settings):
         # RBL emits plain native objects and never produces GCC LTO objects.
         # Disabling the linker plugin avoids shipping GCC's LTO plugin/wrapper
         # (and its compression dependencies) in the minimal user toolchain.
-        ([str(tc["gcc"]), str(obj), str(WIN_RUNTIME_OBJ), str(WIN_CONTAINERS_OBJ), str(WIN_RUNTIME_ABI_OBJ), str(WIN_RUNTIME_FORMAT_OBJ), "-o", str(exe), "-static", "-lm", "-fno-use-linker-plugin"], "link"),
+        ([str(tc["gcc"]), *windows_link_search_args(tc), str(obj), str(WIN_RUNTIME_OBJ), str(WIN_CONTAINERS_OBJ), str(WIN_RUNTIME_ABI_OBJ), str(WIN_RUNTIME_FORMAT_OBJ), "-o", str(exe), "-static", "-lm", "-fno-use-linker-plugin"], "link"),
     ]
     allout = []
     tenv = toolchain_env(tc)
@@ -833,6 +1046,15 @@ def _build_native_windows(source: Path, settings):
             if what == "link":
                 return _link_failure(code, "".join(allout), "link failed")
             return code, "".join(allout), f"{what} failed"
+    crt_notice = Path(tc["gcc"]).parent.parent / "share" / "licenses" / "crt" / "COPYING.MinGW-w64-runtime.txt"
+    if crt_notice.is_file():
+        notice_out = exe.with_name(exe.name + ".COPYING.MinGW-w64-runtime.txt")
+        try:
+            shutil.copy2(crt_notice, notice_out)
+        except OSError as exc:
+            return 1, "".join(allout) + f"\nUnable to copy MinGW-w64 CRT redistribution notice: {exc}\n", "notice copy failed"
+    elif tc.get("kind") == "bundled":
+        return 1, "".join(allout) + "\nBundled MinGW-w64 CRT license notice is missing; refusing to leave a distributable executable without it.\n", "notice missing"
     return 0, "".join(allout), str(exe)
 
 
@@ -854,7 +1076,7 @@ def run_program(source: Path, settings):
         exe = build_output_dir(source, settings) / source.stem
         code, stdout, stderr = run_wsl(shlex.quote(wsl_path(exe, settings)), settings)
     else:
-        exe = Path(info) if info and info != "build failed" else build_output_dir(source, settings) / source.stem
+        exe = Path(info) if info and info != "build failed" else build_output_dir(source, settings) / native_build_stem(source, settings)
         if is_windows() and not use_wsl(settings):
             exe = exe.with_suffix(".exe") if exe.suffix != ".exe" else exe
         code, stdout, stderr = run_native([str(exe)])
@@ -863,7 +1085,7 @@ def run_program(source: Path, settings):
 
 def assemble_preview(source: Path, settings):
     ensure_toolchain(settings)
-    out = build_output_dir(source, settings) / (source.stem + ".s")
+    out = build_output_dir(source, settings) / (native_build_stem(source, settings) + ".s")
     ensure_dir(out.parent)
     if use_wsl(settings):
         c=f"{shlex.quote(wsl_path(COMPILER_BIN, settings))} {shlex.quote(wsl_path(source, settings))} -S {shlex.quote(wsl_path(out, settings))}"
@@ -906,7 +1128,7 @@ def doctor(settings):
             try:
                 root_linux = wsl_path(ROOT, settings)
                 rows.append(("WSL path", root_linux))
-                code, out, err = run_wsl("command -v bash; command -v as; command -v ld; test -x /bin/sh", settings)
+                code, out, err = run_wsl("command -v bash; command -v clang || command -v as; command -v ld.lld || command -v ld; test -x /bin/sh", settings)
                 tools = "\n".join(x for x in (out, err) if x).strip()
                 rows.append(("WSL tools", "OK" if code == 0 else f"ERROR ({code}): {tools}"))
             except Exception as exc:
@@ -915,8 +1137,10 @@ def doctor(settings):
             rows.append(("rblc-asm.exe", "present" if WIN_COMPILER_BIN.exists() else "will bootstrap"))
             rows.append(("runtime_win.o", "present" if WIN_RUNTIME_OBJ.exists() else "will bootstrap"))
     if not is_windows():
-        for t in ("cc","as","ld"):
-            rows.append((t, "OK" if have(t) else "missing"))
+        rows.append(("C compiler (bootstrap only)", "available" if have("cc") else "not installed; not needed for normal use"))
+        require_bundled = os.environ.get("RBL_REQUIRE_BUNDLED_LINUX_TOOLCHAIN") == "1"
+        rows.append(("assembler", f"bundled: {LINUX_CLANG} (integrated)" if LINUX_CLANG.is_file() else ("required bundled LLVM toolchain missing" if require_bundled else ("system GNU as" if have("as") else "missing"))))
+        rows.append(("linker", f"bundled: {LINUX_LLD}" if LINUX_LLD.is_file() else ("required bundled LLVM toolchain missing" if require_bundled else ("system GNU ld" if have("ld") else "missing"))))
     rows.append(("rblc-asm", "present" if COMPILER_BIN.exists() else "will bootstrap"))
     rows.append(("runtime.o", "present" if RUNTIME_OBJ.exists() else "will assemble"))
     abi_obj = WIN_RUNTIME_ABI_OBJ if use_native_windows(settings) else RUNTIME_ABI_OBJ

@@ -24,7 +24,7 @@ $PackageDirectories = Get-ChildItem $RegistrySources -Directory | ForEach-Object
     }
 }
 
-$Destination = Join-Path $Root 'build\rust-link-libs'
+$Destination = Join-Path $Root 'build\output\rust-link-libs'
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 Get-ChildItem $Destination -Filter '*.a' -File -ErrorAction SilentlyContinue | Remove-Item -Force
 $Missing = @()
