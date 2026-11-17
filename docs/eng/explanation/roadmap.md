@@ -4,7 +4,7 @@
 
 This is the authoritative RBL development plan. It separates the implemented 0.8.1 baseline, unfinished engineering work and future proposals. It defines sequencing, dependencies and exit criteria, not calendar promises.
 
-**Current source tree:** root VERSION, CLI and bundled compiler binaries report 0.8.1. This roadmap describes the implementation in that source tree and the remaining engineering milestones. GitHub published the full 0.8.0 source snapshot as `v0.8.0-r2` on 2026-11-15. The older `v0.8.0` pre-release placeholder remains untouched. The current 0.8.1 tree is prepared but not yet published; see the release manifest.
+**Current source tree:** root VERSION, CLI and bundled compiler binaries report 0.8.1. This roadmap describes the implementation in that source tree and the remaining engineering milestones. GitHub published the full 0.8.0 source snapshot as `v0.8.0-r2` on 2026-11-15. The older `v0.8.0` pre-release placeholder remains untouched. RBL Studio 0.8.1 was published as [`v0.8.1`](https://github.com/Reiwa-111/RBL/releases/tag/v0.8.1) on 2026-11-17; see the release manifest.
 
 ## Principles
 

@@ -3,12 +3,12 @@
 # RBL Studio 0.8.1 — engineering audit and readiness status
 
 Record date: 2026-11-17. This is a current engineering status report, not an
-instruction to publish. The 0.8.1 source tree is prepared but not yet published;
-`v0.8.0-r2` remains the published 0.8.0 source snapshot.
+instruction to publish. RBL Studio 0.8.1 was published on 2026-11-17 as [`v0.8.1`](https://github.com/Reiwa-111/RBL/releases/tag/v0.8.1);
+`v0.8.0-r2` remains the previous 0.8.0 source snapshot.
 
 ## Current status — 0.8.1
 
-**RBL Studio 0.8.1: release preparation complete to the recorded scope; publication pending.** The primary launcher/install path selects the C++20/wxWidgets 3.2 + Scintilla frontend with a separate Rust worker. The native first-run setup/installer wizard is implemented. Windows SaveDocument byte-roundtrip acceptance passed 27/27; 60/120/300-second resource smoke runs passed with 32 documents and all four task types. The user confirms that the two-hour (7,200-second) Windows resource soak completed successfully. It is marked PASS by user confirmation; raw CSV/verdict and final GUI/worker hashes have not yet been independently re-audited in this workspace. A pristine-VM run is not recorded.
+**RBL Studio 0.8.1: published release; the recorded acceptance scope is complete.** The primary launcher/install path selects the C++20/wxWidgets 3.2 + Scintilla frontend with a separate Rust worker. The native first-run setup/installer wizard is implemented. Windows SaveDocument byte-roundtrip acceptance passed 27/27; 60/120/300-second resource smoke runs passed with 32 documents and all four task types. The user confirms that the two-hour (7,200-second) Windows resource soak completed successfully. It is marked PASS by user confirmation; raw CSV/verdict and final GUI/worker hashes have not yet been independently re-audited in this workspace. A pristine-VM run is not recorded.
 
 Windows CTest passed 15/15, DPI static tests 12/12, the full RBL regression passed (63/63 direct ASM cases and 63/63 compiler diagnostics), Linux CTest passed 14/14, and Flatpak payload tests passed 6/6. The user confirmed that the real Windows mixed-DPI scenario was tested successfully. The separate live two-monitor run verified window movement, floating-pane persistence, saved-layout migration and off-screen recovery.
 

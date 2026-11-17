@@ -4,8 +4,7 @@
 
 **Current status (2026-11-17):** the 0.8.1 native Linux wxWidgets GUI/Rust-worker
 build and installation through `installer/install_linux.sh` were verified on
-Ubuntu 24.04 with system wxWidgets 3.2.4 (`RBL_USE_SYSTEM_WX=1`). The 0.8.1 tree
-is prepared but not yet published. The local Flatpak payload was built and
+Ubuntu 24.04 with system wxWidgets 3.2.4 (`RBL_USE_SYSTEM_WX=1`). RBL Studio 0.8.1 was published as [`v0.8.1`](https://github.com/Reiwa-111/RBL/releases/tag/v0.8.1) on 2026-11-17. The local Flatpak payload was built and
 installed; sandbox CLI `version`, `doctor`, `check` and `run` passed. Interactive
 Flatpak GUI/display/portal acceptance and Flathub publication remain unverified.
 

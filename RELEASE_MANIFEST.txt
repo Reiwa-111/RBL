@@ -1,9 +1,9 @@
 # RBL Studio — RBL 0.8.1 release-preparation manifest
 # Snapshot: RBL 0.8.1 / 2026-11-17 (documentation, acceptance and source-tree preparation)
-# Status: 0.8.1 release preparation is complete to the recorded scope; not yet published. The published 0.8.0 source release remains v0.8.0-r2.
+# Status: RBL Studio 0.8.1 was published on 2026-11-17 as v0.8.1. The previous 0.8.0 source release remains v0.8.0-r2.
 # GitHub release policy: publish the tagged repository source tree directly. Do not create ZIP/portable archives, binary release assets, or separately assembled corresponding-source archives; none is a release deliverable or publication gate.
 
-## Current status — 0.8.1 release preparation / 0.8.0 published baseline (2026-11-17)
+## Current status — 0.8.1 published release / 0.8.0 previous baseline (2026-11-17)
 
 - Repository/compiler version: 0.8.1. Runtime ABI: 1.2.0.
 - GitHub publication model: the release is the tagged repository source tree.
@@ -35,8 +35,8 @@
   redistributed; notices and provenance records remain in the repository.
 - No separate ZIP/portable archive, binary release asset or corresponding-source archive is a GitHub release deliverable or publication gate. This does not waive third-party license obligations for any bundled binaries. Notices and provenance are maintained in-tree; this is not a formal legal opinion.
 - Known technical boundaries remain documented: Binutils 2.47-4 is listed for CVE-2026-90801 with residual risk accepted only for the supported compiler-generated COFF workflow; the Windows `ReplaceFileW` leaf race is deferred to 0.9; POSIX existing-target saves fail closed when atomic exchange is unavailable.
-- The 0.8.1 source tree is prepared for the publication step. It has not been tagged, published or promoted by this work. The older public `v0.8.0` placeholder remains untouched; `v0.8.0-r2` remains the published 0.8.0 source snapshot.
-- The dated entries below are historical checkpoints. Where they say `UNRELEASED`, `PRE-RELEASE` or `RELEASE BLOCKED`, that was the status at that time; this current section is authoritative for the 0.8.1 preparation tree.
+- GitHub Release [`v0.8.1`](https://github.com/Reiwa-111/RBL/releases/tag/v0.8.1) was published on 2026-11-17, with no manually attached assets. Annotated tag `v0.8.1` points to commit `6861185a3165985e05f2b002efe2d6b40f0bcb6f`. The older public `v0.8.0` placeholder remains untouched; `v0.8.0-r2` remains the previous 0.8.0 source snapshot.
+- The dated entries below are historical checkpoints. Where they say `UNRELEASED`, `PRE-RELEASE` or `RELEASE BLOCKED`, that was the status at that time; this current section is authoritative for the published 0.8.1 release.
 - Tag note: the older public `v0.8.0` tag still contains the damaged
   `examples/utilities/source-WUDMB5.rbl`. The working tree contains the corrected
   1,093-byte file (the earlier packaged archives carried it too). The local
@@ -59,10 +59,9 @@
   Flatpak or GTK-self-contained result. The verification is scoped to Ubuntu
   24.04 and does not establish compatibility with arbitrary Linux
   distributions or older system ABI baselines.
-- This is an expanded 0.8.1 implementation scope, not merely a documentation
-  correction. The repository `VERSION`, Cargo package and lockfile are now
-  0.8.1. It does not change the published 0.8.0 status or declare 0.8.1
-  released.
+- Historical scope note: this entry was written before the 2026-11-17
+  publication. The repository `VERSION`, Cargo package and lockfile were updated
+  to 0.8.1; the release was subsequently published as `v0.8.1`.
 - GitHub Releases continue to publish the tagged repository source tree
   directly. No manually assembled ZIP/portable archive, binary release asset
   or separate corresponding-source archive is a release deliverable or
@@ -128,13 +127,13 @@
   At that dated checkpoint no commit, push, tag, GitHub publication or release
   promotion had yet been performed.
 
-## 0.8.1 documentation and acceptance closeout — 2026-11-17
+## 0.8.1 documentation, acceptance and publication closeout — 2026-11-17
 
-- Current user-facing documentation now identifies 0.8.1 as the release-preparation
-  version and distinguishes it from the published 0.8.0-r2 source snapshot.
+- Current user-facing documentation now identifies 0.8.1 as the published release
+  and links to `https://github.com/Reiwa-111/RBL/releases/tag/v0.8.1`; it distinguishes it from the previous 0.8.0-r2 snapshot.
   English and Russian documentation indexes, IDE guides, README and release notes
   describe the setup wizard, Ubuntu 24.04 native Linux path, Flatpak CLI scope,
-  Windows mixed-DPI confirmation and the actual verification limits.
+  Windows mixed-DPI confirmation, two-hour soak confirmation and actual limits.
 - Windows mixed-DPI acceptance is marked PASS based on the user's explicit
   confirmation. The earlier two-monitor 100%-only note remains as historical
   evidence of the initial automated/live test and is not treated as the final
@@ -143,7 +142,7 @@
   remains unrecorded. Flatpak interactive GUI/portal and Flathub publication remain
   outside the verified scope. Third-party notices/provenance are present, but no
   formal legal sign-off is claimed.
-- This pass adds eight focused RBL 0.8.x examples and ten bilingual tutorials
+- This release includes eight focused RBL 0.8.x examples and ten bilingual tutorials
   (English and Russian editions). The original twenty beginner lessons, first
   written for 0.7.2, were rechecked with the 0.8.1 compiler: all 20 pass `rbl.py
   check`. All eight new examples pass both `check` and `run`.

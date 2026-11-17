@@ -2,11 +2,10 @@
 
 Last verified: 2026-11-17
 
-## RBL 0.8.1 — release preparation (not yet published)
+## RBL 0.8.1 — published release (2026-11-17)
 
-RBL 0.8.1 is the current release-preparation tree. The published `v0.8.0-r2`
-source snapshot remains unchanged; no 0.8.1 tag or GitHub release has been
-created as part of this documentation work.
+RBL Studio 0.8.1 was published on 2026-11-17 as [`v0.8.1`](https://github.com/Reiwa-111/RBL/releases/tag/v0.8.1). The
+previous `v0.8.0-r2` source snapshot remains unchanged.
 
 ### Added
 
@@ -23,6 +22,10 @@ the host display stack remain host dependencies for this native path.
 excluding Windows runtime files and transient Python bytecode from the staged
 payload. A local Flatpak bundle was built and installed; sandbox CLI checks
 (`version`, `doctor`, `check`, `run`) passed.
+- Eight runnable RBL 0.8.x examples under `examples/v081/` and ten bilingual
+  tutorials covering f-string formatting, managed strings/containers, diagnostics,
+  Runtime ABI, first-run setup, native IDE workflows and Linux/Flatpak scope.
+  The original twenty beginner lessons from 0.7.2 were rechecked on 0.8.1.
 
 ### Changed
 
@@ -55,7 +58,7 @@ atomic exchange is unavailable.
 - Third-party notices and provenance are present, but this changelog is not a
 formal legal opinion or a blanket clearance to redistribute bundled binaries.
 
-The 0.8.1 tree has completed content, cleanup and regression validation. The two-hour soak is user-confirmed PASS; pristine-VM and interactive Flatpak GUI/portal checks remain unverified. Git commit, push, tag and GitHub Release publication are the remaining release operations.
+The 0.8.1 release is published. Content, cleanup and regression validation are complete. The two-hour soak is user-confirmed PASS; pristine-VM and interactive Flatpak GUI/portal checks remain unverified. The annotated tag points to the release commit; the main branch also contains this post-publication documentation update.
 
 ## RBL 0.8.0 — full release
 

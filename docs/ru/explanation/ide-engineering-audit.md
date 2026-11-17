@@ -3,12 +3,12 @@
 # RBL Studio 0.8.1 — инженерный аудит и статус готовности
 
 Дата фиксации: 2026-11-17. Это актуальный инженерный статус, а не разрешение на
-публикацию. Дерево 0.8.1 подготовлено, но ещё не опубликовано; `v0.8.0-r2`
-остаётся опубликованным source snapshot версии 0.8.0.
+публикацию. RBL Studio 0.8.1 опубликован 2026-11-17 как [`v0.8.1`](https://github.com/Reiwa-111/RBL/releases/tag/v0.8.1);
+`v0.8.0-r2` остаётся предыдущим source snapshot версии 0.8.0.
 
 ## Текущий статус — 0.8.1
 
-**RBL Studio 0.8.1: подготовка релиза завершена в пределах зафиксированного объёма; публикация ещё не выполнена.** Основной launcher/install path использует C++20/wxWidgets 3.2 + Scintilla и отдельный Rust worker. Нативный first-run setup/installer wizard реализован. Windows SaveDocument byte-roundtrip acceptance прошёл 27/27; resource smoke на 60/120/300 секундах прошёл с 32 документами и всеми четырьмя типами задач. Пользователь подтвердил успешное завершение двухчасового (7 200 секунд) Windows resource soak. Отмечен PASS по подтверждению пользователя; raw CSV/verdict и финальные хэши GUI/worker в этой рабочей сессии независимо не перепроверялись. Запуск на pristine VM не зафиксирован.
+**RBL Studio 0.8.1: релиз опубликован; зафиксированный объём приёмки завершён.** Основной launcher/install path использует C++20/wxWidgets 3.2 + Scintilla и отдельный Rust worker. Нативный first-run setup/installer wizard реализован. Windows SaveDocument byte-roundtrip acceptance прошёл 27/27; resource smoke на 60/120/300 секундах прошёл с 32 документами и всеми четырьмя типами задач. Пользователь подтвердил успешное завершение двухчасового (7 200 секунд) Windows resource soak. Отмечен PASS по подтверждению пользователя; raw CSV/verdict и финальные хэши GUI/worker в этой рабочей сессии независимо не перепроверялись. Запуск на pristine VM не зафиксирован.
 
 Windows CTest прошёл 15/15, DPI static tests — 12/12, полная RBL regression suite прошла (63/63 direct ASM cases и 63/63 compiler diagnostics), Linux CTest — 14/14, Flatpak payload tests — 6/6. Пользователь подтвердил успешную проверку реального Windows mixed-DPI сценария. Отдельный live multi-monitor тест проверил перемещение окна, сохранение/восстановление floating pane, миграцию layout и восстановление окон из координат за пределами экрана.
 
