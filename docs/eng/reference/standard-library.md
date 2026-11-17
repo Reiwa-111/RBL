@@ -1,6 +1,6 @@
-# last verified: v0.8.0 | 2026.11.09 | LANGUAGE CONTRACT RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
-## Reference: RBL 0.8.0 standard library
+## Reference: RBL 0.8.1 standard library
 
 Built-in functions are implemented by the compiler/runtime. Namespace names can be used directly; no `import` statement is needed. This is not a user module system: source imports and third-party package loading are not available.
 
@@ -55,7 +55,7 @@ Details:
 
 - The global `fmod(a, b)` function performs floating-point remainder using C `fmod` behavior: the result has the sign of the dividend.
 - The `%` operator is integer-only.
-- The global `clamp(x, low, high)` function requires compatible numeric types; `rbl.math.clamp` is not implemented in 0.8.0.
+- The global `clamp(x, low, high)` function requires compatible numeric types; `rbl.math.clamp` is not implemented in 0.8.1.
 - `hypot`, `degrees` and `radians` are available as global functions, but not as `rbl.math` methods.
 - `sign(NaN)` returns `0` in the current implementation.
 - `is_nan` and `is_inf` accept numeric values; integers are neither NaN nor infinity.

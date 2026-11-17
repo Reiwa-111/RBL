@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.11 | GATE H CONTAINER CONTRACT UPDATE
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
-## Reference: RBL 0.8.0 syntax
+## Reference: RBL 0.8.1 syntax
 
-This page describes the syntax implemented by the RBL 0.8.0 frontend. Bounded f-string format specifications are part of the language contract. Proposals for future versions are not part of this specification.
+This page describes the syntax implemented by the RBL 0.8.1 frontend. Bounded f-string format specifications are part of the language contract. Proposals for future versions are not part of this specification.
 
 ## Programs and functions
 
@@ -21,7 +21,7 @@ func main() (
 
 A function declaration has the form `func name(parameters) ReturnType (` followed by its body and a closing `)`. The return-type annotation is optional; without one, a function that returns no value produces `Unit`. Parameter types follow parameter names. Parameter values are checked against the declared types when the function is called.
 
-Recursive calls are supported. Functions are not overloaded by signature; when a function name is declared more than once, the last definition is used (covered by `duplicate_functions.rbl`). Return-type annotations are parsed but are not enforced by the runtime in 0.8.0; do not treat them as a statically verified return contract.
+Recursive calls are supported. Functions are not overloaded by signature; when a function name is declared more than once, the last definition is used (covered by `duplicate_functions.rbl`). Return-type annotations are parsed but are not enforced by the runtime in 0.8.1; do not treat them as a statically verified return contract.
 
 ## Declaring and updating variables
 

@@ -13,6 +13,32 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipIf(os.name == "nt", "Linux launcher symlink behavior is POSIX-only")
 class LinuxLauncherTests(unittest.TestCase):
+    def test_installed_root_layout_launches_root_gui_and_worker(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="rbl installed root ") as temporary:
+            install = Path(temporary) / "installation with spaces"
+            install.mkdir()
+            launcher = install / "RBLStudio.sh"
+            shutil.copy2(ROOT / "RBLStudio.sh", launcher)
+            gui = install / "rbl-studio-wx"
+            gui.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf 'root=%s\\nworker=%s\\ncwd=%s\\n' \"$RBL_STUDIO_ROOT\" \"$RBL_STUDIO_WORKER\" \"$PWD\"\n",
+                encoding="utf-8",
+            )
+            gui.chmod(0o755)
+            worker = install / "rbl-studio-worker"
+            worker.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            worker.chmod(0o755)
+
+            completed = subprocess.run(
+                ["bash", str(launcher)], cwd=Path(temporary), text=True,
+                capture_output=True, check=True,
+            )
+            values = dict(line.split("=", 1) for line in completed.stdout.splitlines())
+            self.assertEqual(values["root"], str(install))
+            self.assertEqual(values["worker"], str(worker))
+            self.assertEqual(values["cwd"], str(install))
+
     def test_symlink_launcher_resolves_install_root_and_preserves_arguments(self) -> None:
         with tempfile.TemporaryDirectory(prefix="rbl launcher symlink ") as temporary:
             base = Path(temporary)

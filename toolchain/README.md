@@ -162,45 +162,30 @@ make compiler runtime        # Linux host
 python rbl.py bootstrap      # Windows/WSL, explicit compiler rebuild
 ```
 
-## 5. Produce the prebuilt package
+## 5. Local portable staging (legacy; not the GitHub release workflow)
 
-A released copy is assembled from an **explicit allowlist** of product files
-(`installer/install_windows.ps1`, `installer/install_linux.sh` and
-`tools/prepare_flatpak_payload.py`). Never zip a build tree directly: CMake and
-wxWidgets build directories contain absolute developer paths and test logs that
-must not be distributed.
-
-For a portable package, use the installer's portable staging mode. It stages
-the same allowlist but omits the install manifest, uninstaller and
-registry/XDG integration, so the result contains no machine-specific state:
+The installer `--Portable` modes remain available for local acceptance and
+manual testing. They stage the explicit application allowlist without an install
+manifest, uninstaller or registry/XDG integration. They do not create an
+official release artifact.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File installer/install_windows.ps1 `
-  -InstallDir build/output/stage/RBLStudio-0.8.0-windows-x86_64 `
-  -Portable -BuildDir build/output/wx-ui-win
+  -InstallDir build/output/stage/RBLStudio-0.8.1-windows-x86_64 `
+  -Portable -BuildDir build/output/wx-ui-win-0.8.1
 ```
 
 ```bash
 bash installer/install_linux.sh \
-  --install-dir "$HOME/rbl-stage/RBLStudio-0.8.0-linux-x86_64" \
-  --portable --build-dir build/output/wx-ui-linux
+  --install-dir "$HOME/rbl-stage/RBLStudio-0.8.1-linux-x86_64" \
+  --portable --build-dir build/output/wx-ui-linux-0.8.1
 ```
 
-Then create the transport archive and hashes:
-
-```bash
-python tools/package_release.py --platform windows \
-  --staged build/output/stage/RBLStudio-0.8.0-windows-x86_64
-python tools/package_release.py --platform linux \
-  --staged "$HOME/rbl-stage/RBLStudio-0.8.0-linux-x86_64"
-```
-
-The packager refuses trees that still contain install state, CMake build
-directories, caches or debug artifacts. It writes the archive, `SHA256SUMS`,
-per-archive JSON metadata and a `-LOCAL_CANDIDATE.txt` note; it never publishes
-or uploads anything.
-
-Acceptance for a prebuilt package:
+The former local archive experiment has been removed. The official release is
+the tagged repository source tree: no ZIP/portable archive, `.tar.zst`, binary
+release asset or separately assembled corresponding-source archive is created
+or attached.
+Legacy local prebuilt-package acceptance (not a GitHub release gate):
 
 1. Launch on a clean machine with no Python, compiler, MSYS2 or RBL environment
    variables.
@@ -209,8 +194,9 @@ Acceptance for a prebuilt package:
    rebuild is required.
 3. Check, Build, Run and Format work through the bundled worker and app-local
    Python.
-4. Corresponding-source archives and notices are present and hash-verified by
-   the installer.
+4. Third-party notices and source/provenance inventories are present. No separate
+   corresponding-source archive is expected under the current GitHub source-tree
+   release policy; assess any obligations for redistributed bundled binaries separately.
 
 The shipped `toolchain/windows-x86_64` and `toolchain/linux-x86_64` directories
 are **product runtime closures** (assembler, linker, startup libraries) needed

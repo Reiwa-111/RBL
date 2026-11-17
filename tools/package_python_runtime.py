@@ -20,6 +20,15 @@ from typing import Dict, List, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYTHON_VERSION = "3.14.10"
 
+# Exact names emitted by older packager versions. This list is used only to
+# remove obsolete payloads from an already-verified managed runtime.
+LEGACY_SOURCE_PAYLOAD_FILES = frozenset({
+    "Python-3.14.10.tar.xz",
+    "Python-3.14.10.tar.xz.sha256",
+    "python-build-standalone-20261110.tar.gz",
+    "python-build-standalone-20261110.tar.gz.sha256",
+})
+
 PACKAGES = {
     "windows": {
         "platform": "windows-x86_64",
@@ -56,26 +65,6 @@ PBS_LICENSES = {
         "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
     },
 }
-
-SOURCE_PACKAGES = {
-    "cpython": {
-        "filename": "Python-3.14.10.tar.xz",
-        "url": "https://www.python.org/ftp/python/3.14.10/Python-3.14.10.tar.xz",
-        "sha256": "de414a57119abef52784d8993e341d53aed635fc2b05c2607d9f98a2c5b72032",
-        "size": 24_240_392,
-        "license": "PSF-2.0",
-        "source_ref": "CPython v3.14.10",
-    },
-    "python_build_standalone": {
-        "filename": "python-build-standalone-20261110.tar.gz",
-        "url": "https://github.com/astral-sh/python-build-standalone/archive/refs/tags/20261110.tar.gz",
-        "sha256": "63b8166347616283ee6d3ed449e957bc71b65368bc60945d21ab957e6fcaee49",
-        "size": 470_059,
-        "license": "MPL-2.0",
-        "source_ref": "20261110 / 9244801782b78e4c4afc5c82a4524aa2101d3298",
-    },
-}
-
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -310,18 +299,7 @@ def write_metadata(runtime_dir: Path, platform: str) -> None:
         "archive_sha256": package["sha256"],
         "interpreter": package["interpreter"],
         "license_files": package["license_files"],
-        "source_archives": {
-            key: {
-                "filename": value["filename"],
-                "url": value["url"],
-                "sha256": value["sha256"],
-                "size": value["size"],
-                "license": value["license"],
-                "source_ref": value["source_ref"],
-            }
-            for key, value in SOURCE_PACKAGES.items()
-        },
-        "redistribution_review": "source and license materials included; formal legal sign-off pending",
+        "redistribution_review": "license texts and notices included; formal legal sign-off pending",
     }
     if "glibc_min" in package:
         manifest["glibc_min"] = package["glibc_min"]
@@ -341,7 +319,6 @@ def write_metadata(runtime_dir: Path, platform: str) -> None:
         f"- Interpreter path: `{package['interpreter']}`",
         "- The runtime is invoked app-locally; no system Python or inherited Python PATH is required.",
         "- No additional Python packages are required by the RBL backend; the backend uses the standard library.",
-        "- Corresponding source archives for CPython and python-build-standalone are staged under `source/` with SHA-256 sidecars.",
     ]
     if "glibc_min" in package:
         lines.extend([
@@ -358,39 +335,6 @@ def write_metadata(runtime_dir: Path, platform: str) -> None:
     (runtime_dir / "UPSTREAM.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def _stage_source_archives(runtime_dir: Path, cache_dir: Path) -> None:
-    source_dir = runtime_dir / "source"
-    source_dir.mkdir(parents=True, exist_ok=True)
-    for metadata in SOURCE_PACKAGES.values():
-        filename = metadata["filename"]
-        archive = download_verified(
-            metadata["url"], cache_dir / filename, metadata["sha256"], metadata["size"]
-        )
-        destination = source_dir / filename
-        if destination.exists():
-            if destination.stat().st_size != metadata["size"] or sha256_file(destination) != metadata["sha256"]:
-                raise RuntimeError(f"existing corresponding-source archive failed integrity check: {destination}")
-        else:
-            shutil.copy2(archive, destination)
-        checksum_path = source_dir / f"{filename}.sha256"
-        checksum_path.write_text(metadata["sha256"] + f"  {filename}\n", encoding="ascii")
-
-
-def _verify_source_archives(runtime_dir: Path) -> None:
-    source_dir = runtime_dir / "source"
-    for metadata in SOURCE_PACKAGES.values():
-        filename = metadata["filename"]
-        archive = source_dir / filename
-        checksum_path = source_dir / f"{filename}.sha256"
-        if not archive.is_file() or not checksum_path.is_file():
-            raise RuntimeError(f"corresponding-source archive or checksum is missing: {archive}")
-        if archive.stat().st_size != metadata["size"] or sha256_file(archive) != metadata["sha256"]:
-            raise RuntimeError(f"corresponding-source archive failed its pinned size/hash check: {archive}")
-        expected_line = metadata["sha256"] + f"  {filename}"
-        if checksum_path.read_text(encoding="ascii").strip() != expected_line:
-            raise RuntimeError(f"corresponding-source checksum sidecar does not match: {checksum_path}")
-
-
 def _copy_license_files(runtime_dir: Path, platform: str, cache_dir: Path) -> None:
     licenses_dir = runtime_dir / "licenses"
     licenses_dir.mkdir(parents=True, exist_ok=True)
@@ -401,6 +345,25 @@ def _copy_license_files(runtime_dir: Path, platform: str, cache_dir: Path) -> No
         metadata = PBS_LICENSES[name]
         license_path = download_verified(metadata["url"], cache_dir / name, metadata["sha256"])
         shutil.copy2(str(license_path), str(licenses_dir / name))
+
+
+def _remove_legacy_source_payload(runtime_dir: Path) -> None:
+    source_dir = runtime_dir / "source"
+    if not os.path.lexists(str(source_dir)):
+        return
+    is_junction = getattr(source_dir, "is_junction", lambda: False)
+    if source_dir.is_symlink() or is_junction() or not source_dir.is_dir():
+        raise RuntimeError(f"Refusing to remove non-directory or reparse source payload: {source_dir}")
+    entries = list(source_dir.iterdir())
+    unexpected = [
+        entry.name for entry in entries
+        if entry.name not in LEGACY_SOURCE_PAYLOAD_FILES or entry.is_symlink() or not entry.is_file()
+    ]
+    if unexpected:
+        raise RuntimeError(
+            f"Refusing to remove unmanaged files from legacy source payload {source_dir}: {unexpected}"
+        )
+    shutil.rmtree(str(source_dir))
 
 
 def _verify_existing_linux_package(output: Path, cache_dir: Path) -> None:
@@ -438,7 +401,10 @@ def stage_runtime(platform: str, output: Path, cache_dir: Path) -> None:
             verify_runtime(output, platform)
         else:
             _verify_existing_linux_package(output, cache_dir)
-        _verify_source_archives(output)
+        _remove_legacy_source_payload(output)
+        # Refresh metadata from the pinned binary package definition so an
+        # older managed output cannot retain obsolete source_archives fields.
+        write_metadata(output, platform)
         print(f"CPython {PYTHON_VERSION} already staged: {output}")
         return
 
@@ -454,7 +420,6 @@ def stage_runtime(platform: str, output: Path, cache_dir: Path) -> None:
             _copy_license_files(staging, platform, cache_dir)
             verify_runtime(staging, platform)
             write_metadata(staging, platform)
-            _stage_source_archives(staging, cache_dir)
             os.replace(str(staging), str(output))
         except Exception:
             shutil.rmtree(str(staging), ignore_errors=True)
@@ -470,13 +435,10 @@ def stage_runtime(platform: str, output: Path, cache_dir: Path) -> None:
             _copy_license_files(runtime_staging, platform, cache_dir)
             verify_runtime(runtime_staging, platform)
             write_metadata(runtime_staging, platform)
-            _stage_source_archives(runtime_staging, cache_dir)
-
             shutil.copy2(str(archive_path), str(sidecar_staging / "python-runtime.tar.gz"))
             shutil.copy2(str(runtime_staging / "rbl-python-runtime.json"), str(sidecar_staging / "rbl-python-runtime.json"))
             shutil.copy2(str(runtime_staging / "UPSTREAM.md"), str(sidecar_staging / "UPSTREAM.md"))
             shutil.copytree(str(runtime_staging / "licenses"), str(sidecar_staging / "licenses"))
-            shutil.copytree(str(runtime_staging / "source"), str(sidecar_staging / "source"))
             (sidecar_staging / "python-runtime.sha256").write_text(
                 package["sha256"] + "  python-runtime.tar.gz\n", encoding="ascii"
             )

@@ -1,13 +1,33 @@
-﻿# RBL Studio вЂ” primary wxWidgets frontend
+﻿# RBL Studio — primary wxWidgets frontend
 
 This C++20 + wxWidgets 3.2 + Scintilla application is the primary RBL Studio
 frontend selected by the repository launchers and user-scope installers. The
-previous Rust/egui frontend remains in `rbl-ide/legacy-egui/app.rs` and `rbl-ide/legacy-egui/editor.rs` as a
-rollback/reference implementation. When the wx executable is unavailable,
-`RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately built legacy
-executable from a developer checkout; it is not included in the wx installer
-payload. The wx application remains UNRELEASED until
-the acceptance and distribution gates below are closed.
+previous Rust/egui frontend remains in `rbl-ide/legacy-egui/` as a rollback and
+reference implementation. `RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a
+separately built legacy executable from a developer checkout; it is not included
+in the wx installer payload.
+
+The RBL 0.8.1 tree is prepared for release but has not been published. It
+includes the native first-run setup/installer wizard and the verified Ubuntu
+24.04 Linux GUI/worker build and native shell install path. The historical log
+below records earlier snapshots; old UNRELEASED/RELEASE BLOCKED statements in
+those dated entries do not describe the current 0.8.1 preparation status.
+
+## Current Windows DPI / multi-monitor acceptance — 2026-11-17
+
+The current 0.8.1 Windows GUI and worker were launched from an isolated
+configuration. The initial automated/live check used two 1920x1080 displays at
+96 DPI (100%): the main frame moved between displays, the Project pane detached
+to the secondary display, and its floating position survived a restart. A
+saved-layout migration (stored AUI scale 0.8, current scale 1.0) changed the
+floating pane from 624x558 to 780x698 and clamped it to the work area. Deliberately
+off-screen coordinates recovered to `{x=1140,y=332,w=780,h=698}`.
+
+The user subsequently confirmed that the real Windows mixed-DPI scenario was
+tested successfully. Windows mixed-DPI acceptance is therefore **PASS**. Exact
+physical scale pairs and a detailed theme/dialog checklist were not independently
+captured in this work log; no specific percentages are claimed. See
+[`DPI_LIMITATIONS.md`](DPI_LIMITATIONS.md) for implementation details and scope.
 
 ## Architecture
 
@@ -40,6 +60,22 @@ the acceptance and distribution gates below are closed.
   native/WSL toolchain selection. Apply, OK, Cancel and Restore Defaults are
   available. Values are persisted in `ui.ini`; compatible legacy settings are
   migrated from `settings.json` once.
+- First launch opens a native installer/setup wizard before the backend worker
+  starts. When the platform installer script and a complete build payload are
+  available, Install / Repair runs the existing user-scope installer
+  asynchronously and streams its output and exit status into the wizard. It
+  uses the platform's default per-user destination and disables file-association
+  and desktop registration. After success, the installed IDE can be launched.
+  Regular installations retain their platform installer and uninstaller under
+  `installer/`; Linux installations also retain the verified CPython runtime
+  archive so Install / Repair remains available from the installed copy. The
+  Linux handoff starts `RBLStudio.sh`, which configures the bundled wxWidgets
+  and LLVM library paths before executing the GUI.
+  The wizard also checks the application root, worker executable, Python runtime
+  and compiler toolchain, and stores selected paths and initial theme/toolchain
+  settings in the per-user `ui.ini`. A source checkout can be continued
+  explicitly for development when no installer payload is available. The wizard
+  can be reopened from Settings at any time.
 - View menu commands can show/hide Project and Run/Output panes and restore the
   default workspace layout. A separate New Text File action creates plain-text
   documents that are not sent to the RBL compiler.
@@ -136,7 +172,7 @@ The Windows portable directory with the runtime DLLs is about 25 MiB before
 symbols and optional assets. These are prototype measurements, not final
 release acceptance numbers.
 
-## Remaining acceptance work
+## Current product limitations and follow-up verification
 
 - File open/save, UTF-8/UTF-16 encoding preservation, external-change warnings,
   unsaved-change prompts, AUI layout persistence, basic find/replace, Find in
@@ -155,10 +191,6 @@ release acceptance numbers.
 - Latest Windows idle startup sample: GUI 30.5 MiB working set plus worker
   9.8 MiB working set. This is not the 32-tab / 16 MiB / active-task acceptance
   test; the 512 MiB ceiling remains unproven for peak workloads.
-- No release, commit, tag or push had been made at this 2026-11-09 snapshot. The
-  wxWidgets frontend was still a candidate at that point; current launch/install
-  status and remaining gates are recorded at the top of this README and in the
-  2026-11-10 follow-up below.
 
 ## Licensing
 
@@ -171,7 +203,7 @@ runtime/dependency license directories into `licenses/` and writes
 not by itself complete the separate corresponding-source/source-offer review
 for every redistributed toolchain DLL.
 
-## Verification snapshot вЂ” 2026-11-09
+## Historical verification log — 2026-11-09 onward
 
 Latest source was rebuilt on Windows UCRT64/MinGW and Linux/WSL after the
 current correctness changes. Windows standalone startup was also checked with

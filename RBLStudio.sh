@@ -29,6 +29,10 @@ WORKER=""
 if [[ -x "$APP_ROOT/bin/linux-x86_64/studio/rbl-studio-wx" && -x "$APP_ROOT/bin/linux-x86_64/studio/rbl-studio-worker" ]]; then
   GUI="$APP_ROOT/bin/linux-x86_64/studio/rbl-studio-wx"
   WORKER="$APP_ROOT/bin/linux-x86_64/studio/rbl-studio-worker"
+elif [[ -x "$APP_ROOT/rbl-studio-wx" && -x "$APP_ROOT/rbl-studio-worker" ]]; then
+  # User installation layout produced by installer/install_linux.sh.
+  GUI="$APP_ROOT/rbl-studio-wx"
+  WORKER="$APP_ROOT/rbl-studio-worker"
 else
   # Developer checkout: the build script atomically updates this pointer.
   unset BUILD_DIR

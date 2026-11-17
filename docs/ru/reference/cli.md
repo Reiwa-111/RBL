@@ -1,4 +1,4 @@
-﻿# last verified: v0.8.0 | 2026.11.10 | CLI AND TEST SUITE DOCUMENTATION
+﻿# last verified: v0.8.1 | 2026.11.17 | CURRENT DOCUMENTATION REVIEW
 
 ## Reference: CLI RBL
 

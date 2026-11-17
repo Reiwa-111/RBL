@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.11 | GATE G TESTING RECONCILIATION
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## How-to: testing RBL
 
-The current 0.8.0 checkout has complementary validation paths: the regression suite, standard-library smoke tests, example-source checks and a differential runner for two backends.
+The current 0.8.1 checkout has complementary validation paths: the regression suite, standard-library smoke tests, example-source checks and a differential runner for two backends.
 
 ## Regression tests
 
@@ -12,7 +12,7 @@ From the checkout root:
 python3 tests/run_tests.py
 ```
 
-The current RBL 0.8.0 checkout contains 63 direct RBL test cases in the final Gate H candidate. The runner executes each case through the active backend and compares the exit code, stdout and selected diagnostic fragments. It includes a seven-argument user-function case to keep the generic call fallback covered beyond the six-register fast-call limit. It also inspects generated assembly for GC safe-point placement: proven non-allocating scalar functions omit redundant checks, allocating functions retain them, and proven fast-integer loops contain no per-iteration `rbl_gc_safepoint` call. A separate code-generation regression test exercises the scalar/allocating distinction at runtime.
+The current RBL 0.8.1 checkout contains 63 direct RBL test cases in the final Gate H candidate. The runner executes each case through the active backend and compares the exit code, stdout and selected diagnostic fragments. It includes a seven-argument user-function case to keep the generic call fallback covered beyond the six-register fast-call limit. It also inspects generated assembly for GC safe-point placement: proven non-allocating scalar functions omit redundant checks, allocating functions retain them, and proven fast-integer loops contain no per-iteration `rbl_gc_safepoint` call. A separate code-generation regression test exercises the scalar/allocating distinction at runtime.
 
 ## Standard library and input
 
@@ -84,7 +84,7 @@ This command runs the complete checkout suite sequentially: direct regression, s
 
 ## Compiler lookup example
 
-The compiler refactor is an internal architecture change; separately, RBL 0.8.0 adds bounded f-string format specifications but no source-level module system. This ordinary RBL example exercises repeated variable/function resolution and string reuse; its hash indexes remain private compiler implementation details:
+The compiler refactor is an internal architecture change; separately, RBL 0.8.1 retains bounded f-string format specifications but no source-level module system. This ordinary RBL example exercises repeated variable/function resolution and string reuse; its hash indexes remain private compiler implementation details:
 
 ```bash
 python3 rbl.py check examples/compiler/lookup_demo.rbl

@@ -1,10 +1,10 @@
-﻿# last verified: v0.8.0 | 2026.11.11 | GATE G VERIFICATION RECONCILIATION
+# last verified: v0.8.1 | 2026.11.17 | CURRENT SOURCE TREE AND ROADMAP
 
 ## Purpose and status
 
-This is the authoritative RBL development plan. It separates the implemented 0.8.0 baseline, unfinished engineering work and future proposals. It defines sequencing, dependencies and exit criteria, not calendar promises.
+This is the authoritative RBL development plan. It separates the implemented 0.8.1 baseline, unfinished engineering work and future proposals. It defines sequencing, dependencies and exit criteria, not calendar promises.
 
-**Current source tree:** root VERSION, CLI and bundled compiler binaries report 0.8.0. This roadmap describes the implementation in that source tree and the remaining engineering milestones. GitHub published `v0.8.0` as a pre-release on 2026-11-10 with no assets; promotion to stable remains separately gated.
+**Current source tree:** root VERSION, CLI and bundled compiler binaries report 0.8.1. This roadmap describes the implementation in that source tree and the remaining engineering milestones. GitHub published the full 0.8.0 source snapshot as `v0.8.0-r2` on 2026-11-15. The older `v0.8.0` pre-release placeholder remains untouched. The current 0.8.1 tree is prepared but not yet published; see the release manifest.
 
 ## Principles
 
@@ -16,9 +16,9 @@ This is the authoritative RBL development plan. It separates the implemented 0.8
 6. **No paper features.** Parsing or a prototype alone is not completion. Require implementation, positive and negative tests, documentation and both-platform checks.
 7. **Release with evidence.** Clean builds, regression, smoke and differential tests, synchronized RU/EN docs and release notes are required.
 
-## Current baseline — RBL 0.8.0
+## Current baseline — RBL 0.8.1
 
-RBL 0.8.0 is a native, single-source-file language/toolchain targeting x86-64 Linux ELF64 and x86-64 Windows PE/COFF. One shared C frontend and code generator emit assembly directly; user RBL source is not translated to C.
+RBL 0.8.1 is a native, single-source-file language/toolchain targeting x86-64 Linux ELF64 and x86-64 Windows PE/COFF. One shared C frontend and code generator emit assembly directly; user RBL source is not translated to C.
 
 The compiler is split into `common.c`, `lexer.c`, `ast.c`, `parser.c`, `sema.c`, `codegen.c` and `driver.c`, with private interfaces in `rblc_internal.h`. Variable, function and string-pool lookup use open-addressed hash indexes. The frontend retains one semantic implementation for both platform targets.
 
@@ -36,7 +36,7 @@ The next language/compiler work package is **v0.9.1 — IR specification and ver
 
 ## RBL 0.8.0 — compiler and runtime stabilization
 
-**Goal:** stabilize the compiler/runtime architecture, introduce bounded f-string format specifications and preserve existing language behavior outside that explicit syntax addition. RBL 0.8.0 does not include the source-module system.
+**Goal:** stabilize the compiler/runtime architecture, introduce bounded f-string format specifications and preserve existing language behavior outside that explicit syntax addition. RBL 0.8.1 does not include the source-module system.
 
 ### 0.8.0 — compiler source modularization and lookup performance
 
@@ -79,11 +79,11 @@ The next language/compiler work package is **v0.9.1 — IR specification and ver
 
 **0.8 completion state:** the modular compiler, versioned ABI, documented string lifetime model, bounded f-string format specs and cross-platform verification criteria are implemented. Remaining limitations are listed in the language reference and manifest.
 
-### 0.8.0 release checklist
+### Historical 0.8.0 compiler/runtime checklist
 
-This checklist records the implementation and verification state of RBL 0.8.0. It does not authorize promotion from the already published pre-release to a stable release.
+This historical checklist records the compiler/runtime implementation state of RBL 0.8.0. The complete 0.8.0 source snapshot was later published as `v0.8.0-r2`; current 0.8.1 desktop and distribution status is recorded in the release manifest.
 
-**Scope clarification:** 6/6 means the compiler/Runtime 0.8.0 work packages and their recorded verification are complete. It does not mean the complete desktop product is release-ready. IDE interactive acceptance and the Windows bundled-toolchain corresponding-source/source-offer review are separate open distribution gates tracked in [`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt).
+**Scope clarification:** 6/6 means the compiler/Runtime 0.8.0 work packages and their recorded verification are complete. It does not describe the 0.8.1 desktop product. IDE acceptance and distribution scope are tracked in [`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt); separate corresponding-source archives are not GitHub release deliverables, while third-party obligations for bundled binaries remain applicable.
 
 1. [x] **Architecture** — modular compiler, private module boundaries, lookup indexes, preserved semantics and reproducible compiler/build measurements.
 2. [x] **Runtime ABI** — versioned descriptor, link/startup compatibility checks, value layout, calling convention and required feature bits.
@@ -92,7 +92,7 @@ This checklist records the implementation and verification state of RBL 0.8.0. I
 5. [x] **F-string formatting** — bounded grammar, parser/runtime agreement, runtime type errors, managed output and boundary/differential coverage.
 6. [x] **Final verification** — 63 direct regression cases pass; all 116 positive sources across the 53-example/70-test inventory compile and assemble, while 7 negative sources are rejected; the 63-scenario diagnostics suite passes; the current 85-case differential run passes with 62 successful-output comparisons, 11 expected-runtime-error comparisons, 7 expected-negative diagnostic comparisons and 5 nondeterministic build/exit comparisons, and all 30 diagnostic differential cases match. Runtime ABI, instrumented Linux Runtime call alignment, cache isolation, deterministic OOM/GC/ownership and repeated I/O-under-GC tests pass. The tracked corpus and documentation validators pass. Runtime, module-isolation and Makefile build benchmarks are recorded with environment and measurement caveats. Fresh source-only compiler/Runtime builds and execution pass in Windows and WSL sandboxes. English/Russian documentation, README, VERSION and the published pre-release manifest are synchronized.
 
-[`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt) is the single manifest for the RBL 0.8.0 release. GitHub published it as a pre-release on 2026-11-10 with no assets; keep that state explicit until all stable-release gates pass.
+[`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt) is the current manifest for 0.8.1 release preparation and preserves the history of the published 0.8.0-r2 snapshot and older v0.8.0 placeholder.
 
 ## v0.9 — RBL IR, CFG and optimizer
 

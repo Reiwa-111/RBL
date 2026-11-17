@@ -10,6 +10,8 @@ $RegistryRoot = Resolve-RblRegistryClassesRoot $RegistryClassesRoot
 if (-not $InstallDir) {
     if (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.rblstudio-install.json') -PathType Leaf) {
         $InstallDir = $PSScriptRoot
+    } elseif (Test-Path -LiteralPath (Join-Path $PSScriptRoot '..\.rblstudio-install.json') -PathType Leaf) {
+        $InstallDir = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
     } else {
         $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\RBLStudio'
     }

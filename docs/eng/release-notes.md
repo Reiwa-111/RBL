@@ -1,6 +1,61 @@
-# RBL 0.8.0 — release notes
+# RBL 0.8.1 / 0.8.0 — release notes
 
-Last verified: 2026-11-15
+Last verified: 2026-11-17
+
+## RBL 0.8.1 — release preparation (not yet published)
+
+RBL 0.8.1 is the current release-preparation tree. The published `v0.8.0-r2`
+source snapshot remains unchanged; no 0.8.1 tag or GitHub release has been
+created as part of this documentation work.
+
+### Added
+
+- Native first-run setup and installer wizard in the wxWidgets IDE. It checks
+the application root, worker, Python runtime and compiler toolchain, records
+per-user setup preferences, supports an explicit source-checkout development
+path, and can run the platform user-scope Install / Repair workflow
+asynchronously when a complete installer payload is available. The wizard can
+also be reopened from Settings.
+- Linux native wxWidgets GUI + Rust worker build and shell install path, verified
+on Ubuntu 24.04 with system wxWidgets 3.2.4 (`RBL_USE_SYSTEM_WX=1`). GTK 3 and
+the host display stack remain host dependencies for this native path.
+- Flatpak payload preparation using the Linux app-local CPython runtime and
+excluding Windows runtime files and transient Python bytecode from the staged
+payload. A local Flatpak bundle was built and installed; sandbox CLI checks
+(`version`, `doctor`, `check`, `run`) passed.
+
+### Changed
+
+- GitHub release policy is the tagged repository source tree. No separately
+assembled ZIP/portable archive, binary release asset or corresponding-source
+archive is a release deliverable or publication gate. Third-party notices,
+license texts, provenance URLs and hashes remain in the repository; this policy
+does not waive obligations that apply when bundled third-party binaries are
+redistributed.
+- Windows DPI acceptance now includes the user's confirmation that the real
+mixed-DPI scenario was tested successfully. The work log separately records
+the automated/live two-monitor persistence, floating-pane restoration, saved
+layout migration and off-screen recovery checks.
+
+### Verification and disclosed limits
+
+- `python rbl.py test`: PASS; 63/63 direct ASM cases and 63/63 compiler
+diagnostics. Windows CTest: 15/15. Linux CTest: 14/14. DPI static tests: 12/12.
+- Flatpak payload tests: 6/6. Documentation validation: 103 Markdown files,
+538 relative links, no broken links, and matching English/Russian heading
+hierarchy.
+- The user confirms that the two-hour (7,200-second) Windows resource soak completed successfully. It is marked PASS by user confirmation; raw CSV/verdict and final GUI/worker hashes have not yet been independently re-audited in this workspace. A pristine-VM run is not recorded.
+- The Flatpak GUI/display/portal path and Flathub publication are not claimed as
+accepted. Native Linux GUI/install verification is scoped to Ubuntu 24.04.
+- Binutils 2.47-4 remains listed for CVE-2026-90801; the documented residual-risk
+scope is limited to the supported compiler-generated COFF workflow and does not
+mean the upstream finding is fixed. The Windows `ReplaceFileW` destination-leaf
+race remains documented for 0.9. POSIX existing-target saves fail closed when
+atomic exchange is unavailable.
+- Third-party notices and provenance are present, but this changelog is not a
+formal legal opinion or a blanket clearance to redistribute bundled binaries.
+
+The 0.8.1 tree has completed content, cleanup and regression validation. The two-hour soak is user-confirmed PASS; pristine-VM and interactive Flatpak GUI/portal checks remain unverified. Git commit, push, tag and GitHub Release publication are the remaining release operations.
 
 ## RBL 0.8.0 — full release
 

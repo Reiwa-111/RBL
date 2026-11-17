@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | COMPILER PERFORMANCE AUDIT
+# last verified: v0.8.1 | 2026.11.17 | BENCHMARK BASELINE CONTEXT
 
 ## Explanation: производительность RBL
 
@@ -9,7 +9,7 @@
 1. `benchmarks/run_benchmarks.py` измеряет только RBL: сборку, полное время запуска, startup-adjusted net и размер исполняемого файла. Он поддерживает активный backend.
 2. `benchmarks/compare_all.py` сопоставляет пять реализаций одинаковых синтетических workloads: RBL, C `-O2`, C++ `-O2`, CPython и handwritten x86-64 ASM. Запускается на Linux/WSL из-за Linux syscalls в ASM baseline.
 
-Детали запуска и рекомендации — в [how-to benchmark](../how-to/benchmarking.md). В [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md) приведено текущее десятисерийное runtime-измерение RBL 0.8.0. Финальный запуск был привязан к одному CPU, но выполнялся во время обучения RENA; ограничение фоновой нагрузки указано рядом с результатами.
+Детали запуска и рекомендации — в [how-to benchmark](../how-to/benchmarking.md). В [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md) приведён десятисерийный runtime baseline RBL 0.8.0, сохранённый для сравнения с 0.8.1. Финальный запуск был привязан к одному CPU, но выполнялся во время обучения RENA; ограничение фоновой нагрузки указано рядом с результатами.
 
 Отдельный [performance-аудит компилятора](../../../benchmarks/PERFORMANCE_AUDIT.md) изолирует стоимость translation-unit boundaries, проверяет параллельную/инкрементальную сборку и профилирует hot paths. Эти значения нельзя смешивать с runtime benchmark: они измеряют сам компилятор, а не сгенерированную программу.
 

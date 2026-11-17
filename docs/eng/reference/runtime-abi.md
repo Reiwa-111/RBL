@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.09 | RUNTIME ABI REFERENCE RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## Runtime ABI v1
 
-**Status:** implemented in RBL 0.8.0. The ABI version is independent of the language/compiler version in `VERSION`.
+**Status:** implemented in RBL 0.8.1. The ABI version is independent of the language/compiler version in `VERSION`.
 
 ## Version policy
 
@@ -99,7 +99,7 @@ String payloads remain pointers to NUL-terminated bytes, but dynamically allocat
 - A dynamic string is live while its exact base pointer appears as a pointer-shaped machine word anywhere in the scanned stack range, or is reachable as a string-valued element/key/value in a live container. The stack scan is conservative and does not validate the word's tag. Aliases do not create separate ownership; all aliases refer to the same allocation.
 - Collection is performed at compiler-emitted safe points before statements that may allocate or call code with unknown allocation behavior, and at loop-condition safe points. Proven non-allocating integer/Boolean scalar statements omit redundant safe points. At collection points, live RBL locals have been spilled into stack slots and expression temporaries from the preceding statement are no longer live. Runtime allocators do not trigger collection in the middle of an expression.
 - The collector scans stack words on the current thread between its active frame and the frame pointer captured from generated `main`. A materialized pointer in a native C stack local within that range is therefore a conservative root while that frame remains active; this is not an explicit rooting guarantee. Native heap/global storage and other threads are not scanned. Native code must not retain a managed pointer only in those locations or after all corresponding RBL/stack roots cease to be live. `rbl_string_free` is an internal Runtime helper, not an application-level ownership-transfer API; the ABI provides no pinning or explicit root-handle API.
-- Runtime state and collector registries are process-global and unsynchronized. The 0.8.0 Runtime supports one execution thread: native callers must invoke Runtime helpers only on the thread that entered generated RBL `main`, and must not call them concurrently from other threads. There is no thread-registration or per-thread stack-root protocol.
+- Runtime state and collector registries are process-global and unsynchronized. The 0.8.1 Runtime supports one execution thread: native callers must invoke Runtime helpers only on the thread that entered generated RBL `main`, and must not call them concurrently from other threads. There is no thread-registration or per-thread stack-root protocol.
 - The collector is conservative: an incidental pointer-shaped word on the scanned stack may keep an object alive longer than necessary. It does not move objects, so a live string's address remains stable.
 - If mark-stack, survivor-vector or replacement-container-registry allocation fails, collection clears temporary marks and aborts before sweeping; the existing heap remains intact and a later safe point may retry. Failure to compact the string registry leaves its existing table valid.
 

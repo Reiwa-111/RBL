@@ -9,9 +9,8 @@
   ],
   "platform": "windows-x86_64",
   "python_version": "3.14.10",
-  "redistribution_review": "license materials included; upstream source archives are not bundled in this checkout and the public source-delivery route awaits formal legal sign-off",
+  "redistribution_review": "license texts and notices included; formal legal sign-off pending",
   "schema_version": 1,
-  "source_archives_bundled": false,
   "runtime_trim": {
     "reason": "optional extension modules not used by the RBL backend were removed to reduce payload size",
     "removed": [
@@ -20,24 +19,6 @@
       "_zstd", "libcrypto-3.dll", "libssl-3.dll", "libtommath.dll",
       "pyexpat.pyd", "python.cat", "pythonw.exe", "sqlite3.dll", "winsound.pyd"
     ]
-  },
-  "source_archives": {
-    "cpython": {
-      "filename": "Python-3.14.10.tar.xz",
-      "license": "PSF-2.0",
-      "sha256": "de414a57119abef52784d8993e341d53aed635fc2b05c2607d9f98a2c5b72032",
-      "size": 24240392,
-      "source_ref": "CPython v3.14.10",
-      "url": "https://www.python.org/ftp/python/3.14.10/Python-3.14.10.tar.xz"
-    },
-    "python_build_standalone": {
-      "filename": "python-build-standalone-20261110.tar.gz",
-      "license": "MPL-2.0",
-      "sha256": "63b8166347616283ee6d3ed449e957bc71b65368bc60945d21ab957e6fcaee49",
-      "size": 470059,
-      "source_ref": "20261110 / 9244801782b78e4c4afc5c82a4524aa2101d3298",
-      "url": "https://github.com/astral-sh/python-build-standalone/archive/refs/tags/20261110.tar.gz"
-    }
   },
   "upstream_url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip"
 }

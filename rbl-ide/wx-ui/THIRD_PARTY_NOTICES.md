@@ -1,6 +1,6 @@
 # RBL Studio wx frontend — third-party component inventory
 
-Snapshot: 2026-11-10. This is an engineering inventory, not legal advice or a
+Snapshot: 2026-11-17 (RBL Studio 0.8.1 release preparation). This is an engineering inventory, not legal advice or a
 certification that binary redistribution obligations have been satisfied.
 
 ## GUI and runtime dependencies
@@ -54,49 +54,36 @@ into both platform build payloads.
 
 The worker closure includes option-ext 0.2.0 (MPL-2.0), unicode-ident
 (Unicode-3.0 in addition to MIT/Apache-2.0), and dependencies offering
-Apache-2.0 WITH LLVM-exception and Unlicense alternatives. The exact
-corresponding-source bundle includes worker/shared source files, Cargo.toml,
-Cargo.lock, repository LICENSE, and all 28 exact active crate source archives.
-Both build scripts copy it to source/Rust-worker-source.tar.zst; installers
-verify the adjacent SHA-256 manifest and retain the archive in the installed
-application tree. Bundle path:
+Apache-2.0 WITH LLVM-exception and Unlicense alternatives. Their package license
+and notice texts are retained under `licenses/Rust/` and are copied into build
+payloads. The Rust worker source itself is in the repository under
+`rbl-ide/worker/`, with dependency versions pinned by `Cargo.lock`.
 
-build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261114-release-recheck-r4.tar.zst
-
-Size: 8,255,104 bytes. SHA-256: 0ddd19ba6b4c049fcbef95d32462f6f8b9ebf5788a9077f389c5a1c53ec4340c.
-
-This inventory is not legal certification. The separate MSYS2 source bundle
-and corresponding distribution review remain outstanding. Neither source
-bundle is attached to the published v0.8.0 pre-release.
+A local corresponding-source bundle was assembled during the 0.8.0 audit at
+`build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261114-release-recheck-r4.tar.zst`
+(8,255,104 bytes; SHA-256
+`0ddd19ba6b4c049fcbef95d32462f6f8b9ebf5788a9077f389c5a1c53ec4340c`). This is
+historical verification material only: it is not tracked, not copied into current
+wx build/install payloads, and not a GitHub release deliverable.
 
 ## Corresponding source and distribution status
 
-- The exact-version source archives for the 11 wxWidgets/runtime dependency
-  sources were downloaded and signature-verified as part of the 20-archive
-  corresponding-source set. Their embedded upstream archive hashes match the package
-  PKGBUILD SHA-256 entries.
-- Source archive sizes, SHA-256 values, signature evidence and the complete
-  package list are recorded in
-  [the source archive audit](../../toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md).
-- The `libstdc++` runtime package is a GCC 16.2.0-4 split package; its
-  corresponding source is included in the same `mingw-w64-gcc-16.2.0-4` source
-  archive as the GCC and libgcc packages. Both `libwinpthread/COPYING` and
+- Exact-version source archives for the 11 wxWidgets/runtime dependency sources
+  were downloaded and signature-verified as part of the historical 20-archive
+  audit set. Their upstream archive hashes match package PKGBUILD SHA-256 entries.
+- Source archive sizes, SHA-256 values, signature evidence and package coverage
+  are recorded in [the source archive audit](../../toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md).
+- The `libstdc++` runtime package is a GCC 16.2.0-4 split package; its source is
+  part of the same upstream GCC source package. Both `libwinpthread/COPYING` and
   `winpthreads/COPYING` are copied explicitly; their contents are byte-identical
   (SHA-256 `63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177`).
-- A new source-material archive containing all 20 current source
-  archives, detached signatures, five signed package archives and audit metadata
-  has been assembled locally at
-  `build/source-material/RBL-0.8.0-Windows-Source-Materials-20261111-final-reviewed.tar.zst`.
-  SHA-256: `2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066`.
-  It supersedes the lost 2026-11-10 archive and is not part of the runtime payload.
-- The MSYS2 toolchain/wx source archive remains separate from the runtime
-  payload. The Rust worker source archive is copied into newly built wx payloads
-  and then into the installed application tree; existing RC directories predate
-  this change and do not contain it.
-- No written source offer has been completed or legally reviewed. Do not claim
-  redistribution compliance or publish the portable binary until the source
-  bundle is actually supplied with the binaries or an applicable offer is
-  reviewed for each redistributed component.
+- The historical Windows source-material archive contains the 20 source archives,
+  detached signatures, five signed package archives and audit metadata. It is
+  not part of the current repository source tree or runtime payload.
+- The current 0.8.1 GitHub release model publishes the tagged repository source
+  tree directly and does not assemble separate corresponding-source archives.
+  This does not waive third-party obligations for bundled binaries. No formal
+  legal review or redistribution certification is claimed by this inventory.
 
 The zlib runtime DLL was upgraded from 1.3.2-2 to the signed 1.4-2 MSYS2 package
 on 2026-11-10. The new DLL's imported-symbol compatibility was checked against

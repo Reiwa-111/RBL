@@ -1,0 +1,14 @@
+// RBL 0.8.x: bounded f-string formatting for aligned reports.
+func main() (
+    set item_a = "compiler"
+    set item_b = "runtime"
+    set count_a = 7
+    set count_b = 12
+
+    print("COMPONENT       CASES")
+    print(f"{item_a:<14s} {count_a:>5d}")
+    print(f"{item_b:<14s} {count_b:>5d}")
+    set total_label = "total"
+    set total = count_a + count_b
+    print(f"{total_label:<14s} {total:>5d}")
+)

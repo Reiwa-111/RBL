@@ -99,6 +99,9 @@ if(BUILD_TESTING)
     add_executable(rbl-studio-app-root-test tests/app_root_test.cpp)
     target_include_directories(rbl-studio-app-root-test PRIVATE include)
     add_test(NAME rbl-studio-app-root COMMAND rbl-studio-app-root-test)
+    add_executable(rbl-studio-setup-diagnostics-test tests/setup_diagnostics_test.cpp)
+    target_include_directories(rbl-studio-setup-diagnostics-test PRIVATE include)
+    add_test(NAME rbl-studio-setup-diagnostics COMMAND rbl-studio-setup-diagnostics-test)
     add_executable(rbl-studio-theme-palette-test tests/theme_palette_test.cpp)
     target_include_directories(rbl-studio-theme-palette-test PRIVATE include)
     target_link_libraries(rbl-studio-theme-palette-test PRIVATE ${RBL_WX_LIBRARIES})
@@ -133,6 +136,10 @@ if(BUILD_TESTING)
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/find_replace_static_test.py")
         add_test(NAME rbl-studio-visual-consistency-static
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/visual_consistency_static_test.py")
+        add_test(NAME rbl-studio-setup-wizard-static
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/setup_wizard_static_test.py")
+        add_test(NAME rbl-studio-installer-self-repair-static
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../../tests/test_installer_self_repair.py")
         add_test(NAME rbl-studio-save-security-static
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../../tests/test_wx_save_dirfd_security.py")
         add_test(NAME rbl-studio-worker-lifecycle-static

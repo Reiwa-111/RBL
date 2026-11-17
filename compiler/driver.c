@@ -16,7 +16,7 @@
 #endif
 
 #ifndef RBL_VERSION
-#define RBL_VERSION "0.8.0"
+#define RBL_VERSION "0.8.1"
 #endif
 
 static char *read_file_asm(const char*path,size_t*out_len){FILE*f=fopen(path,"rb");if(!f){perror(path);exit(1);}fseek(f,0,SEEK_END);long n=ftell(f);rewind(f);if(n<0)fatal("cannot stat input");char*s=xmalloc((size_t)n+1);if(fread(s,1,(size_t)n,f)!=(size_t)n){perror("read");exit(1);}s[n]=0;fclose(f);*out_len=(size_t)n;return s;}

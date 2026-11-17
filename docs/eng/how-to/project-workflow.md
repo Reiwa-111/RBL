@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.11 | GATE G PROJECT WORKFLOW RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT DOCUMENTATION REVIEW
 
 ## How-to: project workflow
 

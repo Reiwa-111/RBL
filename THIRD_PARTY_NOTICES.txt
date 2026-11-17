@@ -1,4 +1,4 @@
-﻿RBL Studio portable build - third-party runtime notices
+﻿RBL Studio 0.8.1 Windows runtime bundle - third-party notices
 
 This directory redistributes wxWidgets and the runtime/dependency DLLs listed
 by the exact MSYS2 UCRT64 package versions below. Corresponding license texts
@@ -38,20 +38,17 @@ The Rust worker dependency closure is listed in licenses/Rust/THIRD_PARTY_NOTICE
 package-specific license texts are preserved under licenses/Rust/<crate>-<version>/.
 
 The mingw-w64-ucrt-x86_64-libstdc++ split package is covered by the same
-mingw-w64-gcc source archive listed below. The libwinpthread and winpthreads
-license directories are copied separately; their COPYING files are byte-identical.
+upstream GCC package source. The libwinpthread and winpthreads license
+directories are copied separately; their COPYING files are byte-identical.
 
-The exact corresponding source materials for the redistributed Windows
-MinGW-w64/GCC/Binutils/wxWidgets/runtime package closure are included at
-source/Windows-toolchain-source.tar.zst (SHA-256: 2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066). The archive contains
-the exact upstream source archives and signature/audit material for the
-20 redistributed MSYS2 package families. Verify the archive with
-source/Windows-toolchain-source.sha256. Keep this archive beside any binary
-installer or portable package; do not distribute the binaries without it.
-Rust worker corresponding-source archive is included at
-source/Rust-worker-source.tar.zst (SHA-256: 7f814086a67a007b5fcbf7d871ae45a5fb990f644d884215eaf00ce6541d393f).
-The archive contains worker source, Cargo manifests and exact active crate
-source archives; verify it with source/Rust-worker-source.sha256.
+The repository records upstream source URLs, package versions, hashes and
+historical source-archive verification in toolchain/windows-x86_64/SOURCE_CODE.md
+and SOURCE_ARCHIVE_AUDIT.md. Separate Windows toolchain and Rust corresponding-
+source archives are not included in the current 0.8.1 repository release or
+build/install payload. The GitHub release model publishes the tagged repository
+source tree directly and does not create separate ZIP or source archives. This
+format does not waive any third-party obligations that apply to bundled binaries;
+this inventory is not legal certification.
 App-local CPython 3.14.10 embeddable runtime is included under runtime/python.
 The verified official Python.org package SHA-256 is
 90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159.

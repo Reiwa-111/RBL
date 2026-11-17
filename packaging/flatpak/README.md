@@ -20,7 +20,7 @@ build utilities:
 bash tools/build_wx_ide.sh build/portable-linux
 ```
 
-Prepare the isolated application root and verify its bundled source archives:
+Prepare the isolated application root and verify its staged file/checksum manifest. Separate corresponding-source archives are not staged or required as GitHub release deliverables:
 The output must be on a case-sensitive Linux filesystem. In WSL, do not place
 the prepared payload under `/mnt/c`, `/mnt/q`, or another Windows-mounted drive;
 the Python runtime contains case-distinct terminfo entries. The preparer rejects
@@ -43,20 +43,22 @@ Install the GNOME 51 SDK/runtime and build the local Flatpak bundle:
 flatpak install flathub org.gnome.Platform//51 org.gnome.Sdk//51
 flatpak-builder --force-clean --repo="$HOME/.cache/rbl-studio/flatpak-repo" \
   "$HOME/.cache/rbl-studio/flatpak-build" "$MANIFEST"
-flatpak build-bundle "$HOME/.cache/rbl-studio/flatpak-repo" "$HOME/RBLStudio-0.8.0-linux-x86_64.flatpak" \
+flatpak build-bundle "$HOME/.cache/rbl-studio/flatpak-repo" "$HOME/RBLStudio-0.8.1-linux-x86_64.flatpak" \
   com.reiwa.rblstudio
 ```
 
 Install and run locally:
 
 ```sh
-flatpak install --user build/RBLStudio-0.8.0-linux-x86_64.flatpak
+flatpak install --user "$HOME/RBLStudio-0.8.1-linux-x86_64.flatpak"
 flatpak run com.reiwa.rblstudio
 ```
 
-The bundle includes the RBL source tree, third-party notices, the exact
-wxWidgets and CPython corresponding-source archives, and the Rust worker
-corresponding-source archive. The app-local LLVM binary is distributed under
+The bundle includes the RBL source tree, third-party notices and license texts,
+plus toolchain provenance/source URL and checksum inventories. It does not stage
+separate wxWidgets, CPython, or Rust corresponding-source archives. This source-tree
+release policy does not waive third-party obligations for bundled binaries. The
+app-local LLVM binary is distributed under
 Apache-2.0 with LLVM Exceptions; its complete license text, source commit,
 verified detached GPG signature and provenance checksums are included in
 `toolchain/linux-x86_64/`.

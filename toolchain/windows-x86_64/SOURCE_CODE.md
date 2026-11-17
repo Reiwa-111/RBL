@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.12 | WINDOWS TOOLCHAIN SOURCE INVENTORY
+# last verified: v0.8.1 | 2026.11.17 | SOURCE URL / HASH INVENTORY AND SOURCE-ONLY RELEASE POLICY
 
 # Windows toolchain corresponding-source inventory
 
@@ -56,19 +56,22 @@ signature and installed DLL hash were checked.
   `bundle_sha256.txt`; it is omitted here to avoid a self-referential digest).
   Its 55 SHA256SUMS records cover every other file: 20 source archives and
   detached signatures, five signed binary packages and audit/manifest material.
-- Fresh Windows build payloads now copy that exact archive to
-  `source/Windows-toolchain-source.tar.zst` with a SHA-256 sidecar. The Windows
-  installer requires the archive, verifies its hash before staging, installs it
-  beside the application and verifies it again after installation. It must
-  remain beside every binary distribution; do not detach it from the installer
-  or portable package.
-- No written offer is needed for a distribution that actually includes the
-  complete corresponding-source archive as a sibling download/installed source
-  item, but the distribution process must preserve that pairing. Any alternative
-  source-offer route still requires legal review.
+- The assembled archive described above is historical local audit material. It is
+  not tracked in the repository, not copied by the current Windows build/installer,
+  and not included in the 0.8.1 GitHub source-tree release or installed payload.
+  The current release policy does not create separate corresponding-source
+  archives. Upstream source URLs, package versions and verification evidence
+  remain indexed here and in `SOURCE_ARCHIVE_AUDIT.md`.
+- The preceding written-offer statement is conditional only: it describes a
+  hypothetical distribution that actually includes the complete corresponding-
+  source archive as a sibling download/installed source item. It does not describe
+  the current 0.8.1 payload, which does not include such an archive. Any alternative
+  source-offer route requires legal review.
 
-These results establish archive integrity and source correspondence, not a legal
-certification. The current local Windows payload now contains the corresponding
-source archive; the public pre-release still has no binary/source assets attached.
+These results establish the integrity and correspondence of the historical local
+source-material audit set, not a legal certification. No corresponding-source
+archive is included in the current Windows payload or GitHub source-tree release.
+Third-party obligations that apply to redistributed bundled binaries remain a
+separate compliance matter; this inventory is not legal advice.
 The links above are source-location references and do not guarantee that
 third-party mirrors will retain every historical archive.

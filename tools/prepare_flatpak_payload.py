@@ -30,7 +30,13 @@ def sha256_file(path: Path) -> str:
 def copy_tree(source: Path, destination: Path) -> None:
     if not source.is_dir():
         raise RuntimeError(f"required source directory is missing: {source}")
-    shutil.copytree(source, destination, symlinks=True, dirs_exist_ok=True)
+    shutil.copytree(
+        source,
+        destination,
+        symlinks=True,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
 
 
 def copy_file(source: Path, destination: Path) -> None:
@@ -80,18 +86,6 @@ def require_case_sensitive_parent(parent: Path) -> None:
             )
     finally:
         shutil.rmtree(str(probe), ignore_errors=True)
-
-
-def verify_source_archive(source_dir: Path, filename: str, checksum_filename: str) -> str:
-    archive = source_dir / filename
-    checksum = (source_dir / checksum_filename).read_text(encoding="utf-8").strip()
-    fields = checksum.split()
-    if len(fields) != 2 or fields[1] != filename or len(fields[0]) != 64:
-        raise RuntimeError(f"malformed source checksum sidecar: {source_dir / checksum_filename}")
-    actual = sha256_file(archive)
-    if actual.lower() != fields[0].lower():
-        raise RuntimeError(f"source archive hash mismatch: {archive} ({actual})")
-    return actual
 
 
 def _write_launchers(output: Path) -> None:
@@ -164,7 +158,6 @@ def prepare(build_dir: Path, output: Path) -> Path:
         build_dir / "runtime" / "python" / "python-runtime.tar.gz",
         build_dir / "runtime" / "python" / "rbl-python-runtime.json",
         build_dir / "licenses",
-        build_dir / "source",
     ]
     for path in required_build:
         if not path.exists():
@@ -192,10 +185,6 @@ def prepare(build_dir: Path, output: Path) -> Path:
     if sha256_file(build_dir / "toolchain/linux-x86_64/bin/llvm") != llvm_manifest["binary_sha256"]["bin/llvm"]:
         raise RuntimeError("app-local LLVM binary failed its manifest checksum")
 
-    wx_hash = verify_source_archive(build_dir / "source", "wxWidgets-3.2.4.tar.bz2", "wxWidgets-3.2.4.sha256")
-    rust_hash = verify_source_archive(build_dir / "source", "Rust-worker-source.tar.zst", "Rust-worker-source.sha256")
-    cpython_hash = verify_source_archive(build_dir / "source", "Python-3.14.10.tar.xz", "Python-3.14.10.tar.xz.sha256")
-    pbs_hash = verify_source_archive(build_dir / "source", "python-build-standalone-20261110.tar.gz", "python-build-standalone-20261110.tar.gz.sha256")
     python_archive = build_dir / "runtime/python/python-runtime.tar.gz"
     python_manifest = json.loads((build_dir / "runtime/python/rbl-python-runtime.json").read_text(encoding="utf-8"))
     if sha256_file(python_archive) != python_manifest.get("archive_sha256"):
@@ -210,15 +199,23 @@ def prepare(build_dir: Path, output: Path) -> Path:
     staging.mkdir()
     try:
         for name in (
-            "tools", "compiler", "runtime", "tests", "benchmarks", "examples",
+            "tools", "compiler", "tests", "benchmarks", "examples",
             "docs", "assets", "rbl-ide",
         ):
             copy_tree(ROOT / name, staging / name)
+        # The source checkout's runtime/python directory is the Windows
+        # app-local runtime. Flatpak must extract the verified Linux archive
+        # below instead of copying those Windows binaries into the sandbox.
+        shutil.copytree(
+            ROOT / "runtime",
+            staging / "runtime",
+            symlinks=True,
+            ignore=shutil.ignore_patterns("python", "__pycache__", "*.pyc"),
+        )
         copy_tree(ROOT / "bin/linux-x86_64", staging / "bin/linux-x86_64")
         copy_tree(build_dir / "lib", staging / "lib")
         copy_tree(build_dir / "toolchain/linux-x86_64", staging / "toolchain/linux-x86_64")
         copy_tree(build_dir / "licenses", staging / "licenses")
-        copy_tree(build_dir / "source", staging / "source")
 
         for name in ("VERSION", "rbl.py", "rbl", "rbl.toml", "Cargo.toml", "Cargo.lock", "Makefile", "README.md", "LICENSE", "RELEASE_MANIFEST.txt"):
             source = ROOT / name
@@ -250,10 +247,7 @@ def prepare(build_dir: Path, output: Path) -> Path:
             "python_version": "3.14.10",
             "wxwidgets_version": "3.2.4",
             "llvm_version": "23.1.5",
-            "wxwidgets_source_sha256": wx_hash,
-            "rust_worker_source_sha256": rust_hash,
-            "cpython_source_sha256": cpython_hash,
-            "python_build_standalone_source_sha256": pbs_hash,
+            "release_source_model": "github_repository_tree",
             "build_dir": str(build_dir),
         }
         (staging / ".rbl-flatpak-payload.json").write_text(json.dumps(marker_data, indent=2) + "\n", encoding="utf-8")
@@ -263,7 +257,7 @@ def prepare(build_dir: Path, output: Path) -> Path:
         required_root_markers = (
             "VERSION", "rbl.py", "tools/rbltool.py", "tests/run_tests.py",
             "benchmarks/run_benchmarks.py", "compiler", "runtime", "toolchain",
-            "runtime/python/bin/python3", "lib", "source/wxWidgets-3.2.4.tar.bz2",
+            "runtime/python/bin/python3", "lib",
             "LINUX_ABI_AUDIT.txt", "PYTHON_RUNTIME_ELF_AUDIT.txt", "SHA256SUMS",
         )
         for marker in required_root_markers:

@@ -1,10 +1,12 @@
-# last verified: v0.8.0 | 2026.11.11 | DOCUMENTATION RELEASE STATUS
+# last verified: v0.8.1 | 2026.11.17 | RELEASE PREPARATION AND DOCUMENTATION STATUS
 
 ## RBL documentation
 
-This documentation describes the **RBL 0.8.0 language, compiler, runtime and toolchain contract** and follows [Diátaxis](https://diataxis.fr/): tutorials, how-to guides, reference material and explanations. It documents implemented behavior, not proposed features.
+This documentation describes the **RBL 0.8.1 language, compiler, runtime and toolchain contract** and follows [Diataxis](https://diataxis.fr/): tutorials, how-to guides, reference material and explanations. It documents implemented behavior, not proposed features.
 
 ## Start here
+
+- [0.8.x tutorials](tutorials/README.md) — ten focused lessons on 0.8.x additions and IDE workflows.
 
 | Section | Purpose | Main pages |
 |---|---|---|
@@ -15,16 +17,16 @@ This documentation describes the **RBL 0.8.0 language, compiler, runtime and too
 
 ## Supported version and scope
 
-- Repository/compiler version: `0.8.0`; the source of truth is [`../../VERSION`](../../VERSION).
+- Repository/compiler version: `0.8.1`; the source of truth is [`../../VERSION`](../../VERSION).
 - Targets: x86-64 Linux (ELF64) and x86-64 Windows (PE/COFF).
 - User programs are compiled to machine code through direct x86-64 assembly generation.
 - RBL Studio is an optional graphical IDE; the CLI and compiler can be used independently.
-- The primary RBL Studio launcher/install path uses the native wxWidgets 3.2 + Scintilla frontend in `rbl-ide/wx-ui/` with the Rust `rbl-studio-worker`. Linux build scripts now stage wxWidgets 3.2.4, Clang integrated assembler, LLD and CPython locally; the Flatpak manifest declares GNOME Platform 51 to supply GTK. The native Linux shell installer still uses the host GTK runtime. The wxWidgets build, native installer/CLI acceptance and portable packaging pass; the Flatpak bundle remains in progress; see [Linux packaging](how-to/linux-packaging.md). The previous Rust/egui source remains as a legacy reference; `RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately built executable from a developer checkout when wx is unavailable, but the legacy executable is not included in the wx installer payload. The 0.8.0 Windows payload is the repository checkout itself (GUI, Rust worker and their wx DLLs under `bin/win-x86_64/studio/`, app-local CPython under `runtime/python`, pinned toolchain under `toolchain/`) and is locally verified; it was published on 2026-11-15 as `v0.8.0-r2`. The older GitHub `v0.8.0` entry remains the pre-release placeholder with no assets. The remaining IDE/soak, pristine-VM and source-delivery/legal gates are recorded in the release manifest.
+- The primary RBL Studio launcher/install path uses the native wxWidgets 3.2 + Scintilla frontend in `rbl-ide/wx-ui/` with the Rust `rbl-studio-worker`. The native Linux build and shell install path were verified on Ubuntu 24.04 with system wxWidgets 3.2.4 and host GTK 3. The Flatpak payload and sandbox CLI checks passed locally; interactive GUI/portal and Flathub acceptance are not claimed. The native first-run setup wizard provides prerequisite diagnostics, per-user setup state and asynchronous Install / Repair when a complete installer payload is available. Windows mixed-DPI acceptance was confirmed by the user after live testing. The 0.8.1 tree is prepared for release but not yet published; `v0.8.0-r2` remains the published source snapshot. The older GitHub `v0.8.0` entry remains the pre-release placeholder.
 - Source imports, multi-file compilation and dependency management are not implemented.
 
-RBL 0.8.0 includes bounded f-string format specifications, Runtime ABI 1.2.0, managed dynamic strings, source-position diagnostics and the modular compiler implementation. Page-level `last verified` markers identify the most recent technical review of each page.
+RBL 0.8.1 retains the 0.8.0 language/compiler contract, including bounded f-string format specifications, Runtime ABI 1.2.0, managed dynamic strings, source-position diagnostics and the modular compiler implementation. Page-level `last verified` markers identify the most recent technical review of each page.
 
-The bundled Windows MinGW-w64 toolchain, Linux LLVM toolchain, wx runtime, CPython and Rust worker have separate third-party license/source terms. See the [Windows toolchain notices](../../toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md), [wx notices](../../rbl-ide/wx-ui/THIRD_PARTY_NOTICES.md), [Linux packaging inventory](how-to/linux-packaging.md) and [corresponding-source audit](../../toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md). Apache-2.0 applies to RBL-authored files and does not relicense these binaries. The checkout carries the Rust worker and wxWidgets IDE sources plus the toolchain source inventory; the large upstream corresponding-source archives are not bundled, and their exact source locations and hashes are recorded in the toolchain audit. Component-specific legal sign-off and final source delivery remain open.
+The bundled Windows MinGW-w64 toolchain, Linux LLVM toolchain, wx runtime, CPython and Rust worker have separate third-party license/source terms. See the [Windows toolchain notices](../../toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md), [wx notices](../../rbl-ide/wx-ui/THIRD_PARTY_NOTICES.md), [Linux packaging inventory](how-to/linux-packaging.md) and [corresponding-source audit](../../toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md). Apache-2.0 applies to RBL-authored files and does not relicense these binaries. The GitHub release publishes the repository source tree, which already contains the Rust worker and wxWidgets IDE sources plus the toolchain source inventory; separately assembled upstream corresponding-source archives are not release deliverables or publication gates. Third-party legal obligations still apply before redistributing bundled binaries and remain a separate review item.
 
 ## Releases
 

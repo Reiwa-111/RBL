@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.09 | OPTIMIZATION GUIDE RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## Compiler-side lookup indexes
 
-RBL 0.8.0 retains the existing AST analysis and direct assembly-generation model. It does not introduce a separate IR optimizer. The main compiler-side performance change replaces repeated linear name scans with private hash indexes.
+RBL 0.8.1 retains the existing AST analysis and direct assembly-generation model. It does not introduce a separate IR optimizer. The main compiler-side performance change replaces repeated linear name scans with private hash indexes.
 
 ### Hashing and collision handling
 

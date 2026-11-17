@@ -1,0 +1,13 @@
+// RBL 0.8.x: global math helpers and namespaced constants/functions.
+func main() (
+    set radius = 5.0
+    set x = 3.0
+    set y = 4.0
+    set circumference = 2.0 * rbl.math.pi * radius
+
+    print(f"hypotenuse: {hypot(x, y):.2f}")
+    print(f"circumference: {circumference:.3f}")
+    print(f"sqrt(81): {rbl.math.sqrt(81):.1f}")
+    print(f"remainder: {fmod(7.5, 2.0):.1f}")
+    print("clamped:", clamp(15, 0, 10))
+)

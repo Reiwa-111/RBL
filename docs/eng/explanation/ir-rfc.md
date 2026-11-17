@@ -6,7 +6,7 @@
 
 IR is the contract between the current frontend and a future backend. It must make evaluation order, control flow, runtime checks, side effects and source locations explicit enough for a verifier to reject malformed programs before code generation.
 
-The first version represents one source file per compilation unit, matching RBL 0.8.0. It adds no imports, project modules, closures, exceptions, async execution, public bytecode format or cross-version binary IR ABI. Runtime ABI 1.2.0 is unchanged.
+The first version represents one source file per compilation unit, matching RBL 0.8.1. It adds no imports, project modules, closures, exceptions, async execution, public bytecode format or cross-version binary IR ABI. Runtime ABI 1.2.0 is unchanged.
 
 ## Representation model
 

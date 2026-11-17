@@ -1,0 +1,13 @@
+// RBL 0.8.x: safe small text-file roundtrip under the repository build directory.
+func main() (
+    set path = "build/rbl_081_example.txt"
+    set payload = "RBL 0.8.1\nmanaged strings\nf-string formatting"
+
+    write_file(path, payload)
+    set restored = read_file(path)
+    print("exists:", rbl.fs.exists(path))
+    print("content matches:", restored == payload)
+    print("characters:", len(restored))
+    print("deleted:", rbl.fs.delete(path))
+    print("exists after delete:", rbl.fs.exists(path))
+)

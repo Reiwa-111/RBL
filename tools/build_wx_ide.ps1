@@ -205,86 +205,19 @@ $packageInventory = foreach ($packageId in $packageIds) {
     $packageRecord
 }
 $packageInventory += "mingw-w64-ucrt-x86_64-zlib 1.4-2 (repository-pinned runtime DLL)"
-$sourceMaterialDir = Join-Path $root "build\source-material"
-$sourceMaterialName = "RBL-0.8.0-Windows-Source-Materials-20261111-final-reviewed.tar.zst"
-$sourceMaterialArchive = Join-Path $sourceMaterialDir $sourceMaterialName
-$expectedSourceMaterialHash = "2ca37857afbda2d34d67379b5c12a02ca10f07e12d6d8df2423e00addb708066"
-if (-not (Test-Path -LiteralPath $sourceMaterialArchive -PathType Leaf)) {
-    throw "Required corresponding-source archive is missing: $sourceMaterialArchive"
-}
-$actualSourceMaterialHash = (Get-FileHash -LiteralPath $sourceMaterialArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($actualSourceMaterialHash -ne $expectedSourceMaterialHash) {
-    throw "Windows toolchain source archive SHA-256 mismatch: $actualSourceMaterialHash"
-}
-if ((Get-Item -LiteralPath $sourceMaterialArchive).Length -ne 331187540) {
-    throw "Windows toolchain source archive size mismatch: $sourceMaterialArchive"
-}
-$zstdExe = Join-Path $msysBin "zstd.exe"
-if (-not (Test-Path -LiteralPath $zstdExe -PathType Leaf)) { throw "zstd is required to verify corresponding source: $zstdExe" }
-& $zstdExe -t $sourceMaterialArchive
-if ($LASTEXITCODE -ne 0) { throw "Windows toolchain source archive integrity check failed ($LASTEXITCODE)" }
-$sourcePayloadDir = Join-Path $buildPath "source"
-New-Item -ItemType Directory -Path $sourcePayloadDir -Force | Out-Null
-$sourcePayloadName = "Windows-toolchain-source.tar.zst"
-$sourcePayloadPath = Join-Path $sourcePayloadDir $sourcePayloadName
-Copy-Item -LiteralPath $sourceMaterialArchive -Destination $sourcePayloadPath -Force
-$sourceMaterialHash = (Get-FileHash -LiteralPath $sourcePayloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($sourceMaterialHash -ne $expectedSourceMaterialHash) { throw "Copied Windows source archive hash mismatch: $sourceMaterialHash" }
-[System.IO.File]::WriteAllText((Join-Path $sourcePayloadDir "Windows-toolchain-source.sha256"), "$sourceMaterialHash  $sourcePayloadName`n", [System.Text.UTF8Encoding]::new($false))
-$sourceMaterialNotice = @"
-The exact corresponding source materials for the redistributed Windows
-MinGW-w64/GCC/Binutils/wxWidgets/runtime package closure are included at
-source/$sourcePayloadName (SHA-256: $sourceMaterialHash). The archive contains
-the exact upstream source archives and signature/audit material for the
-20 redistributed MSYS2 package families. Verify the archive with
-source/Windows-toolchain-source.sha256. Keep this archive beside any binary
-installer or portable package; do not distribute the binaries without it.
-"@
-$rustSourceMaterialArchive = Get-ChildItem -LiteralPath $sourceMaterialDir -Filter "RBL-0.8.0-Rust-Worker-Source-Materials-*.tar.zst" -File -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $rustSourceMaterialArchive) {
-    throw "Required Rust worker corresponding-source archive is missing under $sourceMaterialDir"
-}
 $pythonExe = (Get-Command python.exe -ErrorAction Stop).Source
-$zstdExe = Join-Path $msysBin "zstd.exe"
-if (-not (Test-Path -LiteralPath $zstdExe -PathType Leaf)) {
-    throw "zstd is required to validate the Rust worker source archive: $zstdExe"
-}
-& $pythonExe (Join-Path $root "tools/verify_rust_source_bundle.py") --root $root --archive $rustSourceMaterialArchive.FullName --zstd $zstdExe
-if ($LASTEXITCODE -ne 0) { throw "Rust worker source archive verification failed ($LASTEXITCODE)" }
-$rustSourcePayloadDir = Join-Path $buildPath "source"
-New-Item -ItemType Directory -Path $rustSourcePayloadDir -Force | Out-Null
-$rustSourcePayloadName = "Rust-worker-source.tar.zst"
-$rustSourcePayloadPath = Join-Path $rustSourcePayloadDir $rustSourcePayloadName
-Copy-Item -LiteralPath $rustSourceMaterialArchive.FullName -Destination $rustSourcePayloadPath -Force
-$rustSourceMaterialHash = (Get-FileHash -LiteralPath $rustSourcePayloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
-[System.IO.File]::WriteAllText((Join-Path $rustSourcePayloadDir "Rust-worker-source.sha256"), "$rustSourceMaterialHash  $rustSourcePayloadName`n", [System.Text.UTF8Encoding]::new($false))
-$rustSourceNotice = @"
-Rust worker corresponding-source archive is included at
-source/$rustSourcePayloadName (SHA-256: $rustSourceMaterialHash).
-The archive contains worker source, Cargo manifests and exact active crate
-source archives; verify it with source/Rust-worker-source.sha256.
-"@
 & $pythonExe (Join-Path $root "tools/package_python_runtime.py") --platform windows --output (Join-Path $buildPath "runtime/python")
 if ($LASTEXITCODE -ne 0) { throw "App-local CPython packaging failed ($LASTEXITCODE)" }
-$pythonSourceDir = Join-Path $buildPath "runtime/python/source"
-foreach ($sourceName in @('Python-3.14.10.tar.xz', 'Python-3.14.10.tar.xz.sha256', 'python-build-standalone-20261110.tar.gz', 'python-build-standalone-20261110.tar.gz.sha256')) {
-    $sourcePath = Join-Path $pythonSourceDir $sourceName
-    if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) { throw "CPython corresponding-source file is missing: $sourcePath" }
-    Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $buildPath "source/$sourceName") -Force
-}
 $pythonRuntimeNotice = @"
 App-local CPython 3.14.10 embeddable runtime is included under runtime/python.
 The verified official Python.org package SHA-256 is
 90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159.
 The upstream LICENSE.txt and full CPython/third-party license inventory under
 runtime/python/licenses are retained. See runtime/python/UPSTREAM.md.
-Corresponding CPython and python-build-standalone source archives are included
-under source/ with SHA-256 sidecars.
 "@
 
 @"
-RBL Studio portable build - third-party runtime notices
+RBL Studio Windows build - third-party runtime notices
 
 This directory redistributes wxWidgets and the runtime/dependency DLLs listed
 by the exact MSYS2 UCRT64 package versions below. Corresponding license texts
@@ -303,11 +236,9 @@ The Rust worker dependency closure is listed in licenses/Rust/THIRD_PARTY_NOTICE
 package-specific license texts are preserved under licenses/Rust/<crate>-<version>/.
 
 The mingw-w64-ucrt-x86_64-libstdc++ split package is covered by the same
-mingw-w64-gcc source archive listed below. The libwinpthread and winpthreads
+mingw-w64-gcc package inventory. The libwinpthread and winpthreads
 license directories are copied separately; their COPYING files are byte-identical.
 
-$sourceMaterialNotice
-$rustSourceNotice
 $pythonRuntimeNotice
 This inventory is not legal certification.
 "@ | Set-Content -LiteralPath (Join-Path $buildPath "THIRD_PARTY_NOTICES.txt") -Encoding UTF8
@@ -333,5 +264,5 @@ $pointer = Join-Path $pointerDir "wx-ui-current-win.path"
 [System.IO.File]::WriteAllText($pointerTemp, [System.IO.Path]::GetFullPath($buildPath), [System.Text.UTF8Encoding]::new($false))
 Move-Item -LiteralPath $pointerTemp -Destination $pointer -Force
 
-Write-Host "Built portable RBL Studio prototype: $buildPath"
+Write-Host "Built RBL Studio: $buildPath"
 

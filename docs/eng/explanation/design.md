@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.09 | VERSION SCOPE RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT LANGUAGE CONTRACT
 
 ## Explanation: design principles and future directions
 
-This document records design decisions and separates them from the current language contract. Any capability marked as a proposal or roadmap item below is not considered available in RBL 0.8.0.
+This document records design decisions and separates them from the current language contract. Any capability marked as a proposal or roadmap item below is not considered available in RBL 0.8.1.
 
 ## Principles
 

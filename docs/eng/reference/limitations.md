@@ -1,6 +1,6 @@
-# last verified: v0.8.0 | 2026.11.11 | GATE G CLI WORDING RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
-## Reference: RBL 0.8.0 limitations
+## Reference: RBL 0.8.1 limitations
 
 This list deliberately distinguishes implemented language behavior from proposed features. An omitted construct is not necessarily a design rejection; it means the current compiler/runtime does not promise support for it.
 

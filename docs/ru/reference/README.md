@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.09 | REFERENCE INDEX RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT DOCUMENTATION REVIEW
 
 ## Reference
 
-Нормативные страницы RBL 0.8.0:
+Нормативные страницы RBL 0.8.1:
 
 - [Синтаксис языка](syntax.md) — выражения, операторы, функции, циклы, контейнеры и edge cases.
 - [Стандартная библиотека](standard-library.md) — global functions и namespace APIs.

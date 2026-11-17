@@ -54,16 +54,20 @@ printf 'previous.desktop\n' > "$CONFIG_HOME/.rbl-fake-mime-default"
 # Normal registered install, then uninstall with different XDG environment.
 bash "$ROOT/installer/install_linux.sh" --install-dir "$INSTALL_DIR" --build-dir "$BUILD_DIR"
 grep -Fxq "registered=1" "$INSTALL_DIR/.rblstudio-install-state"
-while read -r source_name checksum_name; do
-  test -f "$INSTALL_DIR/source/$source_name"
-  test -f "$INSTALL_DIR/source/$checksum_name"
-  (cd "$INSTALL_DIR/source" && sha256sum -c "$checksum_name")
-done <<'EOF'
-Rust-worker-source.tar.zst Rust-worker-source.sha256
-wxWidgets-3.2.4.tar.bz2 wxWidgets-3.2.4.sha256
-Python-3.14.10.tar.xz Python-3.14.10.tar.xz.sha256
-python-build-standalone-20261110.tar.gz python-build-standalone-20261110.tar.gz.sha256
-EOF
+test -x "$INSTALL_DIR/installer/install_linux.sh"
+test -x "$INSTALL_DIR/installer/uninstall_linux.sh"
+test -f "$INSTALL_DIR/runtime/python/python-runtime.tar.gz"
+cmp -s "$BUILD_DIR/runtime/python/python-runtime.tar.gz" "$INSTALL_DIR/runtime/python/python-runtime.tar.gz"
+grep -Fxq 'installer/install_linux.sh' "$INSTALL_DIR/.rblstudio-install-files"
+grep -Fxq 'runtime/python/python-runtime.tar.gz' "$INSTALL_DIR/.rblstudio-install-files"
+# Exercise repair using only the installed copy. It must find its own staged
+# build payload and preserve the existing registered-install state.
+bash "$INSTALL_DIR/installer/install_linux.sh" --no-register --install-dir "$INSTALL_DIR" --build-dir "$INSTALL_DIR"
+grep -Fxq "registered=1" "$INSTALL_DIR/.rblstudio-install-state"
+test -x "$INSTALL_DIR/installer/install_linux.sh"
+cmp -s "$BUILD_DIR/runtime/python/python-runtime.tar.gz" "$INSTALL_DIR/runtime/python/python-runtime.tar.gz"
+echo 'PASS: installed-copy repair reuses its installer and pinned CPython archive'
+test ! -e "$INSTALL_DIR/source"
 test -x "$INSTALL_DIR/toolchain/linux-x86_64/bin/clang"
 test -x "$INSTALL_DIR/toolchain/linux-x86_64/bin/ld.lld"
 test -f "$INSTALL_DIR/lib/libwx_gtk3u_core-3.2.so.0"
@@ -104,7 +108,7 @@ NEW_DATA="$TMP/changed-data"
 NEW_CONFIG="$TMP/changed-config"
 mkdir -p "$NEW_DATA" "$NEW_CONFIG"
 export XDG_DATA_HOME="$NEW_DATA" XDG_CONFIG_HOME="$NEW_CONFIG"
-bash "$ROOT/installer/uninstall_linux.sh" --install-dir "$INSTALL_DIR"
+bash "$INSTALL_DIR/installer/uninstall_linux.sh"
 test ! -e "$INSTALL_DIR"
 echo 'PASS: registered install/uninstall and XDG migration'
 test ! -e "$DATA_HOME/applications/rblstudio-wx.desktop"

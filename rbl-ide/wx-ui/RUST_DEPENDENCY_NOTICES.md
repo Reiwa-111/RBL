@@ -1,6 +1,6 @@
 # Rust worker — third-party dependency notices
 
-Generated inventory snapshot: RBL Studio 0.8.0 `Cargo.lock`, checked 2026-11-10.
+Generated inventory snapshot: RBL Studio 0.8.1 `Cargo.lock`, checked 2026-11-17.
 This file covers the active normal dependency closure of the explicitly selected `rbl-studio-worker` Cargo binary, using default features and the Windows GNU and Linux x86-64 targets. Cargo.toml gates the retained egui application behind the opt-in `legacy-egui` feature; `eframe` and `rfd` are optional and are not compiled or shipped with the wxWidgets worker.
 
 Direct worker dependencies: `anyhow`, `crossbeam-channel`, `dirs`, `serde`, `serde_json`, `tempfile`; Unix additionally uses `libc`. The legacy GUI-only `eframe` and `rfd` dependencies are optional and excluded from the worker build graph unless `--features legacy-egui` is explicitly requested for the separate `rbl-studio` binary.
@@ -46,5 +46,5 @@ Windows GNU worker closure: 24 crates. Linux x86-64 worker closure: 26 crates. U
 - `unicode-ident 1.0.27` declares `(MIT OR Apache-2.0) AND Unicode-3.0`; its Unicode license text is included separately.
 - `linux-raw-sys` and `rustix` include the Apache-2.0-with-LLVM-exception text as well as the alternative Apache-2.0 and MIT texts.
 - `memchr` declares `Unlicense OR MIT`; both `COPYING` and `LICENSE-MIT` are included.
-- The current Gate H corresponding-source archive is `build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261114-release-recheck-r4.tar.zst` (8,255,104 bytes; SHA-256 `0ddd19ba6b4c049fcbef95d32462f6f8b9ebf5788a9077f389c5a1c53ec4340c`). It includes the current worker/shared Rust source files, Cargo manifests, repository LICENSE, this inventory snapshot and all 28 exact active crates.io source archives. The verifier must pass for Windows GNU and Linux targets (28 licensed crates, 35 archive/checksum records). This local archive is verification material only and is not attached to the public pre-release.
+- The historical Gate H corresponding-source audit bundle was assembled at `build/source-material/RBL-0.8.0-Rust-Worker-Source-Materials-20261114-release-recheck-r4.tar.zst` (8,255,104 bytes; SHA-256 `0ddd19ba6b4c049fcbef95d32462f6f8b9ebf5788a9077f389c5a1c53ec4340c`). It contains the worker/shared Rust sources, Cargo manifests, repository LICENSE, this inventory snapshot and all 28 exact active crates.io source archives. This archive is historical local verification material only; it is not tracked, not staged by current build scripts and not a release deliverable. The repository itself contains the worker sources and Cargo.lock. This local archive is verification material only and is not attached to the public pre-release.
 - This inventory does not replace the separate wxWidgets/Scintilla and MSYS2 MinGW notices, nor does it certify legal compliance. Re-run the dependency inventory whenever `Cargo.lock`, worker imports or target triples change.

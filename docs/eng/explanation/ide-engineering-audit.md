@@ -1,18 +1,25 @@
-# last verified: v0.8.0 | 2026.11.11 | IDE ENGINEERING AUDIT
+# last verified: v0.8.1 | 2026.11.17 | CURRENT IDE ACCEPTANCE / RELEASE PREPARATION
 
-# RBL Studio 0.8.0 — engineering audit and readiness status
+# RBL Studio 0.8.1 — engineering audit and readiness status
 
-Record date: 2026-11-10. This is an engineering status report, not authorization to publish.
+Record date: 2026-11-17. This is a current engineering status report, not an
+instruction to publish. The 0.8.1 source tree is prepared but not yet published;
+`v0.8.0-r2` remains the published 0.8.0 source snapshot.
 
-## Overall status
+## Current status — 0.8.1
 
-**IDE 0.8.0: NOT RELEASE-READY / UNRELEASED.** The primary launcher/install path selects the C++20/wxWidgets 3.2 + Scintilla frontend with a separate Rust worker. Current Windows SaveDocument byte-roundtrip acceptance is 27/27 PASS. Path-backed resource smoke runs passed at 60/120/300 seconds with 32 documents, all four task types and graceful GUI/worker shutdown; the 300-second run completed 84 task cycles and 316 samples. The latest 7,200-second attempt failed before sampling because the harness could not acquire notebook focus. It was not retried after the user's explicit request to stop further IDE launches; the two-hour soak is NOT PASSED. Windows registered install/upgrade/uninstall acceptance passed earlier in an isolated HKCU GUID subtree, but fresh acceptance after the final source-archive revision remains open. DPI static checks pass 12/12, but live 125-200% multi-monitor and interactive Linux GUI acceptance remain unverified. The Windows replacement race, Binutils CVE-2026-90801 and corresponding-source legal/public delivery remain release blockers.
+**RBL Studio 0.8.1: release preparation complete to the recorded scope; publication pending.** The primary launcher/install path selects the C++20/wxWidgets 3.2 + Scintilla frontend with a separate Rust worker. The native first-run setup/installer wizard is implemented. Windows SaveDocument byte-roundtrip acceptance passed 27/27; 60/120/300-second resource smoke runs passed with 32 documents and all four task types. The user confirms that the two-hour (7,200-second) Windows resource soak completed successfully. It is marked PASS by user confirmation; raw CSV/verdict and final GUI/worker hashes have not yet been independently re-audited in this workspace. A pristine-VM run is not recorded.
 
-**Gate I update ? 2026-11-12:** Windows registered installer and installed-CLI acceptance passed in isolated test roots, including upgrade/uninstall, rollback, user-data preservation and CLI `version`/`doctor`/`check`/`run`/`clean`; Linux installer and installed-CLI acceptance also passed. Evidence: `../verification/2026-11-11-Gate-I/GATE_I_REVIEW.md`. These are host-isolated tests, not pristine clean-VM acceptance. GUI startup, GUI-launched backend action and the two-hour soak remain NOT RUN / NOT PASSED. Gate D remains PARTIAL.
+Windows CTest passed 15/15, DPI static tests 12/12, the full RBL regression passed (63/63 direct ASM cases and 63/63 compiler diagnostics), Linux CTest passed 14/14, and Flatpak payload tests passed 6/6. The user confirmed that the real Windows mixed-DPI scenario was tested successfully. The separate live two-monitor run verified window movement, floating-pane persistence, saved-layout migration and off-screen recovery.
 
-This report deliberately separates evidence from assumptions. A successful compile, unit-test suite or `--self-test` does not prove real GUI behavior or whole-application memory compliance under load.
+The Linux wxWidgets GUI + Rust worker build and native shell install path were verified on Ubuntu 24.04 with system wxWidgets 3.2.4. The Flatpak payload was built and installed locally; sandbox CLI `version`, `doctor`, `check` and `run` passed. Interactive Flatpak GUI/display/portal acceptance and Flathub publication are not claimed.
+
+The GitHub release model is the tagged repository source tree. No ZIP/portable archive, binary asset or separately assembled corresponding-source archive is a release deliverable or publication gate. Third-party notices and provenance inventories are present, but this report is not formal legal clearance for redistribution of bundled binaries. Binutils 2.47-4 remains listed for CVE-2026-90801 with residual risk limited to the supported compiler-generated COFF workflow; the Windows `ReplaceFileW` destination-leaf race is documented for 0.9; POSIX existing-target saves fail closed when atomic exchange is unavailable.
+
+The dated 0.8.0 checkpoints below are retained as historical evidence and do not override this current 0.8.1 status. The two-hour soak is marked PASS by user confirmation. The pristine-VM run and interactive Flatpak GUI/portal path remain explicitly unverified.
 
 ## Architecture
+
 
 - The primary UI is C++20 + wxWidgets 3.2 + `wxStyledTextCtrl`/Scintilla in `rbl-ide/wx-ui/`, with a separate Rust `rbl-studio-worker` process.
 - The previous Rust + `eframe/egui` UI remains in `rbl-ide/legacy-egui/app.rs` and `rbl-ide/legacy-egui/editor.rs` as rollback/reference and is selected only by `RBL_STUDIO_ALLOW_LEGACY=1`.
@@ -20,6 +27,8 @@ This report deliberately separates evidence from assumptions. A successful compi
 - Earlier Cargo dependency scans found no Wry/WebView/CEF/Chromium/Electron/WebKit engine packages. External links may be opened in the system browser; that does not embed a browser engine.
 - The IDE edits ordinary text files regardless of extension. Compiler operations are restricted to `.rbl` and checked again at the backend boundary.
 - Project traversal/search, process output, tabs and editor history have software limits. These are not a hard allocator/OS quota for the entire process.
+
+## Historical 0.8.0 transition and acceptance log
 
 ### Initial native frontend transition snapshot (2026-11-09; historical)
 

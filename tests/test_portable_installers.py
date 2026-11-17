@@ -23,6 +23,8 @@ def main() -> int:
     copy_guard = windows.split("if (-not $Portable) {", 1)[1].split("\n    }", 1)[0]
     if "Uninstall-RBLStudio.ps1" not in copy_guard:
         raise AssertionError("Windows uninstaller copy is not inside the portable guard")
+    if "install_windows.ps1" not in copy_guard or "windows_registry_policy.ps1" not in copy_guard:
+        raise AssertionError("Windows self-repair scripts are not guarded out of portable staging")
     manifest_guard = windows.split("if (-not $Portable) {", 2)[2]
     if "$Manifest | ConvertTo-Json" not in manifest_guard:
         raise AssertionError("Windows install manifest is written outside the portable guard")
@@ -32,6 +34,8 @@ def main() -> int:
     copy_guard = linux.split("if ((PORTABLE == 0)); then", 1)[1].split("\nfi", 1)[0]
     if "Uninstall-RBLStudio.sh" not in copy_guard:
         raise AssertionError("Linux uninstaller copy is not inside the portable guard")
+    if "install_linux.sh" not in copy_guard:
+        raise AssertionError("Linux self-repair installer is not guarded out of portable staging")
     if "if ((PORTABLE == 0)); then\n  FILES_LIST=" not in linux:
         raise AssertionError("Linux install state is not guarded by the portable mode")
 

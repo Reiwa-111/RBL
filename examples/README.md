@@ -1,10 +1,14 @@
-# last verified: v0.8.0 | 2026.11.11 | EXAMPLES RECHECK
+# last verified: v0.8.1 | 2026.11.17 | EXAMPLES INDEX / RELEASE SCOPE
 
-# RBL 0.8.0 — example programs
+# RBL 0.8.1 — example programs
 
-This directory contains 53 RBL programs: twenty beginner-course lessons, eight introductory/compatibility examples, one compiler-lookup demonstration, one f-string formatting example and twenty-three larger utility, algorithmic, numerical, statistical, simulation and image-generation workloads. The simulations and pixel calculations are performed by RBL. Python is required to run the repository CLI (`rbl.py`); the additional visualization dependencies are optional.
+This directory contains 61 RBL programs: twenty beginner-course lessons, eight introductory/compatibility examples, one compiler-lookup demonstration, one f-string formatting example, eight focused 0.8.x examples and twenty-three larger utility, algorithmic, numerical, statistical, simulation and image-generation workloads. The simulations and pixel calculations are performed by RBL. Python is required to run the repository CLI (`rbl.py`); the additional visualization dependencies are optional.
 
-RBL 0.8.0 provides bounded f-string format specifications, managed dynamic strings, a versioned Runtime ABI and a modular compiler with indexed lookups. The examples are ordinary single-source RBL programs; they do not import compiler modules or access private compiler data structures.
+RBL 0.8.1 provides bounded f-string format specifications, managed dynamic strings, a versioned Runtime ABI and a modular compiler with indexed lookups. The examples are ordinary single-source RBL programs; they do not import compiler modules or access private compiler data structures.
+
+## 0.8.x focused examples
+
+See the [eight new 0.8.x examples](v081/README.md) and the [ten-lesson tutorial course](../docs/eng/tutorials/README.md).
 
 ## Start here: Beginner Course
 
@@ -27,7 +31,7 @@ These compact programs cover the language surface, standard library, input and f
 
 ## Strings and formatting
 
-[`strings/fstring_formatting.rbl`](strings/fstring_formatting.rbl) is a focused RBL 0.8.0 demonstration of the bounded f-string format grammar: alignment, custom and Unicode fill, width, float precision, and integer bases. It also covers the valid fill/alignment pairs `<<`, `>>` and `^^`.
+[`strings/fstring_formatting.rbl`](strings/fstring_formatting.rbl) is a focused RBL 0.8.1 demonstration of the bounded f-string format grammar: alignment, custom and Unicode fill, width, float precision, and integer bases. It also covers the valid fill/alignment pairs `<<`, `>>` and `^^`.
 
 ## Small CLI utilities
 

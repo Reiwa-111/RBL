@@ -1,55 +1,156 @@
-# RBL Studio — RBL 0.8.0 release manifest
-# Snapshot: RBL 0.8.0 / 2026-11-15 (full 0.8.0 release candidate: wx frontend and release audit)
-# Status: FULL 0.8.0 RELEASE PUBLISHED as v0.8.0-r2 on 2026-11-15 (runnable checkout, no binary assets). The older GitHub v0.8.0 entry visible since 2026-11-10 remains the pre-release placeholder with zero assets and was not moved.
-# Distribution model: the repository checkout is the ready-to-run Windows payload (no separate ZIP/tar.zst release archives). Publication is gated by full interactive IDE/soak acceptance, pristine-VM verification, and owner/legal approval of the public corresponding-source disclosure.
+# RBL Studio — RBL 0.8.1 release-preparation manifest
+# Snapshot: RBL 0.8.1 / 2026-11-17 (documentation, acceptance and source-tree preparation)
+# Status: 0.8.1 release preparation is complete to the recorded scope; not yet published. The published 0.8.0 source release remains v0.8.0-r2.
+# GitHub release policy: publish the tagged repository source tree directly. Do not create ZIP/portable archives, binary release assets, or separately assembled corresponding-source archives; none is a release deliverable or publication gate.
 
-## Current status — final 0.8.0 release (2026-11-15)
+## Current status — 0.8.1 release preparation / 0.8.0 published baseline (2026-11-17)
 
-- Repository/compiler version: 0.8.0. Runtime ABI: 1.2.0.
-- Distribution model: the repository checkout root is the portable application
-  directory. GUI, Rust worker and their wx DLLs live under
-  `bin/win-x86_64/studio/`; app-local CPython 3.14.10 lives under
-  `runtime/python`; the assembler/linker runtime closure is in `toolchain/` and
-  `bin/`. No separate ZIP/tar.zst release archives are produced; `RBLStudio.cmd`
-  and `rbl.cmd` in the checkout root launch the payload. There is no install
-  manifest, uninstaller or registry/XDG integration.
-- The earlier packaged archives (Windows 578 files / Linux 5,149 files) were
-  removed on 2026-11-15 when the distribution model changed; their hashes remain
-  recorded in the historical audit/verification material under `verification/`.
-- Re-verified 2026-11-15: 63/63 RBL direct-assembly tests; Windows wx CTest
-  12/12; Linux wx CTest 11/11; native Windows CLI (`version`, `check`, `run`)
-  and GUI startup from the checkout root with System32-only PATH and no `RBL_*`
-  variables; the earlier Linux package acceptance (CLI/worker in a PATH without
-  system Python or `cc`, GUI under WSLg) is retained as historical evidence.
-- Corresponding source in the checkout: the Rust worker source tree
+- Repository/compiler version: 0.8.1. Runtime ABI: 1.2.0.
+- GitHub publication model: the release is the tagged repository source tree.
+  Do not assemble or attach ZIP/portable archives, binary assets, or separate
+  corresponding-source archives. The Windows checkout contains locally usable
+  application components under `bin/win-x86_64/studio/`, `runtime/python/`,
+  `toolchain/` and `bin/`; this checkout layout does not turn the GitHub release
+  into a separately packaged portable distribution. The source checkout does
+  not contain an installed-state manifest; user-scope installers create their
+  own install manifest/uninstaller and optional registry/XDG integration at
+  installation time. None of those are separate GitHub release assets.
+- Historical packaged archives (Windows 578 files / Linux 5,149 files) were
+  removed on 2026-11-15; their hashes remain recorded in historical
+  audit/verification material under `verification/`. They are not current
+  release deliverables and must not be recreated for publication.
+- The 0.8.0 published baseline was verified on 2026-11-15. For 0.8.1, Windows wx GUI compilation succeeded; Ubuntu 24.04 system-wx GUI/worker build and native shell install completed; local Flatpak bundle/sandbox CLI checks passed. See the dated verification records below.
+- Current regression evidence: `python rbl.py test` exited 0 with 63/63 direct ASM cases and 63/63 compiler diagnostics; Windows CTest 15/15; Linux CTest 14/14; DPI static tests 12/12; Flatpak payload tests 6/6. Documentation validation passed with 103 Markdown files and 538 relative links.
+- Windows multi-monitor persistence, floating-pane restoration, saved-layout migration and off-screen recovery passed in the live check. The user additionally confirmed that the real mixed-DPI Windows scenario was checked successfully. The exact physical scale pair and visual checklist are not independently recorded in this manifest.
+- The user confirms that the two-hour (7,200-second) Windows resource soak completed successfully. Marked PASS by user confirmation; the raw CSV/verdict and exact final GUI/worker hashes have not yet been independently re-audited in this workspace. A pristine-VM run is not recorded.
+- Flatpak payload preparation, local bundle installation and sandbox CLI checks passed. Interactive Flatpak GUI/display/portal acceptance and Flathub publication are not claimed. Native Linux GUI/build/install verification is scoped to Ubuntu 24.04 with system wxWidgets 3.2.4 and host GTK 3.
+- Source/provenance references in the checkout: the Rust worker source tree
   (`rbl-ide/worker`), the wxWidgets IDE sources (`rbl-ide/wx-ui`) and the pinned
   Windows toolchain bundle with `SOURCE_CODE.md` and the toolchain manifest.
-  The large upstream corresponding-source archives (MSYS2 toolchain, CPython,
-  python-build-standalone, wxWidgets) are not bundled in the checkout; their
-  exact source locations and hashes are recorded in
-  `toolchain/windows-x86_64/SOURCE_CODE.md`. The public source-delivery route
-  still requires owner/legal approval.
-- Remaining publication gates: full interactive GUI checklist, live
-  high-DPI/multi-monitor and all-theme acceptance, 7,200-second resource soak,
-  pristine-VM installation, and owner/legal approval of the release-page
-  corresponding-source disclosure. The Windows `ReplaceFileW` leaf race remains
-  documented for 0.9; CVE-2026-90801 residual risk is accepted only for the
-  supported compiler-generated COFF workflow.
-- Tag note: the public `v0.8.0` tag still contains the damaged
+  Upstream source URLs and hashes are recorded in
+  `toolchain/windows-x86_64/SOURCE_CODE.md` and the relevant runtime/toolchain
+  manifests. Separately assembled corresponding-source archives are not
+  required, published, or attached for a GitHub source-code release. This does
+  not waive third-party license obligations that apply if bundled binaries are
+  redistributed; notices and provenance records remain in the repository.
+- No separate ZIP/portable archive, binary release asset or corresponding-source archive is a GitHub release deliverable or publication gate. This does not waive third-party license obligations for any bundled binaries. Notices and provenance are maintained in-tree; this is not a formal legal opinion.
+- Known technical boundaries remain documented: Binutils 2.47-4 is listed for CVE-2026-90801 with residual risk accepted only for the supported compiler-generated COFF workflow; the Windows `ReplaceFileW` leaf race is deferred to 0.9; POSIX existing-target saves fail closed when atomic exchange is unavailable.
+- The 0.8.1 source tree is prepared for the publication step. It has not been tagged, published or promoted by this work. The older public `v0.8.0` placeholder remains untouched; `v0.8.0-r2` remains the published 0.8.0 source snapshot.
+- The dated entries below are historical checkpoints. Where they say `UNRELEASED`, `PRE-RELEASE` or `RELEASE BLOCKED`, that was the status at that time; this current section is authoritative for the 0.8.1 preparation tree.
+- Tag note: the older public `v0.8.0` tag still contains the damaged
   `examples/utilities/source-WUDMB5.rbl`. The working tree contains the corrected
-  1,093-byte file (the earlier packaged archives carried it too). The final
-  release must be cut from a new commit/tag; do not move the existing tag
-  retroactively.
-- The dated entries below are historical checkpoints. Where they say
-  `UNRELEASED`, `PRE-RELEASE` or `RELEASE BLOCKED`, that was the status at the
-  time of the entry; this section is authoritative for the current 0.8.0
-  payload.
-- No publication, upload, tag movement, release-status change or asset attach
-  was performed on 2026-11-15.
+  1,093-byte file (the earlier packaged archives carried it too). The local
+  full-release source snapshot is tagged `v0.8.0-r2`; do not move or rewrite the
+  older `v0.8.0` tag retroactively.
+
+## 0.8.1 scope — native first-run setup and Linux wx install path (2026-11-17)
+
+- 0.8.1 extends the native wxWidgets IDE with a first-run setup/installer
+  wizard. It checks the application root, worker, Python runtime and compiler
+  toolchain; records initial per-user UI/toolchain preferences; and, when a
+  complete platform installer payload is present, can run Install / Repair
+  asynchronously with captured output and exit status. The wizard can also be
+  reopened from Settings. A source checkout remains usable as an explicit
+  development path when no complete installer payload is available.
+- A Linux wxWidgets GUI + Rust worker build and native shell install path have
+  been verified on Ubuntu 24.04 using the system wxWidgets 3.2.4 build mode
+  (`RBL_USE_SYSTEM_WX=1`). GTK 3 and the host display stack remain host
+  dependencies for the native Linux application/installer; this is not a
+  Flatpak or GTK-self-contained result. The verification is scoped to Ubuntu
+  24.04 and does not establish compatibility with arbitrary Linux
+  distributions or older system ABI baselines.
+- This is an expanded 0.8.1 implementation scope, not merely a documentation
+  correction. The repository `VERSION`, Cargo package and lockfile are now
+  0.8.1. It does not change the published 0.8.0 status or declare 0.8.1
+  released.
+- GitHub Releases continue to publish the tagged repository source tree
+  directly. No manually assembled ZIP/portable archive, binary release asset
+  or separate corresponding-source archive is a release deliverable or
+  publication gate.
+- Historical dated audit entries below are retained as history. Their former
+  `UNRELEASED`, `RELEASE BLOCKED`, source-archive-delivery and package-status
+  statements describe the state at the time and do not override this current
+  policy section.
+- Third-party notices, license texts, source/provenance URLs and hashes remain
+  repository documentation. Any obligations applicable to redistributing
+  third-party binaries remain separate; this source-release policy does not
+  represent a legal opinion or authorize binary redistribution.
+
+## 0.8.1 follow-up — Flatpak bundle and Windows DPI acceptance (2026-11-17)
+
+- Flatpak payload preparation was reconciled with the current source-only GitHub
+  release model. It no longer requires or copies separately assembled
+  corresponding-source archives. The pinned `runtime/python/python-runtime.tar.gz`
+  remains an internal binary build input and is SHA-256 checked against its
+  runtime manifest; it is not a corresponding-source release archive.
+- Fixed the Flatpak payload preparer to exclude the Windows `runtime/python`
+  directory from the source checkout and extract the verified Linux CPython
+  3.14.10 archive instead. Source-tree `__pycache__` and `.pyc` files are omitted
+  from copied project directories. Added regression coverage for source-only
+  preparation, Python runtime selection and transient-bytecode exclusion.
+- `tests/test_flatpak_payload.py`: 6/6 PASS. The prepared Linux payload contains
+  5,192 SHA256SUMS entries, no `source/` corresponding-source archive tree, no
+  Windows Python DLLs, and no source-tree Python bytecode caches. The Flatpak
+  manifest parses with `flatpak-builder --show-manifest`.
+- Built a local Flatpak bundle with Flatpak 1.14.6 / flatpak-builder 1.4.2 using
+  installed `org.gnome.Platform//51` and `org.gnome.Sdk//51`. Bundle:
+  `/home/reiwa/RBLStudio-0.8.1-linux-x86_64.flatpak`, 72,734,608 bytes,
+  SHA-256 `82d761e2ab633456c0cb6ff95520bd432895dcaa0015c804c700d323b28afad1`.
+  This is a local test artifact, not a GitHub release asset.
+- Installed the bundle into the Ubuntu 24.04 WSL user Flatpak installation.
+  Sandbox `rbl version`, `rbl doctor`, `rbl check` and `rbl run` all passed.
+  `doctor` resolved app-local CPython 3.14.10, LLVM integrated assembler,
+  `ld.lld`, compiler and Runtime ABI 1.2.0. The WSL Flathub remote emitted a
+  non-fatal runtime-ref lookup warning even though GNOME Platform/SDK 51 were
+  already installed locally.
+- The wx GUI was deliberately not launched in the Flatpak sandbox. Therefore
+  interactive GUI startup, Wayland/X11 display, file dialogs/portals, desktop
+  integration and multi-monitor behavior remain unverified. The app ID
+  `com.reiwa.rblstudio` is still provisional; this prebuilt-payload manifest is
+  not a Flathub source-module submission.
+- DPI static regression passed 12/12, and the Linux DPI CTest passed 1/1.
+  The initial automated/live Windows pass used two 100% displays and covered
+  multi-monitor persistence, floating-pane restore, layout migration and
+  off-screen recovery. The user subsequently confirmed that the real Windows
+  mixed-DPI scenario was tested successfully; this later confirmation supersedes
+  the initial 100%-only limitation for Windows mixed-DPI acceptance.
+- Interactive Flatpak GUI/display/portal acceptance remains NOT RUN; the
+  user-confirmed Windows mixed-DPI result does not cover Linux or Flatpak.
+- `ApplyDpiMetrics` now calls `manager_.Update()` after successfully loading
+  and clamping the scaled AUI perspective, ensuring native floating frames and
+  dock geometry are committed during the deferred DPI pass. The DPI static
+  regression now asserts this ordering.
+- After that source change, the Windows wx GUI target rebuilt successfully;
+  `python rbl.py test` exited 0, Windows CTest passed 15/15, DPI static passed
+  12/12, and `git diff --check` passed (only existing line-ending warnings).
+- Documentation validation passed: 103 Markdown files, 538 relative links,
+  zero missing links or bad fragments, and matching EN/RU heading hierarchy.
+  At that dated checkpoint no commit, push, tag, GitHub publication or release
+  promotion had yet been performed.
+
+## 0.8.1 documentation and acceptance closeout — 2026-11-17
+
+- Current user-facing documentation now identifies 0.8.1 as the release-preparation
+  version and distinguishes it from the published 0.8.0-r2 source snapshot.
+  English and Russian documentation indexes, IDE guides, README and release notes
+  describe the setup wizard, Ubuntu 24.04 native Linux path, Flatpak CLI scope,
+  Windows mixed-DPI confirmation and the actual verification limits.
+- Windows mixed-DPI acceptance is marked PASS based on the user's explicit
+  confirmation. The earlier two-monitor 100%-only note remains as historical
+  evidence of the initial automated/live test and is not treated as the final
+  mixed-DPI verdict.
+- The two-hour soak is marked PASS by user confirmation; pristine-VM verification
+  remains unrecorded. Flatpak interactive GUI/portal and Flathub publication remain
+  outside the verified scope. Third-party notices/provenance are present, but no
+  formal legal sign-off is claimed.
+- This pass adds eight focused RBL 0.8.x examples and ten bilingual tutorials
+  (English and Russian editions). The original twenty beginner lessons, first
+  written for 0.7.2, were rechecked with the 0.8.1 compiler: all 20 pass `rbl.py
+  check`. All eight new examples pass both `check` and `run`.
 
 ## Version and targets
 
-Repository/compiler version: 0.8.0 (`VERSION` is authoritative).
+Repository/compiler version: 0.8.1 (`VERSION` is authoritative).
 Runtime ABI: 1.2.0 (`runtime/rbl_abi.h` is authoritative).
 Required features: TAGGED_VALUES, SYSV_AMD64, STACK_VALUE_ARRAYS, CONTAINERS,
 GC_MANAGED_STRINGS and FSTRING_FORMAT (bit 5).
@@ -57,7 +158,7 @@ Targets: x86-64 Linux ELF64 and x86-64 Windows PE/COFF.
 User programs compile through the shared C frontend/code generator to native
 x86-64 assembly; user RBL programs are not compiled through C.
 
-## Implemented 0.8.0 scope
+## Compiler/runtime scope inherited from 0.8.0
 
 - Compiler split into common.c, lexer.c, ast.c, parser.c, sema.c, codegen.c
   and driver.c, with private declarations in compiler/rblc_internal.h.

@@ -125,6 +125,9 @@ def run_tests() -> int:
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_rbltool_windows_paths.py')], cwd=ROOT)
     if rc:
         return rc
+    rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_windows_launcher_root.py')], cwd=ROOT)
+    if rc:
+        return rc
     rc = subprocess.call([sys.executable, str(ROOT / 'tests' / 'test_make_clean_safety.py')], cwd=ROOT)
     if rc:
         return rc

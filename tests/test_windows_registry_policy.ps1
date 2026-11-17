@@ -62,8 +62,9 @@ Assert-Equal $true (Test-RblOwnedShortcutPath 'C:\Users\Test\AppData\Roaming\Mic
 Assert-Equal $false (Test-RblOwnedShortcutPath 'C:\Users\Test\Documents\important.lnk' 'C:\Users\Test\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\RBL Studio wx.lnk') 'foreign shortcut path'
 Assert-Equal $false (Test-RblOwnedShortcutPath '' 'C:\Users\Test\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\RBL Studio wx.lnk') 'missing shortcut path'
 $installerSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\installer\install_windows.ps1') -Raw
-if (-not $installerSource.Contains('Assert-RustWorkerSourceBundle')) { throw 'Installer must verify the Rust worker corresponding-source archive.' }
-if (-not $installerSource.Contains('Copy-Tree (Join-Path $BuildDir ''source'') (Join-Path $Stage ''source'')')) { throw 'Installer must retain the Rust worker source archive in the installed tree.' }
+if ($installerSource.Contains('Assert-RustWorkerSourceBundle') -or $installerSource.Contains('Copy-Tree (Join-Path $BuildDir ''source'') (Join-Path $Stage ''source'')')) {
+    throw 'Installer must not require or stage a separate corresponding-source archive payload.'
+}
 $installerGuard = $installerSource.IndexOf('Assert-NoReparsePath $ShortcutPath')
 $installerInspect = $installerSource.IndexOf('Test-Path -LiteralPath $ShortcutPath')
 if ($installerGuard -lt 0 -or $installerInspect -lt 0 -or $installerGuard -gt $installerInspect) { throw 'Installer must assert shortcut path reparse safety before inspecting it.' }
@@ -90,8 +91,11 @@ if (([regex]::Matches($installerSource, 'Assert-RblRegistrySnapshotRoot .*Regist
 if (([regex]::Matches($uninstallerSource, 'Assert-RblRegistrySnapshotRoot .*RegistryRegExeRoot')).Count -ne 2) { throw 'Uninstaller must validate both registry snapshots before import.' }
 $acceptanceSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'accept_windows_registered_installer.ps1') -Raw
 if ($acceptanceSource -match 'HKCU:\\Software\\Classes') { throw 'Acceptance script must never target the real Classes root.' }
-foreach ($requiredAcceptanceText in @('function Invoke-AcceptanceReg', "Invoke-AcceptanceReg @('export'", "Invoke-AcceptanceReg @('import'", '-RegistryClassesRoot $RegistryClassesRoot', 'finally', 'Remove-Item -LiteralPath $GuidSubkey', 'AppData With Spaces', 'user-changed default', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'source/Rust-worker-source.tar.zst', 'source/Rust-worker-source.sha256', 'New-Item -ItemType Junction', 'Remove-AcceptanceJunction', 'RollbackSentinel', 'late shortcut failure registry rollback')) {
+foreach ($requiredAcceptanceText in @('function Invoke-AcceptanceReg', "Invoke-AcceptanceReg @('export'", "Invoke-AcceptanceReg @('import'", '-RegistryClassesRoot $RegistryClassesRoot', 'finally', 'Remove-Item -LiteralPath $GuidSubkey', 'AppData With Spaces', 'user-changed default', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'New-Item -ItemType Junction', 'Remove-AcceptanceJunction', 'RollbackSentinel', 'late shortcut failure registry rollback')) {
     if (-not $acceptanceSource.Contains($requiredAcceptanceText)) { throw "Acceptance script is missing required coverage text: $requiredAcceptanceText" }
+}
+foreach ($obsoleteSourcePayload in @('Rust-worker-source.tar.zst', 'Windows-toolchain-source.tar.zst', 'Python-3.14.10.tar.xz', 'python-build-standalone-20261110.tar.gz')) {
+    if ($acceptanceSource.Contains($obsoleteSourcePayload)) { throw "Acceptance must not require corresponding-source payload: $obsoleteSourcePayload" }
 }
 $uninstallerOwnership = $uninstallerSource.IndexOf('Test-RblOwnedShortcutPath $ShortcutPath $ExpectedShortcutPath')
 $uninstallerGuard = $uninstallerSource.IndexOf('Assert-NoReparsePath $ShortcutPath')

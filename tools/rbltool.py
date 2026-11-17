@@ -314,7 +314,73 @@ def find_native_toolchain():
     """Return a dict describing a native Windows GNU toolchain, or None."""
     if not is_windows():
         return None
-    for d in _mingw_candidates():
+    bundled_bin = ROOT / "toolchain" / "windows-x86_64" / "msys64" / "ucrt64" / "bin"
+    candidates = _mingw_candidates()
+
+    # An explicit developer override remains authoritative and is trusted as
+    # an external toolchain. The packaged bundle is validated independently.
+    explicit = os.environ.get("RBL_MINGW")
+    if explicit:
+        override = Path(explicit)
+        try:
+            override_is_bundled = override.resolve() == bundled_bin.resolve()
+        except (OSError, RuntimeError):
+            override_is_bundled = override == bundled_bin
+        if not override_is_bundled and override.is_dir():
+            gcc, asm = override / "gcc.exe", override / "as.exe"
+            if gcc.is_file() and asm.is_file():
+                return {"bin": override, "gcc": gcc, "as": asm,
+                        "nm": override / "nm.exe" if (override / "nm.exe").is_file() else None,
+                        "name": f"{override.parent.name}/{override.name}", "kind": "external"}
+
+    bundled_root = bundled_bin.parent
+    manifest_path = bundled_root / "rbl-toolchain-manifest.json"
+    bundle_present = (
+        bundled_root.exists() or bundled_root.is_symlink()
+        or manifest_path.exists() or manifest_path.is_symlink()
+    )
+    if bundle_present:
+        try:
+            if not bundled_bin.is_dir():
+                raise RuntimeError(f"bundled toolchain directory is missing or invalid: {bundled_bin}")
+            if not manifest_path.is_file():
+                raise RuntimeError(f"bundled toolchain manifest is missing or invalid: {manifest_path}")
+            # The app-local CPython uses python314._pth, so the script's
+            # directory is intentionally absent from sys.path. Load this one
+            # trusted sibling by its resolved path without widening imports.
+            import importlib.util
+
+            verifier_path = Path(__file__).resolve().parent / "package_windows_toolchain.py"
+            spec = importlib.util.spec_from_file_location(
+                "_rbl_package_windows_toolchain", verifier_path
+            )
+            if spec is None or spec.loader is None:
+                raise RuntimeError(f"cannot load bundled toolchain verifier: {verifier_path}")
+            verifier_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(verifier_module)
+            verify_manifest = verifier_module.verify_manifest
+
+            manifest = verify_manifest(bundled_root)
+            gcc_version = manifest.get("gcc_version")
+            required = {
+                "bin/gcc.exe", "bin/as.exe", "x86_64-w64-mingw32/bin/ld.exe",
+                "lib/crt2.o", "lib/default-manifest.o",
+                f"lib/gcc/x86_64-w64-mingw32/{gcc_version}/collect2.exe",
+            }
+            if not required.issubset(manifest["files"]):
+                raise RuntimeError("required GCC, assembler, linker or startup inputs are missing")
+        except (
+            ImportError, OSError, RuntimeError, ValueError, KeyError, TypeError
+        ) as exc:
+            raise RuntimeError(f"Bundled Windows toolchain failed manifest verification: {exc}") from exc
+        gcc, asm = bundled_bin / "gcc.exe", bundled_bin / "as.exe"
+        return {"bin": bundled_bin, "gcc": gcc, "as": asm,
+                "nm": bundled_bin / "nm.exe" if (bundled_bin / "nm.exe").is_file() else None,
+                "name": "RBL bundled MinGW-w64", "kind": "bundled"}
+
+    for d in candidates:
+        if d == bundled_bin or (explicit and d == Path(explicit)):
+            continue
         try:
             if not d or not d.is_dir():
                 continue
@@ -322,34 +388,9 @@ def find_native_toolchain():
             continue
         gcc, asm = d / "gcc.exe", d / "as.exe"
         if gcc.is_file() and asm.is_file():
-            bundled = d == (ROOT / "toolchain" / "windows-x86_64" / "msys64" / "ucrt64" / "bin")
-            if bundled:
-                manifest_path = d.parent / "rbl-toolchain-manifest.json"
-                try:
-                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                    files = manifest["files"]
-                    if manifest.get("schema") != 1 or not files:
-                        continue
-                    gcc_version = manifest.get("gcc_version")
-                    required = {
-                        "bin/gcc.exe", "bin/as.exe", "x86_64-w64-mingw32/bin/ld.exe",
-                        "lib/crt2.o", "lib/default-manifest.o",
-                        f"lib/gcc/x86_64-w64-mingw32/{gcc_version}/collect2.exe",
-                    }
-                    if not required.issubset(files):
-                        continue
-                    if any(
-                        not (d.parent / relative).is_file()
-                        or (d.parent / relative).stat().st_size != info.get("size")
-                        for relative, info in files.items()
-                    ):
-                        continue
-                except (OSError, ValueError, KeyError, TypeError):
-                    continue
             return {"bin": d, "gcc": gcc, "as": asm,
                     "nm": d / "nm.exe" if (d / "nm.exe").is_file() else None,
-                    "name": "RBL bundled MinGW-w64" if bundled else f"{d.parent.name}/{d.name}",
-                    "kind": "bundled" if bundled else "external"}
+                    "name": f"{d.parent.name}/{d.name}", "kind": "external"}
     gcc, asm = shutil.which("gcc"), shutil.which("as")
     if gcc and asm:
         return {"bin": Path(gcc).parent, "gcc": Path(gcc), "as": Path(asm),

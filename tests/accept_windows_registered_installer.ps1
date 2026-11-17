@@ -7,21 +7,10 @@ $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $Root 'installer\windows_registry_policy.ps1')
 $BuildDir = (Resolve-Path -LiteralPath $BuildDir).Path
-foreach ($required in @('rbl-studio-wx.exe', 'rbl-studio-worker.exe', 'THIRD_PARTY_NOTICES.txt', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md', 'source/Rust-worker-source.tar.zst', 'source/Rust-worker-source.sha256', 'source/Windows-toolchain-source.tar.zst', 'source/Windows-toolchain-source.sha256', 'source/Python-3.14.10.tar.xz', 'source/Python-3.14.10.tar.xz.sha256', 'source/python-build-standalone-20261110.tar.gz', 'source/python-build-standalone-20261110.tar.gz.sha256')) {
+foreach ($required in @('rbl-studio-wx.exe', 'rbl-studio-worker.exe', 'THIRD_PARTY_NOTICES.txt', 'licenses/Scintilla/License.txt', 'licenses/Rust/THIRD_PARTY_NOTICES.md')) {
     if (-not (Test-Path -LiteralPath (Join-Path $BuildDir $required) -PathType Leaf)) {
         throw "Acceptance requires an existing complete BuildDir; missing: $required"
     }
-}
-$sourceChecksum = (Get-Content -LiteralPath (Join-Path $BuildDir 'source/Rust-worker-source.sha256') -Raw).Trim()
-if ($sourceChecksum -notmatch '^([0-9a-fA-F]{64})  Rust-worker-source\.tar\.zst$') { throw 'Rust source checksum manifest is malformed.' }
-if ((Get-FileHash -LiteralPath (Join-Path $BuildDir 'source/Rust-worker-source.tar.zst') -Algorithm SHA256).Hash -ine $Matches[1]) { throw 'Rust source archive checksum mismatch.' }
-$windowsSourceChecksum = (Get-Content -LiteralPath (Join-Path $BuildDir 'source/Windows-toolchain-source.sha256') -Raw).Trim()
-if ($windowsSourceChecksum -notmatch '^([0-9a-fA-F]{64})  Windows-toolchain-source\.tar\.zst$') { throw 'Windows toolchain source checksum manifest is malformed.' }
-if ((Get-FileHash -LiteralPath (Join-Path $BuildDir 'source/Windows-toolchain-source.tar.zst') -Algorithm SHA256).Hash -ine $Matches[1]) { throw 'Windows toolchain source archive checksum mismatch.' }
-foreach ($pythonSourceName in @('Python-3.14.10.tar.xz', 'python-build-standalone-20261110.tar.gz')) {
-    $pythonSourceChecksum = (Get-Content -LiteralPath (Join-Path $BuildDir ("source/" + $pythonSourceName + '.sha256')) -Raw).Trim()
-    if ($pythonSourceChecksum -notmatch ('^([0-9a-fA-F]{64})  ' + [regex]::Escape($pythonSourceName) + '$')) { throw "Python source checksum manifest is malformed: $pythonSourceName" }
-    if ((Get-FileHash -LiteralPath (Join-Path $BuildDir ("source/" + $pythonSourceName)) -Algorithm SHA256).Hash -ine $Matches[1]) { throw "Python source archive checksum mismatch: $pythonSourceName" }
 }
 
 $RunId = [guid]::NewGuid().ToString('D')
@@ -210,19 +199,35 @@ try {
     $manifestPath = Join-Path $InstallOne '.rblstudio-install.json'
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if ($manifest.registry_classes_root -cne $RegistryClassesRoot) { throw 'Installer did not persist the validated registry root.' }
+    $InstalledInstaller = Join-Path $InstallOne 'installer\install_windows.ps1'
+    $InstalledUninstaller = Join-Path $InstallOne 'installer\uninstall_windows.ps1'
+    $InstalledRegistryPolicy = Join-Path $InstallOne 'installer\windows_registry_policy.ps1'
+    foreach ($installedScript in @($InstalledInstaller, $InstalledUninstaller, $InstalledRegistryPolicy)) {
+        if (-not (Test-Path -LiteralPath $installedScript -PathType Leaf)) {
+            throw "Installed-copy repair payload is missing: $installedScript"
+        }
+    }
+    # Re-run Install / Repair using only the installed copy. This proves the
+    # installed tree retains its installer, registry policy and complete
+    # BuildDir payload instead of depending on the original checkout.
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $repairOutput = & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $InstalledInstaller `
+            -InstallDir $InstallOne -BuildDir $InstallOne -RegistryClassesRoot $RegistryClassesRoot -NoRegister 2>&1
+        $repairExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+    if ($repairExitCode -ne 0) {
+        throw "Installed-copy repair failed ($repairExitCode): $($repairOutput -join "`n")"
+    }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if (-not $manifest.registered) { throw 'Installed-copy repair lost the existing registration state.' }
+    Assert-RegistryDefault $ProgId 'installed-copy repair'
     $expectedShortcut = Join-Path $TestAppData 'Microsoft\Windows\Start Menu\Programs\RBL Studio wx.lnk'
     if ($manifest.shortcut_path -cne $expectedShortcut) { throw 'Installer did not isolate its Start Menu shortcut under the temporary APPDATA.' }
     Assert-RegistryDefault $ProgId 'initial registered install'
-    $installedWindowsSource = Join-Path $InstallOne 'source/Windows-toolchain-source.tar.zst'
-    $installedWindowsSourceChecksum = (Get-Content -LiteralPath (Join-Path $InstallOne 'source/Windows-toolchain-source.sha256') -Raw).Trim()
-    if ($installedWindowsSourceChecksum -notmatch '^([0-9a-fA-F]{64})  Windows-toolchain-source\.tar\.zst$') { throw 'Installed Windows source checksum manifest is malformed.' }
-    if ((Get-FileHash -LiteralPath $installedWindowsSource -Algorithm SHA256).Hash -ine $Matches[1]) { throw 'Installed Windows source archive checksum mismatch.' }
-    foreach ($pythonSourceName in @('Python-3.14.10.tar.xz', 'python-build-standalone-20261110.tar.gz')) {
-        $installedPythonSource = Join-Path $InstallOne ("source/" + $pythonSourceName)
-        $installedPythonChecksum = (Get-Content -LiteralPath (Join-Path $InstallOne ("source/" + $pythonSourceName + '.sha256')) -Raw).Trim()
-        if ($installedPythonChecksum -notmatch ('^([0-9a-fA-F]{64})  ' + [regex]::Escape($pythonSourceName) + '$')) { throw "Installed Python source checksum manifest is malformed: $pythonSourceName" }
-        if ((Get-FileHash -LiteralPath $installedPythonSource -Algorithm SHA256).Hash -ine $Matches[1]) { throw "Installed Python source checksum mismatch: $pythonSourceName" }
-    }
     $savedPath = $env:PATH
     $savedRblPython = $env:RBL_PYTHON
     $savedToolchain = $env:RBL_TOOLCHAIN

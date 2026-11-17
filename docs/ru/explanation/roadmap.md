@@ -1,10 +1,10 @@
-# last verified: v0.8.0 | 2026.11.11 | GATE G VERIFICATION RECONCILIATION
+# last verified: v0.8.1 | 2026.11.17 | CURRENT SOURCE TREE AND ROADMAP
 
 ## Назначение и статус
 
-Это основной план развития RBL. В нём отдельно описаны реализованная база 0.8.0, незавершённая инженерная работа и будущие предложения. Roadmap задаёт порядок и критерии готовности, а не календарные обещания.
+Это основной план развития RBL. В нём отдельно описаны реализованная база 0.8.1, незавершённая инженерная работа и будущие предложения. Roadmap задаёт порядок и критерии готовности, а не календарные обещания.
 
-**Текущее состояние исходников:** корневой VERSION, CLI и compiler binaries сообщают 0.8.0. Этот roadmap описывает реализацию в текущем дереве исходников и оставшиеся инженерные этапы. GitHub опубликовал `v0.8.0` как pre-release 2026-11-10 без assets; перевод в stable остаётся отдельным gate.
+**Текущее состояние исходников:** корневой VERSION, CLI и compiler binaries сообщают 0.8.1. Этот roadmap описывает реализацию в текущем дереве исходников и оставшиеся инженерные этапы. GitHub опубликовал полный source snapshot 0.8.0 как `v0.8.0-r2` 2026-11-15. Более ранний pre-release placeholder `v0.8.0` оставлен без изменений. Текущее дерево 0.8.1 подготовлено, но ещё не опубликовано; см. release manifest.
 
 ## Принципы
 
@@ -16,9 +16,9 @@
 6. **Нет функций «на бумаге».** Парсинг или прототип не означают готовность. Нужны реализация, позитивные и негативные тесты, документация и проверки обеих платформ.
 7. **Релиз закрывается доказательствами.** Чистая сборка, regression, smoke и differential tests, обновлённые RU/EN docs и release notes.
 
-## Текущая база — RBL 0.8.0
+## Текущая база — RBL 0.8.1
 
-RBL 0.8.0 — нативный однофайловый язык и toolchain для x86-64 Linux ELF64 и x86-64 Windows PE/COFF. Общий C frontend и code generator напрямую создают assembly; пользовательский RBL-код не транслируется в C.
+RBL 0.8.1 — нативный однофайловый язык и toolchain для x86-64 Linux ELF64 и x86-64 Windows PE/COFF. Общий C frontend и code generator напрямую создают assembly; пользовательский RBL-код не транслируется в C.
 
 Компилятор разделён на `common.c`, `lexer.c`, `ast.c`, `parser.c`, `sema.c`, `codegen.c` и `driver.c`; внутренние интерфейсы находятся в `rblc_internal.h`. Поиск переменных, функций и строковых констант использует open-addressing hash indexes. Обе платформы используют общую реализацию frontend и семантики.
 
@@ -79,11 +79,11 @@ Runtime ABI `1.2.0` описывает tagged value representation, calling conv
 
 **Состояние 0.8.0:** модульный compiler, версионированный ABI, документированная lifetime-модель строк, ограниченные f-string format specs и межплатформенные критерии проверки реализованы. Оставшиеся ограничения перечислены в справочнике языка и manifest.
 
-### Release checklist RBL 0.8.0
+### Исторический compiler/runtime checklist RBL 0.8.0
 
-Этот checklist фиксирует реализацию и проверочное состояние RBL 0.8.0. Сам по себе он не разрешает перевод уже опубликованного pre-release в stable-релиз.
+Этот исторический checklist фиксирует реализацию compiler/runtime RBL 0.8.0. Позднее полный source snapshot 0.8.0 был опубликован как `v0.8.0-r2`; текущий статус desktop-продукта и дистрибуции 0.8.1 описан в release manifest.
 
-**Уточнение области:** 6/6 означает завершение пакетов compiler/Runtime 0.8.0 и зафиксированных для них проверок. Это не означает готовность всего desktop-продукта к релизу. Интерактивная приёмка IDE и проверка corresponding source/source-offer для встроенного Windows toolchain — отдельные незакрытые release gates; они отслеживаются в [`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt).
+**Уточнение области:** 6/6 означает завершение пакетов compiler/Runtime 0.8.0 и зафиксированных для них проверок. Это не описывает desktop-продукт 0.8.1. Приёмка IDE и область дистрибуции отслеживаются в [`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt); отдельные corresponding-source archives не являются GitHub release deliverables, но сторонние лицензионные обязательства для bundled binaries сохраняются.
 
 1. [x] **Архитектура** — модульный compiler, приватные границы модулей, lookup indexes, сохранённая семантика и воспроизводимые compiler/build measurements.
 2. [x] **Runtime ABI** — версионированный descriptor, link/startup compatibility checks, layout значений, calling convention и обязательные feature bits.
@@ -92,7 +92,7 @@ Runtime ABI `1.2.0` описывает tagged value representation, calling conv
 5. [x] **Форматирование f-строк** — ограниченная грамматика, согласованность parser/runtime, runtime type errors, managed output и граничные/differential tests.
 6. [x] **Финальная проверка** — проходят 63 direct regression cases; все 116 положительных исходников в наборе из 53 примеров и 70 тестовых файлов компилируются и проходят assembler, 7 отрицательных отклоняются; проходит 63-сценарный diagnostic suite; текущий differential run из 85 source cases проходит с 62 успешными output comparisons, 11 expected-runtime-error comparisons, 7 expected-negative diagnostic и 5 nondeterministic build/exit comparisons, все 30 diagnostic differential cases совпадают. Проходят Runtime ABI, инструментальный Linux Runtime call alignment, build-cache isolation, deterministic OOM/GC/ownership и повторный I/O под GC. Tracked corpus и documentation validators проходят. Записаны controlled runtime (2 warmup/10 samples), module-isolation (3/10) и Makefile build (2/12 в disposable sandbox) benchmarks. Чистые source-only compiler/Runtime builds и запуск программ проходят в Windows и WSL sandboxes. Документация EN/RU, README, VERSION и manifest синхронизированы. Runtime benchmark был привязан к CPU, но выполнялся под задокументированной фоновой нагрузкой.
 
-[`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt) — единственный manifest релиза RBL 0.8.0. GitHub опубликовал его как pre-release 2026-11-10 без assets; этот статус должен оставаться явно указанным, пока не пройдены все stable-release gates.
+[`RELEASE_MANIFEST.txt`](../../../RELEASE_MANIFEST.txt) — актуальный manifest подготовки 0.8.1; в нём также сохранена история опубликованного snapshot 0.8.0-r2 и более раннего placeholder v0.8.0.
 
 ## v0.9 — RBL IR, CFG и оптимизатор
 

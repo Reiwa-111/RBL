@@ -1,0 +1,13 @@
+// RBL 0.8.x: integer bases and bounded floating-point precision.
+func main() (
+    set value = 255
+    set ratio = 22.0 / 7.0
+
+    print(f"decimal: {value:d}")
+    print(f"binary:  {value:b}")
+    print(f"octal:   {value:o}")
+    print(f"hex:     {value:X}")
+    print(f"fixed:   {ratio:.4f}")
+    print(f"general: {ratio:.6g}")
+    print(f"sci:     {ratio:.3e}")
+)

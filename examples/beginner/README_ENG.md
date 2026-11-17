@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.11 | BEGINNER GUIDE RECHECK
+# last verified: v0.8.1 | 2026.11.17 | 20 FOUNDATION LESSONS RECHECK
 
-# RBL 0.8.0 - Beginner's Guide
+# RBL 0.8.1 - Beginner's Guide
 
-> **Guide version: RBL 0.8.0.** The course follows the current language and runtime contract, including bounded f-string format specifications. See the reference pages for the complete specification.
+> **Guide version: RBL 0.8.1.** This twenty-lesson foundation was originally written for the 0.7.2 series and has been rechecked against the 0.8.1 compiler. The language/runtime additions in 0.8.x are covered separately by the [ten-lesson 0.8.x tutorial course](../../docs/eng/tutorials/README.md).
 
 ---
 
@@ -25,7 +25,7 @@ This does not mean that one README covers every implementation detail. For confi
 
 ### Important facts before you start
 
-- RBL 0.8.0 is not Python with renamed keywords. Some concepts may look familiar, but blocks, variable declarations and parts of runtime semantics are different.
+- RBL 0.8.1 is not Python with renamed keywords. Some concepts may look familiar, but blocks, variable declarations and parts of runtime semantics are different.
 - The course examples are written in **RBL**. Python is only used to run the repository's `rbl.py` CLI tool; it is not the language used in the examples.
 - Built-in functions and standard-library namespaces are available without `import`.
 - User-defined `import`, a package manager and multi-file compilation are not available in this version.
@@ -135,7 +135,7 @@ func main() (
 - The `(` and `)` around the body delimit a block. RBL does not use curly braces for blocks.
 - `print(...)` writes values to the terminal.
 
-A program can contain function and `struct` declarations. In RBL 0.8.0, one source file is compiled as one program.
+A program can contain function and `struct` declarations. In RBL 0.8.1, one source file is compiled as one program.
 
 ### Comments
 
@@ -170,7 +170,7 @@ let score--
 
 Unlike Python, RBL does not use `x = 5` to declare or update a variable. Use `set` or `let`.
 
-### Types in RBL 0.8.0
+### Types in RBL 0.8.1
 
 | Type / value | Meaning |
 |---|---|
@@ -236,7 +236,7 @@ Integer division truncates toward zero: `7 / 2` produces `3`. If both operands a
 - Logic: `and`, `or`, `not`; `!` is an alternative spelling of `not`.
 - `==` checks equality; `is` checks value/object identity.
 
-**Important:** `and` and `or` in RBL 0.8.0 do not use short-circuit evaluation. Both operands are evaluated. Do not put an expression on the right-hand side if it is unsafe to evaluate regardless of the left-hand result.
+**Important:** `and` and `or` in RBL 0.8.1 do not use short-circuit evaluation. Both operands are evaluated. Do not put an expression on the right-hand side if it is unsafe to evaluate regardless of the left-hand result.
 
 Conditional expressions are supported:
 
@@ -303,7 +303,7 @@ for (name in names) (
 )
 ```
 
-The `for (item in source)` form accepts a range or a list. General dictionary iteration is not available in 0.8.0.
+The `for (item in source)` form accepts a range or a list. General dictionary iteration is not available in 0.8.1.
 
 ### Condition loop
 
@@ -356,7 +356,7 @@ func main() (
 
 Declarations start with `func`. A parameter type follows its name: `a int`. An optional return type follows the closing parameter parenthesis: `) int (`. `return` returns a value. A function with no return value produces `Unit`.
 
-Parameter types are checked at call time. Return-type annotations are parsed but are not enforced by the runtime as strict contracts in 0.8.0. Function overloading is not available. If a function name is declared more than once, the last definition is used. Named, optional and variadic parameters are not available.
+Parameter types are checked at call time. Return-type annotations are parsed but are not enforced by the runtime as strict contracts in 0.8.1. Function overloading is not available. If a function name is declared more than once, the last definition is used. Named, optional and variadic parameters are not available.
 
 ### Recursion
 
@@ -402,7 +402,7 @@ set matrix = [[1, 2], [3, 4]]
 print(matrix[0][1])
 ```
 
-Negative indexing, slicing and list concatenation with `+` are not implemented in 0.8.0.
+Negative indexing, slicing and list concatenation with `+` are not implemented in 0.8.1.
 
 ## 11. Dictionaries and nested dictionaries
 
@@ -612,7 +612,7 @@ Implemented namespace methods: `abs`, `sqrt`, `pow`, `min`, `max`, `floor`, `cei
 
 Constants: `rbl.math.pi` and `rbl.math.e` are values, not functions; they are available only through the `rbl.math` namespace, not as global names. Do not add parentheses.
 
-Important: `fmod`, `hypot`, `degrees`, `radians` and `clamp` are available as global functions, but not as `rbl.math` methods in the 0.8.0 implementation. In particular, `rbl.math.clamp(...)` produces an unknown-method runtime error; use `clamp(...)`. Some entries in the separate standard-library reference list more namespace methods than the implementation actually provides; this guide lists the implemented set.
+Important: `fmod`, `hypot`, `degrees`, `radians` and `clamp` are available as global functions, but not as `rbl.math` methods in the 0.8.1 implementation. In particular, `rbl.math.clamp(...)` produces an unknown-method runtime error; use `clamp(...)`. Some entries in the separate standard-library reference list more namespace methods than the implementation actually provides; this guide lists the implemented set.
 
 ### Namespace `rbl.io`
 
@@ -697,11 +697,11 @@ python ../rbl.py check
 python ../rbl.py run
 ```
 
-## 18. What is NOT implemented in RBL 0.8.0
+## 18. What is NOT implemented in RBL 0.8.1
 
 This section is important: do not assume that a Python or another language feature exists in RBL unless it is implemented by the current frontend/runtime.
 
-| Feature | Status in 0.8.0 |
+| Feature | Status in 0.8.1 |
 |---|---|
 | `import`, user modules, multi-file compilation | Not available. One source file per program. |
 | Global variables and constants | Not available. |
@@ -726,11 +726,11 @@ This section is important: do not assume that a Python or another language featu
 
 Also keep runtime limitations in mind: `upper/lower` only handle ASCII; the PRNG is not cryptographically secure; `cwd` and the clock source are platform-dependent; strings allocated by current runtime paths are not individually freed before process exit.
 
-See the [RBL 0.8.0 limitations reference](../../docs/eng/reference/limitations.md) for the full list.
+See the [RBL 0.8.1 limitations reference](../../docs/eng/reference/limitations.md) for the full list.
 
 ## 19. Feature map: where to study additional topics
 
-The twenty lessons are an introduction, not an exhaustive list of RBL features. The table below lists additional features implemented in RBL 0.8.0 and where to study them.
+The twenty lessons are an introduction, not an exhaustive list of RBL 0.8.1 features. The separate 0.8.x tutorial course covers the additions made after the 0.7.2 foundation. The table below lists additional features implemented in RBL 0.8.1 and where to study them.
 
 | Feature | Where to study next |
 |---|---|
@@ -770,12 +770,12 @@ Practical assessment:
 |---|---|
 | Has only seen Python and knows a few commands | Can read simple examples with guidance, but needs to learn programming fundamentals separately. |
 | Has written small scripts using variables, `if`, loops and functions | Should be able to learn basic RBL from the twenty lessons and this guide. |
-| Confidently uses Python lists, dictionaries, functions, files and debugging | Should be able to learn most of RBL 0.8.0 independently; the main work is adapting to syntax and runtime differences. |
+| Confidently uses Python lists, dictionaries, functions, files and debugging | Should be able to learn most of RBL 0.8.1 independently; the main work is adapting to syntax and runtime differences. |
 | Experienced Python developer | Should be able to read the language quickly, but must not assume that RBL supports every familiar Python feature. |
 
 ### The most important differences from Python
 
-| Python | RBL 0.8.0 |
+| Python | RBL 0.8.1 |
 |---|---|
 | `x = 10` | `set x = 10` |
 | `x = 20` to update | `let x = 20` |
@@ -818,9 +818,9 @@ Practical assessment:
 
 ## 22. Documentation links
 
-- [RBL 0.8.0 syntax](../../docs/eng/reference/syntax.md)
-- [RBL 0.8.0 standard library](../../docs/eng/reference/standard-library.md)
-- [RBL 0.8.0 limitations](../../docs/eng/reference/limitations.md)
+- [RBL 0.8.1 syntax](../../docs/eng/reference/syntax.md)
+- [RBL 0.8.1 standard library](../../docs/eng/reference/standard-library.md)
+- [RBL 0.8.1 limitations](../../docs/eng/reference/limitations.md)
 - [CLI reference](../../docs/eng/reference/cli.md)
 - [Project workflow](../../docs/eng/how-to/project-workflow.md)
 - [Testing guide](../../docs/eng/how-to/testing.md)

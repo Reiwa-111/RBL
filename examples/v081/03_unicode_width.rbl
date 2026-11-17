@@ -1,0 +1,11 @@
+// RBL 0.8.x: f-string width counts Unicode code points, not terminal cells.
+func main() (
+    set latin = "RBL"
+    set greek = "κόσμος"
+    set symbol = "λ"
+
+    print(f"[{latin:·^12s}]")
+    print(f"[{greek:*>12s}]")
+    print(f"[{symbol:>>8s}]")
+    print("String code-point lengths:", len(greek), len(symbol))
+)

@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | VERSION AND CLI RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT DOCUMENTATION REVIEW
 
 ## Reference: `rbl.toml`
 

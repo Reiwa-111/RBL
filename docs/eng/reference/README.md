@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.09 | REFERENCE INDEX RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT DOCUMENTATION REVIEW
 
 ## Reference
 
-Normative RBL 0.8.0 reference pages:
+Normative RBL 0.8.1 reference pages:
 
 - [Language syntax](syntax.md) — expressions, operators, functions, loops, containers and edge cases.
 - [Standard library](standard-library.md) — global functions and namespace APIs.

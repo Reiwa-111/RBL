@@ -1,3 +1,5 @@
+> Historical local source-archive verification evidence. These archives are not part of the current 0.8.1 repository release or installed payload.
+
 # last verified: v0.8.0 | 2026.11.12 | SOURCE ARCHIVE AUDIT
 
 # Windows toolchain and wx runtime — corresponding-source audit

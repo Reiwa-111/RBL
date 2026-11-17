@@ -6,7 +6,7 @@
 
 IR становится контрактом между текущим frontend и будущим backend. В нём должны быть явны порядок вычислений, control flow, runtime checks, side effects и source locations, чтобы verifier отклонял некорректные программы до codegen.
 
-Первая версия представляет один source file на compilation unit, как в RBL 0.8.0. Она не добавляет imports, project modules, closures, exceptions, async execution, публичный bytecode format или binary IR ABI между версиями. Runtime ABI 1.2.0 не меняется.
+Первая версия представляет один source file на compilation unit, как в RBL 0.8.1. Она не добавляет imports, project modules, closures, exceptions, async execution, публичный bytecode format или binary IR ABI между версиями. Runtime ABI 1.2.0 не меняется.
 
 ## Модель представления
 

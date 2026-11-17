@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 set "APP_ROOT=%~dp0"
-if "%APP_ROOT:~-1%"=="\" set "APP_ROOT=%APP_ROOT:~0,-1%"
+if not "%APP_ROOT:~3%"=="" if "%APP_ROOT:~-1%"=="\" set "APP_ROOT=%APP_ROOT:~0,-1%"
 set "GUI="
 set "WORKER="
 

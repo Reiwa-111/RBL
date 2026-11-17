@@ -3,6 +3,7 @@
 #include "app_root.hpp"
 #include "windows_path_parts.hpp"
 #include "worker_frame_limits.hpp"
+#include "setup_diagnostics.hpp"
 
 #include <wx/filedlg.h>
 #include <wx/filefn.h>
@@ -363,6 +364,8 @@ enum : int {
     ID_Doctor,
     ID_Diagnostics,
     ID_Settings,
+    ID_SetupWizard,
+    ID_SetupInstallerProcess,
     ID_FindInFiles,
     ID_SearchResults,
     ID_ProjectSearchDone,
@@ -1708,6 +1711,7 @@ wxBEGIN_EVENT_TABLE(MainFrame, wxFrame)
     EVT_TREE_ITEM_ACTIVATED(wxID_ANY, MainFrame::OnProjectFileActivated)
     EVT_LIST_ITEM_ACTIVATED(ID_Diagnostics, MainFrame::OnDiagnosticActivated)
     EVT_MENU(ID_Settings, MainFrame::OnSettings)
+    EVT_MENU(ID_SetupWizard, MainFrame::OnSetupWizard)
     EVT_MENU(ID_ToggleProjectPane, MainFrame::OnToggleProjectPane)
     EVT_MENU(ID_ToggleOutputPane, MainFrame::OnToggleOutputPane)
     EVT_MENU(ID_ResetLayout, MainFrame::OnResetLayout)
@@ -1774,26 +1778,30 @@ MainFrame::MainFrame()
     status->SetStatusWidths(4, status_widths);
     status->SetBackgroundColour(wxColour(30, 33, 40));
     status->SetForegroundColour(wxColour(205, 211, 220));
-    SetStatusText("RBL Studio 0.8.0", 0);
+    SetStatusText("RBL Studio 0.8.1", 0);
     SetStatusText(PathLabel(workspace_root_), 1);
     SetStatusText("Ready", 2);
     SetStatusText("Ln 1, Col 1", 3);
     BuildMenus();
     BuildLayout();
     Bind(wxEVT_DPI_CHANGED, &MainFrame::OnDpiChanged, this);
-    CallAfter(&MainFrame::LoadUiState);
+    CallAfter([this] {
+        LoadUiState();
+        if ((!ui_config_ || !ui_config_->ReadBool("Setup/Completed", false)) &&
+            !RunSetupWizard(true)) {
+            Close(true);
+            return;
+        }
+        StartWorker();
+    });
     NewDocument();
     Centre();
     ClampFrameToWorkArea(this, GetSize());
-    // Start the redirected worker only after the frame has entered the wx
-    // event loop. Starting its polling timer from the constructor can leave
-    // the Windows timer without a live owner HWND; the child then runs but its
-    // `worker_started`/`ready` frames are never drained until another message
-    // happens to wake the frame.
-    CallAfter(&MainFrame::StartWorker);
+    // Worker startup follows the first-launch setup dialog from the event loop.
 }
 
 MainFrame::~MainFrame() {
+    worker_startup_deadline_ = {};
     search_cancel_.store(true, std::memory_order_relaxed);
     if (search_thread_.joinable()) search_thread_.join();
     SaveUiState();
@@ -1872,6 +1880,31 @@ void MainFrame::LoadUiState() {
     const auto file = directory + wxFILE_SEP_PATH + "ui.ini";
     ui_config_ = std::make_unique<wxFileConfig>("RBLStudio", wxEmptyString, file,
         wxEmptyString, wxCONFIG_USE_LOCAL_FILE);
+    const auto setup_root = ui_config_->Read("Setup/ApplicationRoot", wxEmptyString);
+    if (!setup_root.empty()) {
+        const auto detected_root = application_root_;
+        const auto resolved = rbl::wxui::ResolveApplicationRoot(
+            std::filesystem::path(setup_root.ToStdWstring()),
+            std::filesystem::path(wxStandardPaths::Get().GetExecutablePath().ToStdWstring()));
+        if (resolved) {
+            application_root_ = resolved.root;
+            if (workspace_root_ == detected_root) workspace_root_ = resolved.root;
+            wxSetEnv("RBL_STUDIO_ROOT", wxString(application_root_.wstring()));
+        } else {
+            if (!detected_root.empty() && rbl::wxui::IsApplicationRoot(detected_root)) {
+                application_root_ = detected_root;
+                application_root_error_.clear();
+                wxSetEnv("RBL_STUDIO_ROOT", wxString(application_root_.wstring()));
+            } else {
+                application_root_ = std::filesystem::path{};
+                application_root_error_ = resolved.error;
+            }
+        }
+    }
+    const auto setup_worker = ui_config_->Read("Setup/WorkerPath", wxEmptyString);
+    if (!setup_worker.empty()) wxSetEnv("RBL_STUDIO_WORKER", setup_worker);
+    const auto setup_python = ui_config_->Read("Setup/PythonPath", wxEmptyString);
+    if (!setup_python.empty()) wxSetEnv("RBL_PYTHON", setup_python);
     ui_theme_ = ui_config_->Read("Appearance/Theme", "RBL Dark");
     if (ui_theme_ == "Dark") ui_theme_ = "RBL Dark";
     if (ui_theme_ == "Light") ui_theme_ = "RBL Light";
@@ -2071,6 +2104,12 @@ void MainFrame::ApplyDpiMetrics(double scale_ratio) {
         if (perspective) {
             if (manager_.LoadPerspective(wxString::FromUTF8(perspective->c_str()), true)) {
                 ClampFloatingPanesToDisplays(manager_, this);
+                // LoadPerspective mutates pane state, but does not guarantee
+                // that native floating frames and dock geometry are committed
+                // before the DPI-specific metrics below are recalculated.
+                // Force the AUI layout now so every pane uses the destination
+                // monitor's metrics in the same deferred DPI pass.
+                manager_.Update();
             }
         }
 
@@ -2208,6 +2247,8 @@ void MainFrame::BuildMenus() {
     view->Append(ID_ResetLayout, "Restore Default Layout");
     menu_bar->Append(view, "&View");
     auto* settings = new wxMenu();
+    settings->Append(ID_SetupWizard, "First Launch Setup...");
+    settings->AppendSeparator();
     settings->Append(ID_Settings, "&Settings...");
     menu_bar->Append(settings, "&Settings");
     auto* help = new wxMenu();
@@ -2298,7 +2339,7 @@ void MainFrame::BuildLayout() {
     add_tool(ID_QuickOpen, "Quick Open", wxART_FOLDER_OPEN, "Quickly open a project file");
     add_tool(ID_CommandPalette, "Commands", wxART_HELP, "Open command palette");
     toolbar_->AddStretchSpacer();
-        toolbar_->AddLabel(wxID_ANY, "RBL 0.8.0", FromDIP(88));
+        toolbar_->AddLabel(wxID_ANY, "RBL 0.8.1", FromDIP(88));
     toolbar_->Realize();
 
     auto* output_panel = new wxPanel(this);
@@ -4546,6 +4587,7 @@ void MainFrame::OnDiagnosticsTimer(wxTimerEvent&) {
 }
 
 void MainFrame::StartWorker() {
+    worker_startup_deadline_ = {};
     if (application_root_.empty()) {
         AppendOutput("Cannot locate the RBL Studio installation root: " +
             FromUtf8(application_root_error_) + "\n");
@@ -4571,6 +4613,7 @@ void MainFrame::StartWorker() {
     if (!wxFileExists(executable)) {
         AppendOutput("Backend worker not found: " + executable + "\n"
                      "Set RBL_STUDIO_WORKER to its full path.\n");
+        SetStatusText("Backend offline", 2);
         return;
     }
     worker_ = new wxProcess(this, ID_WorkerProcess);
@@ -4580,12 +4623,30 @@ void MainFrame::StartWorker() {
         delete worker_;
         worker_ = nullptr;
         AppendOutput("Could not start the Rust backend worker.\n");
+        SetStatusText("Backend offline", 2);
         return;
     }
     worker_shutdown_kill_sent_ = false;
     worker_shutdown_deadline_ = {};
+    worker_ready_ = false;
     const bool timer_started = worker_timer_.Start(25);
-    SetStatusText(timer_started ? "Polling worker" : "Worker timer failed", 2);
+    if (!timer_started) {
+        worker_startup_deadline_ = {};
+        worker_timer_.Stop();
+        UpdateToolbarState();
+        SetStatusText("Backend startup failed: polling timer", 2);
+        AppendOutput("[backend] worker startup failed: wx polling timer could not start; terminating worker\n");
+        const auto kill_result = wxProcess::Kill(worker_pid_, wxSIGKILL, wxKILL_CHILDREN);
+        if (kill_result != wxKILL_OK && wxProcess::Exists(worker_pid_)) {
+            AppendOutput("[backend] worker termination after polling timer failure was not confirmed; waiting for process exit notification\n");
+        }
+        return;
+    }
+    // Allow slow first-start machines 15 seconds to complete the initialize
+    // handshake. PollWorker enforces this deadline while the 25 ms timer drains
+    // stdout/stderr, and a ready frame clears it immediately.
+    worker_startup_deadline_ = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+    SetStatusText("Polling worker", 2);
     const auto root_bytes = application_root_.u8string();
     const auto root = wxString::FromUTF8(reinterpret_cast<const char*>(root_bytes.data()), root_bytes.size());
     SendWorkerRequest("{\"command\":\"initialize\",\"root\":\"" +
@@ -4594,6 +4655,7 @@ void MainFrame::StartWorker() {
 
 void MainFrame::RestartWorker() {
     if (task_running_) return;
+    worker_startup_deadline_ = {};
     if (worker_) {
         restart_worker_pending_ = true;
         worker_ready_ = false;
@@ -4892,11 +4954,25 @@ void MainFrame::PollWorker() {
         AppendOutput("[backend] worker did not stop after restart request; forcing shutdown\n");
         wxProcess::Kill(worker_pid_, wxSIGKILL, wxKILL_CHILDREN);
     }
+    if (!worker_ready_ && worker_startup_deadline_ != std::chrono::steady_clock::time_point{} &&
+        std::chrono::steady_clock::now() >= worker_startup_deadline_) {
+        worker_startup_deadline_ = {};
+        UpdateToolbarState();
+        SetStatusText("Backend startup timed out", 2);
+        AppendOutput("[backend] worker startup failed: no ready handshake received within 15 seconds; terminating worker\n");
+        if (worker_pid_ > 0 && wxProcess::Exists(worker_pid_)) {
+            const auto kill_result = wxProcess::Kill(worker_pid_, wxSIGKILL, wxKILL_CHILDREN);
+            if (kill_result != wxKILL_OK && wxProcess::Exists(worker_pid_)) {
+                AppendOutput("[backend] worker termination after startup timeout was not confirmed; waiting for process exit notification\n");
+            }
+        }
+    }
 }
 
 void MainFrame::HandleWorkerEvent(const wxString& line) {
     const auto event = JsonStringField(line, "event");
     if (event == "ready") {
+        worker_startup_deadline_ = {};
         worker_ready_ = true;
         UpdateToolbarState();
         SetStatusText("Ready", 2);
@@ -5119,6 +5195,7 @@ void MainFrame::OnWorkerExit(wxProcessEvent& event) {
         AppendOutput("[backend] worker exited before sending task completion; received diagnostics were finalized\n");
     }
     worker_ready_ = false;
+    worker_startup_deadline_ = {};
     task_running_ = false;
     task_started_ = false;
     active_task_accepts_stdin_ = false;
@@ -5605,6 +5682,477 @@ void MainFrame::OnSettings(wxCommandEvent&) {
     dialog.ShowModal();
 }
 
+void MainFrame::OnSetupWizard(wxCommandEvent&) {
+    RunSetupWizard(false);
+}
+
+bool MainFrame::RunSetupWizard(bool first_launch) {
+    wxString worker_default;
+    if (!wxGetEnv("RBL_STUDIO_WORKER", &worker_default) || worker_default.empty()) {
+        const auto executable = wxFileName(wxStandardPaths::Get().GetExecutablePath());
+#ifdef __WXMSW__
+        worker_default = executable.GetPathWithSep() + "rbl-studio-worker.exe";
+#else
+        worker_default = executable.GetPathWithSep() + "rbl-studio-worker";
+#endif
+    }
+    wxString python_default;
+    if (!wxGetEnv("RBL_PYTHON", &python_default) || python_default.empty()) {
+#ifdef __WXMSW__
+        python_default = wxString((application_root_ / "runtime" / "python" / "python.exe").wstring());
+#else
+        python_default = wxString((application_root_ / "runtime" / "python" / "bin" / "python3").wstring());
+#endif
+    }
+
+    wxDialog dialog(this, wxID_ANY,
+        first_launch ? "Welcome to RBL Studio" : "RBL Studio Setup",
+        wxDefaultPosition, FromDIP(wxSize(790, 690)), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+    const int pad = FromDIP(12);
+    const int field_width = FromDIP(560);
+    auto* root_layout = new wxBoxSizer(wxVERTICAL);
+    root_layout->Add(new wxStaticText(&dialog, wxID_ANY,
+        first_launch
+            ? "Configure this installation and review the component checks before using RBL Studio."
+            : "Review the installation, update component paths and adjust startup settings."),
+        0, wxEXPAND | wxALL, pad);
+
+    auto* paths = new wxStaticBoxSizer(wxVERTICAL, &dialog, "Installation paths");
+    auto add_path_row = [&](const wxString& label, const wxString& initial,
+                            const wxString& button_label, auto on_browse) {
+        auto* row = new wxBoxSizer(wxHORIZONTAL);
+        row->Add(new wxStaticText(&dialog, wxID_ANY, label), 0,
+            wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
+        auto* field = new wxTextCtrl(&dialog, wxID_ANY, initial);
+        field->SetMinSize(wxSize(field_width, -1));
+        row->Add(field, 1, wxEXPAND | wxRIGHT, pad);
+        auto* browse = new wxButton(&dialog, wxID_ANY, button_label);
+        row->Add(browse, 0, wxALIGN_CENTER_VERTICAL);
+        browse->Bind(wxEVT_BUTTON, [&, field, on_browse](wxCommandEvent&) {
+            on_browse(field);
+        });
+        paths->Add(row, 0, wxEXPAND | wxALL, pad);
+        return field;
+    };
+
+    auto* root_path = add_path_row("Application root", wxString(application_root_.wstring()), "Browse...",
+        [&](wxTextCtrl* field) {
+            wxDirDialog picker(&dialog, "Select the RBL Studio application directory", field->GetValue());
+            if (picker.ShowModal() == wxID_OK) field->SetValue(picker.GetPath());
+        });
+    auto* worker_path = add_path_row("Backend worker", worker_default, "Browse...",
+        [&](wxTextCtrl* field) {
+            wxFileDialog picker(&dialog, "Select rbl-studio-worker", wxEmptyString, wxEmptyString,
+                "RBL Studio worker (rbl-studio-worker*)|rbl-studio-worker*|All files|*.*",
+                wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+            if (picker.ShowModal() == wxID_OK) field->SetValue(picker.GetPath());
+        });
+    auto* python_path = add_path_row("Python runtime", python_default, "Browse...",
+        [&](wxTextCtrl* field) {
+            wxFileDialog picker(&dialog, "Select Python interpreter", wxEmptyString, wxEmptyString,
+                "Python executable (python*)|python*|All files|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+            if (picker.ShowModal() == wxID_OK) field->SetValue(picker.GetPath());
+        });
+    wxString install_default;
+#ifdef __WXMSW__
+    wxString local_app_data;
+    if (wxGetEnv("LOCALAPPDATA", &local_app_data) && !local_app_data.empty())
+        install_default = local_app_data + wxFILE_SEP_PATH + "Programs" + wxFILE_SEP_PATH + "RBLStudio";
+    else
+        install_default = wxStandardPaths::Get().GetUserConfigDir() + wxFILE_SEP_PATH + "Programs" + wxFILE_SEP_PATH + "RBLStudio";
+#else
+    install_default = wxGetHomeDir() + wxFILE_SEP_PATH + ".local" + wxFILE_SEP_PATH + "lib" + wxFILE_SEP_PATH + "rblstudio";
+#endif
+    auto* install_path = add_path_row("Install destination", install_default, "Browse...",
+        [&](wxTextCtrl* field) {
+            wxDirDialog picker(&dialog, "Select the RBL Studio installation directory", field->GetValue());
+            if (picker.ShowModal() == wxID_OK) field->SetValue(picker.GetPath());
+        });
+    root_layout->Add(paths, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, pad);
+
+    auto* settings = new wxStaticBoxSizer(wxVERTICAL, &dialog, "Initial settings");
+    auto* theme_row = new wxBoxSizer(wxHORIZONTAL);
+    theme_row->Add(new wxStaticText(&dialog, wxID_ANY, "Interface theme"),
+        0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
+    auto* theme = new wxChoice(&dialog, wxID_ANY);
+    for (const auto& name : {"RBL Dark", "RBL Light", "Nord", "Monokai", "High Contrast"})
+        theme->Append(name);
+    theme->SetStringSelection(ui_theme_);
+    if (theme->GetSelection() == wxNOT_FOUND) theme->SetSelection(0);
+    theme_row->Add(theme, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(28));
+    theme_row->Add(new wxStaticText(&dialog, wxID_ANY, "Toolchain mode"),
+        0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
+    auto* toolchain = new wxChoice(&dialog, wxID_ANY);
+    toolchain->Append("auto");
+    toolchain->Append("native");
+    toolchain->Append("wsl");
+    toolchain->SetStringSelection(toolchain_mode_);
+    if (toolchain->GetSelection() == wxNOT_FOUND) toolchain->SetSelection(0);
+    theme_row->Add(toolchain, 0, wxALIGN_CENTER_VERTICAL);
+    settings->Add(theme_row, 0, wxEXPAND | wxALL, pad);
+    auto* distro_row = new wxBoxSizer(wxHORIZONTAL);
+    distro_row->Add(new wxStaticText(&dialog, wxID_ANY, "WSL distribution"),
+        0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
+    auto* distro = new wxTextCtrl(&dialog, wxID_ANY, wsl_distribution_);
+    distro_row->Add(distro, 1, wxEXPAND);
+    settings->Add(distro_row, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, pad);
+#ifndef __WXMSW__
+    toolchain->Enable(false);
+    distro->Enable(false);
+#endif
+    root_layout->Add(settings, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, pad);
+
+    auto* diagnostics_group = new wxStaticBoxSizer(wxVERTICAL, &dialog, "Installation diagnostics");
+    auto* diagnostics = new wxTextCtrl(&dialog, wxID_ANY, wxEmptyString, wxDefaultPosition,
+        FromDIP(wxSize(-1, 190)), wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxTE_DONTWRAP);
+    diagnostics_group->Add(diagnostics, 1, wxEXPAND | wxALL, pad);
+    auto* refresh = new wxButton(&dialog, wxID_REFRESH, "Refresh checks");
+    auto* diagnostic_actions = new wxBoxSizer(wxHORIZONTAL);
+    diagnostic_actions->AddStretchSpacer(1);
+    diagnostic_actions->Add(refresh, 0, wxRIGHT, pad);
+    auto* install = new wxButton(&dialog, wxID_ANY, "Install / Repair");
+    diagnostic_actions->Add(install, 0);
+    auto* launch_installed = new wxButton(&dialog, wxID_ANY, "Launch installed copy");
+    launch_installed->Enable(false);
+    diagnostic_actions->Add(launch_installed, 0, wxLEFT, pad);
+    diagnostics_group->Add(diagnostic_actions, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, pad);
+    root_layout->Add(diagnostics_group, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, pad);
+    auto* developer_continue = new wxCheckBox(&dialog, wxID_ANY,
+        "Continue anyway despite failed checks (development checkout)");
+    developer_continue->SetValue(false);
+    developer_continue->Show(first_launch);
+    root_layout->Add(developer_continue, 0, wxLEFT | wxRIGHT | wxBOTTOM, pad);
+
+    auto refresh_checks = [&] {
+        const auto checks = rbl::wxui::InspectSetup(
+            std::filesystem::path(root_path->GetValue().ToStdWstring()),
+            std::filesystem::path(worker_path->GetValue().ToStdWstring()),
+            std::filesystem::path(python_path->GetValue().ToStdWstring()));
+        wxString report;
+        int passed = 0;
+        for (const auto& check : checks) {
+            if (check.passed) ++passed;
+            report += check.passed ? "[OK]   " : "[ERROR] ";
+            report += wxString::FromUTF8(check.name) + "\n        " +
+                wxString::FromUTF8(check.detail) + "\n\n";
+        }
+        report = wxString::Format("%d of %zu checks passed\n\n", passed, checks.size()) + report;
+        diagnostics->SetValue(report);
+    };
+    refresh->Bind(wxEVT_BUTTON, [&](wxCommandEvent&) { refresh_checks(); });
+
+    auto* footer = new wxBoxSizer(wxHORIZONTAL);
+    footer->AddStretchSpacer(1);
+    auto* buttons = new wxStdDialogButtonSizer();
+    auto* finish = new wxButton(&dialog, wxID_OK, first_launch ? "Finish setup" : "Save setup");
+    auto* cancel = new wxButton(&dialog, wxID_CANCEL);
+    buttons->AddButton(finish);
+    buttons->AddButton(cancel);
+    buttons->Realize();
+    footer->Add(buttons, 0, wxALIGN_CENTER_VERTICAL);
+    root_layout->Add(footer, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, pad);
+    dialog.SetSizer(root_layout);
+    dialog.SetMinSize(FromDIP(wxSize(720, 620)));
+    dialog.CentreOnParent();
+    refresh_checks();
+
+    bool install_succeeded = false;
+    finish->Bind(wxEVT_BUTTON, [&](wxCommandEvent&) {
+        const std::filesystem::path selected_root(root_path->GetValue().ToStdWstring());
+        const auto selected_worker = worker_path->GetValue().Trim(true).Trim(false);
+        const auto selected_python = python_path->GetValue().Trim(true).Trim(false);
+        const auto current_checks = rbl::wxui::InspectSetup(selected_root,
+            std::filesystem::path(selected_worker.ToStdWstring()),
+            std::filesystem::path(selected_python.ToStdWstring()));
+        const bool configuration_valid = std::all_of(current_checks.begin(), current_checks.end(),
+            [](const auto& check) { return check.passed; });
+        if (first_launch && !install_succeeded && !configuration_valid && !developer_continue->GetValue()) {
+            wxMessageBox("Run Install / Repair successfully, or explicitly select the development-checkout option to continue.",
+                "Setup is incomplete", wxOK | wxICON_WARNING, &dialog);
+            return;
+        }
+        if (install_succeeded) {
+            if (std::any_of(current_checks.begin(), current_checks.end(),
+                    [](const auto& check) { return !check.passed; })) {
+                refresh_checks();
+                wxMessageBox("The installed copy did not pass every component check. Review the diagnostics before finishing setup.",
+                    "Installation verification failed", wxOK | wxICON_ERROR, &dialog);
+                return;
+            }
+        }
+        const auto resolved = rbl::wxui::ResolveApplicationRoot(
+            selected_root.empty() ? std::nullopt : std::optional<std::filesystem::path>(selected_root),
+            std::filesystem::path(wxStandardPaths::Get().GetExecutablePath().ToStdWstring()));
+        application_root_ = resolved ? resolved.root : std::filesystem::path{};
+        application_root_error_ = resolved ? std::string{} : resolved.error;
+        if (resolved) wxSetEnv("RBL_STUDIO_ROOT", wxString(application_root_.wstring()));
+        else wxSetEnv("RBL_STUDIO_ROOT", root_path->GetValue());
+
+        if (selected_worker.empty()) wxUnsetEnv("RBL_STUDIO_WORKER");
+        else wxSetEnv("RBL_STUDIO_WORKER", selected_worker);
+        if (selected_python.empty()) wxUnsetEnv("RBL_PYTHON");
+        else wxSetEnv("RBL_PYTHON", selected_python);
+
+        ui_theme_ = theme->GetStringSelection();
+        toolchain_mode_ = toolchain->GetStringSelection();
+        wsl_distribution_ = distro->GetValue().Trim(true).Trim(false);
+        if (wsl_distribution_.empty()) wsl_distribution_ = "Ubuntu-24.04";
+        wxSetEnv("RBL_TOOLCHAIN", toolchain_mode_);
+        wxSetEnv("RBL_WSL_DISTRO", wsl_distribution_);
+        if (ui_config_) {
+            if (install_succeeded || configuration_valid || developer_continue->GetValue() || !first_launch)
+                ui_config_->Write("Setup/Completed", true);
+            ui_config_->Write("Setup/ApplicationRoot", root_path->GetValue());
+            ui_config_->Write("Setup/WorkerPath", selected_worker);
+            ui_config_->Write("Setup/PythonPath", selected_python);
+            SaveUiState();
+        }
+        ApplyUiTheme();
+        SetStatusText(application_root_.empty() ? "Application root missing" : "Setup saved", 2);
+        dialog.EndModal(wxID_OK);
+    });
+    cancel->Bind(wxEVT_BUTTON, [&](wxCommandEvent&) { dialog.EndModal(wxID_CANCEL); });
+
+    const auto executable_directory = wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath();
+    const auto installer_script = application_root_ / "installer" /
+#ifdef __WXMSW__
+        "install_windows.ps1";
+#else
+        "install_linux.sh";
+#endif
+    const std::filesystem::path build_directory(executable_directory.ToStdWstring());
+#ifdef __WXMSW__
+    const std::vector<std::filesystem::path> installer_payload{
+        build_directory / "rbl-studio-wx.exe", build_directory / "rbl-studio-worker.exe",
+        build_directory / "THIRD_PARTY_NOTICES.txt", build_directory / "runtime/python/python.exe",
+        build_directory / "runtime/python/rbl-python-runtime.json", build_directory / "runtime/python/UPSTREAM.md",
+        build_directory / "runtime/python/LICENSE.txt", build_directory / "runtime/python/licenses/LICENSE.cpython.txt",
+        build_directory / "licenses/Scintilla/License.txt", application_root_ / "installer/uninstall_windows.ps1",
+        application_root_ / "installer/windows_registry_policy.ps1",
+        build_directory / "licenses/Rust/THIRD_PARTY_NOTICES.md"};
+#else
+    const std::vector<std::filesystem::path> installer_payload{
+        build_directory / "rbl-studio-wx", build_directory / "rbl-studio-worker",
+        build_directory / "THIRD_PARTY_NOTICES.txt", build_directory / "lib/libwx_gtk3u_core-3.2.so.0",
+        build_directory / "toolchain/linux-x86_64/bin/clang", build_directory / "toolchain/linux-x86_64/bin/ld.lld",
+        build_directory / "toolchain/linux-x86_64/manifest.json", build_directory / "toolchain/linux-x86_64/SHA256SUMS",
+        build_directory / "toolchain/linux-x86_64/UPSTREAM.md", build_directory / "toolchain/linux-x86_64/LICENSE.TXT",
+        build_directory / "toolchain/linux-x86_64/provenance/llvm-23.1.5-x86_64.tar.sign",
+        build_directory / "toolchain/linux-x86_64/provenance/llvm-signing-key.asc",
+        build_directory / "runtime/python/python-runtime.tar.gz",
+        build_directory / "runtime/python/rbl-python-runtime.json", build_directory / "runtime/python/UPSTREAM.md",
+        build_directory / "runtime/python/python-runtime.sha256",
+        build_directory / "runtime/python/licenses/LICENSE.cpython.txt",
+        build_directory / "runtime/python/licenses/LICENSE.python-build-standalone-MPL-2.0.txt",
+        build_directory / "licenses/Scintilla/License.txt", build_directory / "licenses/wxWidgets/License.txt",
+        build_directory / "licenses/Rust/THIRD_PARTY_NOTICES.md",
+        build_directory / "LINUX_ABI_AUDIT.txt", build_directory / "PYTHON_RUNTIME_ELF_AUDIT.txt",
+        application_root_ / "installer/uninstall_linux.sh"};
+#endif
+    std::vector<std::filesystem::path> installer_missing;
+    if (!rbl::wxui::IsRegularFile(installer_script)) installer_missing.push_back(installer_script);
+    for (const auto& file : installer_payload)
+        if (!rbl::wxui::IsRegularFile(file)) installer_missing.push_back(file);
+    const bool installer_available = installer_missing.empty();
+    if (!installer_available) {
+        install->Enable(false);
+        diagnostics->AppendText("\nInstaller unavailable. Missing required files:\n");
+        for (const auto& file : installer_missing)
+            diagnostics->AppendText("  " + wxString(file.wstring()) + "\n");
+    }
+
+    wxTimer installer_timer(&dialog);
+    wxProcess* installer_process = nullptr;
+    long installer_pid = -1;
+    auto execute_async = [](const wxArrayString& arguments, int flags, wxProcess* process) {
+#ifdef __WXMSW__
+        std::vector<std::wstring> storage;
+        storage.reserve(arguments.size());
+        for (const auto& argument : arguments) storage.push_back(argument.ToStdWstring());
+        std::vector<const wchar_t*> argv;
+        argv.reserve(storage.size() + 1);
+        for (const auto& argument : storage) argv.push_back(argument.c_str());
+        argv.push_back(nullptr);
+        return wxExecute(argv.data(), flags, process);
+#else
+        std::vector<std::string> storage;
+        storage.reserve(arguments.size());
+        for (const auto& argument : arguments) {
+            const auto utf8 = argument.ToUTF8();
+            storage.emplace_back(utf8.data());
+        }
+        std::vector<const char*> argv;
+        argv.reserve(storage.size() + 1);
+        for (const auto& argument : storage) argv.push_back(argument.c_str());
+        argv.push_back(nullptr);
+        return wxExecute(argv.data(), flags, process);
+#endif
+    };
+    auto drain_installer_output = [&] {
+        if (!installer_process) return;
+        const auto append_stream = [&](wxInputStream* stream, const wxString& prefix) {
+            if (!stream) return;
+            char buffer[4096];
+            while (stream->CanRead()) {
+                stream->Read(buffer, sizeof(buffer));
+                const auto count = stream->LastRead();
+                if (count == 0) break;
+                diagnostics->AppendText(prefix + wxString::FromUTF8(buffer, count));
+            }
+        };
+        append_stream(installer_process->GetInputStream(), "");
+        append_stream(installer_process->GetErrorStream(), "[stderr] ");
+        if (diagnostics->GetLastPosition() > 256 * 1024)
+            diagnostics->Remove(0, diagnostics->GetLastPosition() - 192 * 1024);
+    };
+    dialog.Bind(wxEVT_TIMER, [&](wxTimerEvent&) { drain_installer_output(); }, installer_timer.GetId());
+    dialog.Bind(wxEVT_END_PROCESS, [&](wxProcessEvent& event) {
+        if (event.GetPid() != installer_pid) return;
+        drain_installer_output();
+        installer_timer.Stop();
+        installer_pid = -1;
+        delete installer_process;
+        installer_process = nullptr;
+        install->Enable(installer_available);
+        cancel->Enable(true);
+        finish->Enable(true);
+        dialog.SetEscapeId(wxID_CANCEL);
+        if (event.GetExitCode() == 0) {
+            install_succeeded = true;
+            const auto destination = install_path->GetValue();
+            root_path->SetValue(destination);
+#ifdef __WXMSW__
+            worker_path->SetValue(destination + wxFILE_SEP_PATH + "rbl-studio-worker.exe");
+            python_path->SetValue(destination + wxFILE_SEP_PATH + "runtime" + wxFILE_SEP_PATH + "python" + wxFILE_SEP_PATH + "python.exe");
+#else
+            worker_path->SetValue(destination + wxFILE_SEP_PATH + "rbl-studio-worker");
+            python_path->SetValue(destination + wxFILE_SEP_PATH + "runtime" + wxFILE_SEP_PATH + "python" + wxFILE_SEP_PATH + "bin" + wxFILE_SEP_PATH + "python3");
+#endif
+            diagnostics->AppendText("\n[OK] Installer completed successfully.\n");
+            launch_installed->Enable(true);
+        } else {
+            diagnostics->AppendText(wxString::Format("\n[ERROR] Installer failed with exit code %d. Correct the error above and retry.\n", event.GetExitCode()));
+            install_succeeded = false;
+            launch_installed->Enable(false);
+        }
+    }, ID_SetupInstallerProcess);
+    dialog.Bind(wxEVT_CLOSE_WINDOW, [&](wxCloseEvent& event) {
+        if (installer_pid > 0) {
+            wxBell();
+            return;
+        }
+        event.Skip();
+    });
+    install->Bind(wxEVT_BUTTON, [&](wxCommandEvent&) {
+        const auto destination = install_path->GetValue().Trim(true).Trim(false);
+        if (destination.empty()) {
+            wxMessageBox("Choose an installation destination first.", "RBL Studio Setup", wxOK | wxICON_WARNING, &dialog);
+            return;
+        }
+        if (wxMessageBox("Install or repair RBL Studio in:\n\n" + destination +
+                "\n\nRecognized installations are preserved. File associations and desktop integration remain unchanged.",
+                "Confirm installation", wxYES_NO | wxICON_QUESTION, &dialog) != wxYES) return;
+        wxArrayString arguments;
+#ifdef __WXMSW__
+        arguments.Add("powershell.exe");
+        arguments.Add("-NoProfile");
+        arguments.Add("-ExecutionPolicy");
+        arguments.Add("Bypass");
+        arguments.Add("-File");
+        arguments.Add(wxString(installer_script.wstring()));
+        arguments.Add("-InstallDir");
+        arguments.Add(destination);
+        arguments.Add("-BuildDir");
+        arguments.Add(executable_directory);
+        arguments.Add("-NoRegister");
+#else
+        arguments.Add("/bin/bash");
+        arguments.Add(wxString(installer_script.wstring()));
+        arguments.Add("--install-dir");
+        arguments.Add(destination);
+        arguments.Add("--build-dir");
+        arguments.Add(executable_directory);
+        arguments.Add("--no-register");
+#endif
+        diagnostics->AppendText("\nStarting installer...\n");
+        install->Enable(false);
+        launch_installed->Enable(false);
+        cancel->Enable(false);
+        finish->Enable(false);
+        dialog.SetEscapeId(wxID_NONE);
+        installer_process = new wxProcess(&dialog, ID_SetupInstallerProcess);
+        installer_process->Redirect();
+        installer_pid = execute_async(arguments, wxEXEC_ASYNC, installer_process);
+        if (installer_pid <= 0) {
+            delete installer_process;
+            installer_process = nullptr;
+            installer_pid = -1;
+            install->Enable(installer_available);
+            cancel->Enable(true);
+            finish->Enable(true);
+            dialog.SetEscapeId(wxID_CANCEL);
+            diagnostics->AppendText("[ERROR] Could not start the platform installer process.\n");
+            return;
+        }
+        if (!installer_timer.Start(100)) {
+            diagnostics->AppendText("[ERROR] Could not start installer output polling. Terminating installer.\n");
+            wxProcess::Kill(installer_pid, wxSIGTERM, wxKILL_CHILDREN);
+        }
+    });
+    launch_installed->Bind(wxEVT_BUTTON, [&](wxCommandEvent&) {
+#ifdef __WXMSW__
+        const auto installed_executable = install_path->GetValue() + wxFILE_SEP_PATH + "rbl-studio-wx.exe";
+#else
+        const auto installed_executable = install_path->GetValue() + wxFILE_SEP_PATH + "RBLStudio.sh";
+#endif
+        if (!wxFileExists(installed_executable)) {
+            diagnostics->AppendText("[ERROR] Installed IDE executable is missing: " + installed_executable + "\n");
+            return;
+        }
+        wxArrayString launch_arguments;
+        launch_arguments.Add(installed_executable);
+        wxString old_root, old_worker, old_python;
+        const bool had_root = wxGetEnv("RBL_STUDIO_ROOT", &old_root);
+        const bool had_worker = wxGetEnv("RBL_STUDIO_WORKER", &old_worker);
+        const bool had_python = wxGetEnv("RBL_PYTHON", &old_python);
+        wxString old_toolchain, old_distro;
+        const bool had_toolchain = wxGetEnv("RBL_TOOLCHAIN", &old_toolchain);
+        const bool had_distro = wxGetEnv("RBL_WSL_DISTRO", &old_distro);
+        wxSetEnv("RBL_STUDIO_ROOT", install_path->GetValue());
+        wxSetEnv("RBL_STUDIO_WORKER", worker_path->GetValue());
+        wxSetEnv("RBL_PYTHON", python_path->GetValue());
+        const auto selected_toolchain = toolchain->GetStringSelection();
+        auto selected_distro = distro->GetValue().Trim(true).Trim(false);
+        if (selected_distro.empty()) selected_distro = "Ubuntu-24.04";
+        wxSetEnv("RBL_TOOLCHAIN", selected_toolchain);
+        wxSetEnv("RBL_WSL_DISTRO", selected_distro);
+        if (execute_async(launch_arguments, wxEXEC_ASYNC, nullptr) <= 0) {
+            if (had_root) wxSetEnv("RBL_STUDIO_ROOT", old_root); else wxUnsetEnv("RBL_STUDIO_ROOT");
+            if (had_worker) wxSetEnv("RBL_STUDIO_WORKER", old_worker); else wxUnsetEnv("RBL_STUDIO_WORKER");
+            if (had_python) wxSetEnv("RBL_PYTHON", old_python); else wxUnsetEnv("RBL_PYTHON");
+            if (had_toolchain) wxSetEnv("RBL_TOOLCHAIN", old_toolchain); else wxUnsetEnv("RBL_TOOLCHAIN");
+            if (had_distro) wxSetEnv("RBL_WSL_DISTRO", old_distro); else wxUnsetEnv("RBL_WSL_DISTRO");
+            diagnostics->AppendText("[ERROR] Could not launch the installed IDE.\n");
+            return;
+        }
+        if (ui_config_) {
+            ui_theme_ = theme->GetStringSelection();
+            toolchain_mode_ = selected_toolchain;
+            wsl_distribution_ = selected_distro;
+            ui_config_->Write("Setup/Completed", true);
+            ui_config_->Write("Setup/ApplicationRoot", install_path->GetValue());
+            ui_config_->Write("Setup/WorkerPath", worker_path->GetValue());
+            ui_config_->Write("Setup/PythonPath", python_path->GetValue());
+            SaveUiState();
+        }
+        setup_launch_requested_ = true;
+        dialog.EndModal(wxID_OK);
+    });
+    const int result = dialog.ShowModal();
+    return result == wxID_OK && !setup_launch_requested_ && ui_config_ &&
+        ui_config_->ReadBool("Setup/Completed", false);
+}
+
 void MainFrame::OnToggleProjectPane(wxCommandEvent& event) {
     auto& pane = manager_.GetPane("project-pane");
     if (!pane.IsOk()) return;
@@ -6073,8 +6621,8 @@ void MainFrame::OnQuickReference(wxCommandEvent&) {
 }
 
 void MainFrame::OnAbout(wxCommandEvent&) {
-    wxMessageBox("RBL Studio 0.8.0\nNative wxWidgets + Scintilla frontend candidate\n"
-        "Compiler/runtime backend: RBL 0.8.0\n\n"
+    wxMessageBox("RBL Studio 0.8.1\nNative wxWidgets + Scintilla frontend\n"
+        "Compiler/runtime backend: RBL 0.8.1\n\n"
         "This frontend is an engineering candidate and has not been released.",
         "About RBL Studio", wxOK | wxICON_INFORMATION, this);
 }

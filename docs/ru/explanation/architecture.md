@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.09 | ARCHITECTURE GUIDE RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## Explanation: архитектура компилятора и backend
 
-RBL 0.8.0 использует модульный bootstrap-компилятор на C, который генерирует x86-64 assembly непосредственно из синтаксического дерева. Пользовательская программа не транслируется в C.
+RBL 0.8.1 использует модульный bootstrap-компилятор на C, который генерирует x86-64 assembly непосредственно из синтаксического дерева. Пользовательская программа не транслируется в C.
 
 ## Путь от исходника до executable
 
@@ -41,7 +41,7 @@ UTF-8 lexer → parser → AST → static analysis
 | `driver.c` | CLI, чтение исходника и orchestration pipeline |
 | `rblc_internal.h` | Приватные структуры данных и межмодульные объявления; это не публичный RBL API |
 
-Порядок compilation pipeline: общие утилиты → lexing/создание AST → parsing → semantic analysis → code generation → orchestration в driver. Если описывать именно зависимости исходных файлов, driver использует frontend и code generator; parser зависит от AST/common utilities; semantic analysis — от AST/common utilities; code generator — от semantic analysis/common utilities; lexer и AST helpers — от common utilities. Этот граф ацикличен. Проверка допустимости fast-integer path принадлежит semantic analysis и не вызывает assembly emitter. Общий header раскрывает межмодульные объявления; внутренние helpers объявлены `static` и остаются внутри своих модулей. Build paths компилятора включают диагностику отсутствующих/нестрогих прототипов, повторных объявлений и неявных объявлений функций, чтобы граница интерфейса контролировалась сборкой. Один frontend и один code generator обслуживают Linux ELF64 и Windows PE/COFF. В 0.8.0 по-прежнему нет отдельного RBL IR, CFG/basic-block pipeline или whole-function liveness allocator.
+Порядок compilation pipeline: общие утилиты → lexing/создание AST → parsing → semantic analysis → code generation → orchestration в driver. Если описывать именно зависимости исходных файлов, driver использует frontend и code generator; parser зависит от AST/common utilities; semantic analysis — от AST/common utilities; code generator — от semantic analysis/common utilities; lexer и AST helpers — от common utilities. Этот граф ацикличен. Проверка допустимости fast-integer path принадлежит semantic analysis и не вызывает assembly emitter. Общий header раскрывает межмодульные объявления; внутренние helpers объявлены `static` и остаются внутри своих модулей. Build paths компилятора включают диагностику отсутствующих/нестрогих прототипов, повторных объявлений и неявных объявлений функций, чтобы граница интерфейса контролировалась сборкой. Один frontend и один code generator обслуживают Linux ELF64 и Windows PE/COFF. В 0.8.1 по-прежнему нет отдельного RBL IR, CFG/basic-block pipeline или whole-function liveness allocator.
 
 Makefile компилирует каждый модуль в отдельный object file и затем линкует объекты. Это позволяет выполнять полную сборку параллельно и перекомпилировать только изменённый модуль. Make и native/WSL bootstrap paths в `tools/rbltool.py` отслеживают исходники компилятора, приватный header и каноническую версию из `VERSION` при проверке необходимости пересборки. Отдельный Linux-скрипт `tools/rebuild_compiler.sh` пересобирает те же семь исходников компилятора и все четыре Linux Runtime objects (assembly, containers, ABI и formatting), читая `VERSION` при запуске.
 
@@ -53,7 +53,7 @@ Driver помечает этапы lexer, parser, semantic validation и codegen
 
 ### Пример на RBL
 
-Разделение компилятора на C-модули не является системой модулей исходного языка. Программы RBL 0.8.0 по-прежнему компилируются из одного `.rbl`-файла и не могут импортировать C-модули компилятора. [`examples/compiler/lookup_demo.rbl`](../../../examples/compiler/lookup_demo.rbl) — небольшой запускаемый пример, который повторно использует локальные переменные, функции и строковые значения. Он показывает обычную нагрузку, обрабатываемую приватными индексами, но не предоставляет к ним доступ из RBL. Подробности и ожидаемый вывод — в [описании примера](../../../examples/compiler/README.md).
+Разделение компилятора на C-модули не является системой модулей исходного языка. Программы RBL 0.8.1 по-прежнему компилируются из одного `.rbl`-файла и не могут импортировать C-модули компилятора. [`examples/compiler/lookup_demo.rbl`](../../../examples/compiler/lookup_demo.rbl) — небольшой запускаемый пример, который повторно использует локальные переменные, функции и строковые значения. Он показывает обычную нагрузку, обрабатываемую приватными индексами, но не предоставляет к ним доступ из RBL. Подробности и ожидаемый вывод — в [описании примера](../../../examples/compiler/README.md).
 
 ## Поддерживаемые targets
 

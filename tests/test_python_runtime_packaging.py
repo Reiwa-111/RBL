@@ -1,5 +1,6 @@
 from pathlib import Path
 import io
+import json
 import os
 import stat
 import tarfile
@@ -13,13 +14,14 @@ sys.path.insert(0, str(ROOT))
 
 from tools.package_python_runtime import (
     PACKAGES,
-    SOURCE_PACKAGES,
-    _verify_source_archives,
     _safe_link_target,
     extract_tar_safely,
     extract_zip_safely,
     safe_parts,
+    stage_runtime,
+    write_metadata,
 )
+from unittest.mock import patch
 
 
 class PythonRuntimePackagingTests(unittest.TestCase):
@@ -28,21 +30,87 @@ class PythonRuntimePackagingTests(unittest.TestCase):
         self.assertEqual(PACKAGES["linux"]["sha256"], "c2ff2e97422f5d3896a16e0317fd212ba977bbf2688d93a6f7a03d817506bd30")
         self.assertEqual(PACKAGES["linux"]["glibc_min"], "2.17")
 
-    def test_corresponding_source_archives_are_pinned_and_verified(self):
-        self.assertEqual(SOURCE_PACKAGES["cpython"]["sha256"], "de414a57119abef52784d8993e341d53aed635fc2b05c2607d9f98a2c5b72032")
-        self.assertEqual(SOURCE_PACKAGES["python_build_standalone"]["source_ref"], "20261110 / 9244801782b78e4c4afc5c82a4524aa2101d3298")
+    def test_runtime_metadata_keeps_binary_provenance_and_licenses_without_source_payload(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            write_metadata(root, "linux")
+            manifest = json.loads((root / "rbl-python-runtime.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["upstream_url"], PACKAGES["linux"]["url"])
+            self.assertEqual(manifest["archive_sha256"], PACKAGES["linux"]["sha256"])
+            self.assertEqual(manifest["archive_size"], PACKAGES["linux"]["size"])
+            self.assertIn("licenses/LICENSE.cpython.txt", manifest["license_files"])
+            self.assertIn("licenses/LICENSE.python-build-standalone-MPL-2.0.txt", manifest["license_files"])
+            self.assertNotIn("source_archives", manifest)
+            upstream = (root / "UPSTREAM.md").read_text(encoding="utf-8")
+            self.assertIn(PACKAGES["linux"]["url"], upstream)
+            self.assertIn(PACKAGES["linux"]["sha256"], upstream)
+            self.assertNotIn("corresponding source archive", upstream.lower())
+            self.assertFalse((root / "source").exists())
+
+    def test_checked_in_runtime_metadata_has_no_source_archive_fields(self):
+        manifest = json.loads(
+            (ROOT / "runtime" / "python" / "rbl-python-runtime.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["upstream_url"], PACKAGES["windows"]["url"])
+        self.assertEqual(manifest["archive_sha256"], PACKAGES["windows"]["sha256"])
+        self.assertNotIn("source_archives", manifest)
+        self.assertNotIn("source_archives_bundled", manifest)
+
+    def test_existing_windows_runtime_does_not_require_source_archive_payload(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            root.mkdir()
             source = root / "source"
             source.mkdir()
-            for metadata in SOURCE_PACKAGES.values():
-                filename = metadata["filename"]
-                (source / filename).write_bytes(b"source archive fixture")
-                (source / f"{filename}.sha256").write_text(
-                    metadata["sha256"] + f"  {filename}\n", encoding="ascii"
-                )
-            with self.assertRaises(RuntimeError):
-                _verify_source_archives(root)
+            for filename in (
+                "Python-3.14.10.tar.xz",
+                "Python-3.14.10.tar.xz.sha256",
+                "python-build-standalone-20261110.tar.gz",
+                "python-build-standalone-20261110.tar.gz.sha256",
+            ):
+                (source / filename).write_bytes(b"obsolete source payload")
+            (root / "rbl-python-runtime.json").write_text(
+                json.dumps({
+                    "platform": PACKAGES["windows"]["platform"],
+                    "archive_sha256": PACKAGES["windows"]["sha256"],
+                    "source_archives": {"obsolete": True},
+                }),
+                encoding="utf-8",
+            )
+            def verify_after_manifest_validation(runtime_dir, platform):
+                self.assertTrue((runtime_dir / "source").is_dir())
+                self.assertEqual(platform, "windows")
+
+            with patch(
+                "tools.package_python_runtime.verify_runtime",
+                side_effect=verify_after_manifest_validation,
+            ) as verify:
+                stage_runtime("windows", root, Path(temporary) / "cache")
+            verify.assert_called_once_with(root.resolve(), "windows")
+            self.assertFalse((root / "source").exists())
+            refreshed = json.loads((root / "rbl-python-runtime.json").read_text(encoding="utf-8"))
+            self.assertNotIn("source_archives", refreshed)
+            self.assertEqual(refreshed["archive_sha256"], PACKAGES["windows"]["sha256"])
+
+    def test_existing_runtime_preserves_unmanaged_source_directory_contents(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            root.mkdir()
+            source = root / "source"
+            source.mkdir()
+            unexpected = source / "user-data.txt"
+            unexpected.write_text("preserve", encoding="utf-8")
+            (root / "rbl-python-runtime.json").write_text(
+                json.dumps({
+                    "platform": PACKAGES["windows"]["platform"],
+                    "archive_sha256": PACKAGES["windows"]["sha256"],
+                }),
+                encoding="utf-8",
+            )
+            with patch("tools.package_python_runtime.verify_runtime"):
+                with self.assertRaisesRegex(RuntimeError, "unmanaged files"):
+                    stage_runtime("windows", root, Path(temporary) / "cache")
+            self.assertEqual(unexpected.read_text(encoding="utf-8"), "preserve")
 
     def test_safe_parts_rejects_absolute_traversal_and_windows_paths(self):
         for value in ("../escape", "/absolute", "C:/drive", "python\\..\\escape"):

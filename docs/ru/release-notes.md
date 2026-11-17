@@ -1,6 +1,64 @@
-﻿# RBL 0.8.0 — заметки о релизе
+# RBL 0.8.1 / 0.8.0 — заметки о релизе
 
-Последняя проверка: 2026-11-15
+Последняя проверка: 2026-11-17
+
+## RBL 0.8.1 — подготовка релиза (ещё не опубликован)
+
+RBL 0.8.1 — текущее дерево подготовки релиза. Опубликованный source snapshot
+`v0.8.0-r2` остаётся неизменным; в рамках этой работы тег 0.8.1 и GitHub Release
+не создавались.
+
+### Добавлено
+
+- Нативный first-run setup/installer wizard в wxWidgets IDE. Он проверяет
+application root, worker, Python runtime и compiler toolchain, сохраняет
+per-user настройки, поддерживает явный development path из source checkout и
+может асинхронно запускать платформенный user-scope Install / Repair при наличии
+полного installer payload. Wizard также можно повторно открыть из Settings.
+- Нативный Linux build wxWidgets GUI + Rust worker и shell install path,
+проверенные на Ubuntu 24.04 с системным wxWidgets 3.2.4
+(`RBL_USE_SYSTEM_WX=1`). Для этого варианта GTK 3 и display stack остаются
+системными зависимостями.
+- Подготовка Flatpak payload с Linux app-local CPython; Windows runtime-файлы и
+временный Python bytecode исключаются из staging payload. Локальный Flatpak
+bundle собран и установлен; sandbox CLI-команды `version`, `doctor`, `check` и
+`run` прошли.
+- Восемь небольших программ RBL 0.8.x в `examples/v081/` и десять уроков на
+  русском и английском: форматирование f-строк, managed strings/containers,
+  диагностика, Runtime ABI, setup wizard, native IDE и Linux/Flatpak. Исходные
+  двадцать beginner-уроков серии 0.7.2 повторно проверены компилятором 0.8.1.
+
+### Изменено
+
+- Модель GitHub release — tagged repository source tree. Отдельные ZIP/portable
+archives, binary release assets и corresponding-source archives не являются
+release deliverables или publication gates. Third-party notices, тексты лицензий,
+provenance URLs и hashes остаются в репозитории; эта политика не отменяет
+обязательств при распространении bundled third-party binaries.
+- Windows DPI acceptance дополнена подтверждением пользователя, что реальный
+mixed-DPI сценарий проверен успешно. В журнале отдельно записаны проверки
+перемещения между мониторами, восстановления floating pane, миграции сохранённого
+layout и восстановления окон из координат за пределами экрана.
+
+### Проверки и явно указанные ограничения
+
+- `python rbl.py test`: PASS; 63/63 direct ASM cases и 63/63 compiler
+diagnostics. Windows CTest: 15/15. Linux CTest: 14/14. DPI static tests: 12/12.
+- Flatpak payload tests: 6/6. Проверка документации: 103 Markdown-файла,
+538 относительных ссылок, битых ссылок нет, иерархия заголовков EN/RU совпадает.
+- Пользователь подтвердил успешное завершение двухчасового (7 200 секунд) Windows resource soak. Отмечен PASS по подтверждению пользователя; raw CSV/verdict и финальные хэши GUI/worker в этой рабочей сессии независимо не перепроверялись. Проверка на pristine VM не зафиксирована.
+- Flatpak GUI/display/portal path и Flathub publication не объявляются принятыми.
+  Нативная Linux GUI/install проверка ограничена Ubuntu 24.04.
+- Binutils 2.47-4 остаётся отмеченным для CVE-2026-90801; документированная
+область остаточного риска ограничена поддерживаемым compiler-generated COFF
+workflow и не означает исправления upstream finding. Windows
+`ReplaceFileW` destination-leaf race остаётся задокументированной задачей для
+0.9. POSIX existing-target save работает fail-closed, если atomic exchange
+недоступен.
+- Third-party notices и provenance присутствуют, но эти release notes не являются
+юридическим заключением или общим разрешением на распространение bundled binaries.
+
+Подготовка учебных материалов, очистка и regression для 0.8.1 завершены. Двухчасовой soak отмечен PASS по подтверждению пользователя; pristine-VM и интерактивный Flatpak GUI/portal остаются непроверенными. Остаются git commit, push, tag и публикация GitHub Release.
 
 ## RBL 0.8.0 — полноценный релиз
 

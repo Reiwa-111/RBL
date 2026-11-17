@@ -8,7 +8,11 @@
     "compiled_program_cache": "build/cache/sources",
     "downloaded_sources": "build/cache/<component>",
     "build_outputs": "build/output",
-    "environment_overrides": ["RBL_BUILD_DIR", "RBL_CACHE_DIR", "RBL_OUTPUT_DIR"]
+    "environment_overrides": [
+      "RBL_BUILD_DIR",
+      "RBL_CACHE_DIR",
+      "RBL_OUTPUT_DIR"
+    ]
   },
   "host_tools": {
     "windows": {
@@ -36,32 +40,123 @@
     }
   },
   "msys2_ucrt64_packages": [
-    {"id": "mingw-w64-ucrt-x86_64-gcc", "version": "16.2.0-4", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-libgcc", "version": "16.2.0-4", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-libstdc++", "version": "16.2.0-4", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-binutils", "version": "2.47-4", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-binutils-2.47-4.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-crt", "version": "14.0.0.r426.g4564ee4b5-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-crt-14.0.0.r426.g4564ee4b5-1.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-libwinpthread", "version": "14.0.0.r426.g4564ee4b5-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-winpthreads-14.0.0.r426.g4564ee4b5-1.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-winpthreads", "version": "14.0.0.r426.g4564ee4b5-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-winpthreads-14.0.0.r426.g4564ee4b5-1.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-gettext-runtime", "version": "1.0-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gettext-1.0-1.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-libiconv", "version": "1.19-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-libiconv-1.19-1.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-zlib", "version": "1.4-2", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-zlib-1.4-2.src.tar.zst", "note": "Release zlib1.dll is additionally hash-pinned to aa658771fb152b095eda1614d8bde798efb92324b6f4a0c99c743cd96b67ac90 by tools/build_wx_ide.ps1."},
-    {"id": "mingw-w64-ucrt-x86_64-zstd", "version": "1.5.7-2", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-zstd-1.5.7-2.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-windows-default-manifest", "version": "20260815-1", "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-windows-default-manifest-20260815-1.src.tar.zst"},
-    {"id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-common", "version": "3.2.11-1"},
-    {"id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-common-libs", "version": "3.2.11-1"},
-    {"id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-msw", "version": "3.2.11-1"},
-    {"id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-msw-libs", "version": "3.2.11-1"},
-    {"id": "mingw-w64-ucrt-x86_64-brotli", "version": "1.2.0-1"},
-    {"id": "mingw-w64-ucrt-x86_64-jbigkit", "version": "2.1-6"},
-    {"id": "mingw-w64-ucrt-x86_64-lerc", "version": "4.1.1-1"},
-    {"id": "mingw-w64-ucrt-x86_64-libdeflate", "version": "1.26-1"},
-    {"id": "mingw-w64-ucrt-x86_64-libjpeg-turbo", "version": "3.2.0-1"},
-    {"id": "mingw-w64-ucrt-x86_64-libpng", "version": "1.6.59-1"},
-    {"id": "mingw-w64-ucrt-x86_64-libtiff", "version": "4.7.2-1"},
-    {"id": "mingw-w64-ucrt-x86_64-libwebp", "version": "1.6.0-1"},
-    {"id": "mingw-w64-ucrt-x86_64-pcre2", "version": "10.49-1"},
-    {"id": "mingw-w64-ucrt-x86_64-xz", "version": "5.8.4-1"}
+    {
+      "id": "mingw-w64-ucrt-x86_64-gcc",
+      "version": "16.2.0-4",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libgcc",
+      "version": "16.2.0-4",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libstdc++",
+      "version": "16.2.0-4",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gcc-16.2.0-4.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-binutils",
+      "version": "2.47-4",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-binutils-2.47-4.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-crt",
+      "version": "14.0.0.r426.g4564ee4b5-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-crt-14.0.0.r426.g4564ee4b5-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libwinpthread",
+      "version": "14.0.0.r426.g4564ee4b5-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-winpthreads-14.0.0.r426.g4564ee4b5-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-winpthreads",
+      "version": "14.0.0.r426.g4564ee4b5-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-winpthreads-14.0.0.r426.g4564ee4b5-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-gettext-runtime",
+      "version": "1.0-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-gettext-1.0-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libiconv",
+      "version": "1.19-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-libiconv-1.19-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-zlib",
+      "version": "1.4-2",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-zlib-1.4-2.src.tar.zst",
+      "note": "Release zlib1.dll is additionally hash-pinned to aa658771fb152b095eda1614d8bde798efb92324b6f4a0c99c743cd96b67ac90 by tools/build_wx_ide.ps1."
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-zstd",
+      "version": "1.5.7-2",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-zstd-1.5.7-2.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-windows-default-manifest",
+      "version": "20260815-1",
+      "source_archive": "https://mirror.msys2.org/mingw/sources/mingw-w64-windows-default-manifest-20260815-1.src.tar.zst"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-common",
+      "version": "3.2.11-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-common-libs",
+      "version": "3.2.11-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-msw",
+      "version": "3.2.11-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-wxwidgets3.2-msw-libs",
+      "version": "3.2.11-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-brotli",
+      "version": "1.2.0-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-jbigkit",
+      "version": "2.1-6"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-lerc",
+      "version": "4.1.1-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libdeflate",
+      "version": "1.26-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libjpeg-turbo",
+      "version": "3.2.0-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libpng",
+      "version": "1.6.59-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libtiff",
+      "version": "4.7.2-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-libwebp",
+      "version": "1.6.0-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-pcre2",
+      "version": "10.49-1"
+    },
+    {
+      "id": "mingw-w64-ucrt-x86_64-xz",
+      "version": "5.8.4-1"
+    }
   ],
   "msys2_verification": {
     "method": "pacman package signatures verified against the MSYS2 keyring; exact installed versions captured with pacman -Q during packaging",
@@ -125,7 +220,10 @@
     "msrv": "1.85",
     "verified_windows": "1.97.1",
     "verified_linux": "1.99.1",
-    "targets": ["x86_64-pc-windows-gnu", "x86_64-unknown-linux-gnu"],
+    "targets": [
+      "x86_64-pc-windows-gnu",
+      "x86_64-unknown-linux-gnu"
+    ],
     "lockfile": "Cargo.lock",
     "note": "The worker builds with --locked; crate sources and checksums come from Cargo.lock and are mirrored in the Rust corresponding-source bundle."
   },
@@ -142,8 +240,9 @@
     "distribution_requires_external_maintainer_compiler": false,
     "clean_user_rbl_compilation_requires_external_toolchain": false,
     "assembly_rule": "Explicit installer allowlist only; never archive a CMake/wxWidgets build tree.",
-    "portable_staging": "install_windows.ps1 -Portable and install_linux.sh --portable omit the install manifest, uninstaller and registry/XDG integration so archives contain no machine-specific state.",
-    "release_packaging": "tools/package_release.py validates a portable staging tree and writes the archive, SHA256SUMS, per-archive JSON metadata and a LOCAL_CANDIDATE note. It never publishes or uploads.",
+    "portable_staging": "install_windows.ps1 -Portable and install_linux.sh --portable remain local acceptance helpers; they omit the install manifest, uninstaller and registry/XDG integration and are not the official GitHub release workflow.",
+    "release_packaging": "Official releases publish the tagged repository source tree directly; no ZIP/portable archive, tar archive, binary asset or separately assembled corresponding-source archive is created. The former local archive utility has been removed.",
     "windows_user_program_backend": "toolchain/windows-x86_64 contains a 43-file pruned MinGW runtime bundle (44 files on disk including its manifest; 47 tracked files including notices/audits) used to assemble/link RBL programs in a source checkout and staged into the prebuilt Windows app. It is not sufficient to rebuild RBL Studio itself; full MSYS2/CMake/Rust/wx build dependencies remain external. Keep this separate from maintainer build requirements until a replacement passes clean-install compile acceptance."
-  }
+  },
+  "release_packaging": "Official releases publish the tagged repository source tree directly; no ZIP/portable archive, tar archive, binary asset or separately assembled corresponding-source archive is created. The former local archive utility has been removed."
 }

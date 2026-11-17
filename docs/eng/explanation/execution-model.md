@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.09 | LANGUAGE CONTRACT RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## Explanation: execution model and semantics
 
-This page explains some less obvious properties of the RBL 0.8.0 language and runtime. Bounded f-string format specifications are documented in the [syntax reference](../reference/syntax.md).
+This page explains some less obvious properties of the RBL 0.8.1 language and runtime. Bounded f-string format specifications are documented in the [syntax reference](../reference/syntax.md).
 
 ## Functions, arguments and types
 
@@ -25,7 +25,7 @@ String values use shared, immutable-by-language, NUL-terminated byte buffers. St
 
 Dynamic strings and containers are reclaimed by a conservative, non-moving mark-and-sweep collector. A value is retained when its exact base pointer appears as a pointer-shaped machine word anywhere in the scanned stack range, or when it is reachable through a live list, tuple or dictionary. The stack scan does not validate tags. The compiler emits collection safe points before statements that may allocate or call code with unknown allocation behavior, and at loop-condition checks. Proven non-allocating integer/Boolean scalar statements omit redundant checks. A proven non-allocating fast integer/Boolean loop also omits per-iteration safe points; its enclosing `for` statement still checks before entry, and the next potentially allocating statement checks again. Runtime allocation helpers do not collect during expression evaluation, so temporary operands and return values remain valid until the expression finishes. The collector may retain unreachable allocations when stale pointer-shaped data remains on the stack; reclamation is not deterministic at a particular safe point.
 
-RBL code must not manually free string payloads. The collector scans the current thread's stack range up to the frame pointer captured from generated `main`, so a materialized pointer in a native C stack local inside that range is conservatively treated as a root while the frame is active. Native heap/global storage and other threads are not scanned. This stack behavior is not a pinning or registration API; native code must not retain a managed pointer only in unscanned storage or after all corresponding RBL/stack roots cease to be live. Runtime state is process-global and unsynchronized: 0.8.0 supports only the thread that entered generated `main`, not concurrent calls from native worker threads.
+RBL code must not manually free string payloads. The collector scans the current thread's stack range up to the frame pointer captured from generated `main`, so a materialized pointer in a native C stack local inside that range is conservatively treated as a root while the frame is active. Native heap/global storage and other threads are not scanned. This stack behavior is not a pinning or registration API; native code must not retain a managed pointer only in unscanned storage or after all corresponding RBL/stack roots cease to be live. Runtime state is process-global and unsynchronized: 0.8.1 supports only the thread that entered generated `main`, not concurrent calls from native worker threads.
 
 ## Scope
 
@@ -43,7 +43,7 @@ A missing dictionary key returns `Unit`, not `null`; use `in` to check whether t
 
 ## Structs
 
-In 0.8.0, `struct` is syntax for declaring field names and receiver methods, not a full object system. A constructed instance is stored as a dictionary. A call such as `instance.method(args)` is lowered to an ordinary function call with the receiver as its first argument. The receiver type does not guarantee a dedicated runtime class identity.
+In 0.8.1, `struct` is syntax for declaring field names and receiver methods, not a full object system. A constructed instance is stored as a dictionary. A call such as `instance.method(args)` is lowered to an ordinary function call with the receiver as its first argument. The receiver type does not guarantee a dedicated runtime class identity.
 
 ## Platform-dependent observations
 

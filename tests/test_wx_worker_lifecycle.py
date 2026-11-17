@@ -38,6 +38,43 @@ class WxWorkerLifecycleTests(unittest.TestCase):
         self.assertIn("restart_worker_pending_ && !worker_shutdown_kill_sent_", poll_body)
         self.assertIn("wxProcess::Kill(worker_pid_, wxSIGKILL, wxKILL_CHILDREN)", poll_body)
 
+    def test_startup_ready_handshake_has_a_bounded_deadline(self) -> None:
+        start = self.frame.index("void MainFrame::StartWorker()")
+        start_end = self.frame.index("void MainFrame::RestartWorker()", start)
+        start_body = self.frame[start:start_end]
+        self.assertIn("std::chrono::seconds(15)", start_body)
+        self.assertIn("worker_startup_deadline_ = std::chrono::steady_clock::now()", start_body)
+        self.assertLess(start_body.index("worker_timer_.Start(25)"), start_body.index("worker_startup_deadline_ = std::chrono::steady_clock::now()"))
+
+        poll = self.frame.index("void MainFrame::PollWorker()")
+        poll_end = self.frame.index("void MainFrame::HandleWorkerEvent", poll)
+        poll_body = self.frame[poll:poll_end]
+        self.assertIn("std::chrono::steady_clock::now() >= worker_startup_deadline_", poll_body)
+        self.assertIn("no ready handshake received within 15 seconds", poll_body)
+        self.assertIn("wxProcess::Kill(worker_pid_, wxSIGKILL, wxKILL_CHILDREN)", poll_body)
+
+    def test_poll_timer_start_failure_terminates_worker_before_initialize(self) -> None:
+        start = self.frame.index("void MainFrame::StartWorker()")
+        start_end = self.frame.index("void MainFrame::RestartWorker()", start)
+        start_body = self.frame[start:start_end]
+        timer_failure = start_body.index("if (!timer_started)")
+        failure_end = start_body.index("worker_startup_deadline_ = std::chrono::steady_clock::now()", timer_failure)
+        failure_body = start_body[timer_failure:failure_end]
+        self.assertIn("wxProcess::Kill(worker_pid_, wxSIGKILL, wxKILL_CHILDREN)", failure_body)
+        self.assertIn("worker_timer_.Stop()", failure_body)
+        self.assertIn("return;", failure_body)
+        self.assertNotIn('SendWorkerRequest("{\\"command\\":\\"initialize', failure_body)
+
+    def test_startup_deadline_is_cleared_on_ready_exit_restart_and_destruction(self) -> None:
+        destructor = self.frame[self.frame.index("MainFrame::~MainFrame()"):self.frame.index("void MainFrame::OpenStartupFile")]
+        restart = self.frame[self.frame.index("void MainFrame::RestartWorker()"):self.frame.index("bool MainFrame::SendWorkerLine")]
+        ready = self.frame[self.frame.index('if (event == "ready")'):self.frame.index('} else if (event == "output")')]
+        exit_handler = self.frame[self.frame.index("void MainFrame::OnWorkerExit"):self.frame.index("void MainFrame::OnFrameClose")]
+        self.assertIn("worker_startup_deadline_ = {}", destructor)
+        self.assertIn("worker_startup_deadline_ = {}", restart)
+        self.assertIn("worker_startup_deadline_ = {}", ready)
+        self.assertIn("worker_startup_deadline_ = {}", exit_handler)
+
     def test_protocol_requests_pause_before_control_reserve_is_consumed(self) -> None:
         self.assertIn("fn ready_request_receiver(", self.worker)
         self.assertIn("output_queue_has_control_reserve(pending_output_len)", self.worker)

@@ -1,0 +1,23 @@
+// RBL 0.8.x: repeated dynamic string creation and container updates.
+// Runtime collection is automatic; this is a functional workload, not a benchmark.
+func make_label(index int) string (
+    return f"sample-{index:04d}-managed-string"
+)
+
+func main() (
+    set samples = ["seed-a", "seed-b", "seed-c"]
+    set checksum = 0
+    set label = ""
+
+    for (i in 0..300) (
+        let label = make_label(i)
+        let samples[i % 3] = label
+        let checksum += len(label)
+    )
+
+    print("last slots:")
+    for (sample in samples) (
+        print(sample)
+    )
+    print("aggregate code points:", checksum)
+)

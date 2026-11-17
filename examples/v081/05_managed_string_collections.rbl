@@ -1,0 +1,15 @@
+// RBL 0.8.x: strings stored in containers are Runtime-managed values.
+// No manual free operation exists or is required in RBL source.
+func main() (
+    set labels = ["lexer", "parser", "sema", "codegen"]
+    set metadata = {"version": "0.8.1", "abi": "1.2.0", "status": "ready"}
+
+    for (label in labels) (
+        print(f"module: {label:*>10s}")
+    )
+
+    print("release:", metadata["version"])
+    print("runtime ABI:", metadata["abi"])
+    let metadata["status"] = "verified"
+    print("status:", metadata["status"])
+)

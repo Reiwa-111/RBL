@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.09 | ARCHITECTURE GUIDE RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## Explanation: compiler and backend architecture
 
-RBL 0.8.0 uses a modular C bootstrap compiler that emits x86-64 assembly directly from its syntax tree. User programs are not translated to C.
+RBL 0.8.1 uses a modular C bootstrap compiler that emits x86-64 assembly directly from its syntax tree. User programs are not translated to C.
 
 ## From source to executable
 
@@ -41,7 +41,7 @@ The compiler is split into independent C translation units with one private shar
 | `driver.c` | CLI, source loading and pipeline orchestration |
 | `rblc_internal.h` | Private data layouts and cross-module declarations; not a public RBL API |
 
-The compilation pipeline runs from common utilities through lexing/AST construction, parsing, semantic analysis, code generation and finally driver orchestration. In terms of source dependencies, the driver consumes the frontend and code generator; the parser consumes AST/common utilities; semantic analysis consumes AST/common utilities; code generation consumes semantic analysis/common utilities; lexer and AST helpers consume common utilities. This graph is acyclic. Fast-integer eligibility is owned by semantic analysis; it does not call back into the assembly emitter. The shared header exposes the cross-translation-unit declarations; implementation helpers are `static` and remain local to their owning module. Compiler build paths enable missing-prototype, strict-prototype, redundant-declaration and implicit-declaration diagnostics to keep that boundary enforced. The same frontend and code generator serve Linux ELF64 and Windows PE/COFF. There is no separate RBL IR, CFG/basic-block pipeline or whole-function liveness allocator in 0.8.0.
+The compilation pipeline runs from common utilities through lexing/AST construction, parsing, semantic analysis, code generation and finally driver orchestration. In terms of source dependencies, the driver consumes the frontend and code generator; the parser consumes AST/common utilities; semantic analysis consumes AST/common utilities; code generation consumes semantic analysis/common utilities; lexer and AST helpers consume common utilities. This graph is acyclic. Fast-integer eligibility is owned by semantic analysis; it does not call back into the assembly emitter. The shared header exposes the cross-translation-unit declarations; implementation helpers are `static` and remain local to their owning module. Compiler build paths enable missing-prototype, strict-prototype, redundant-declaration and implicit-declaration diagnostics to keep that boundary enforced. The same frontend and code generator serve Linux ELF64 and Windows PE/COFF. There is no separate RBL IR, CFG/basic-block pipeline or whole-function liveness allocator in 0.8.1.
 
 The Makefile compiles each module into its own object and links the objects; this enables parallel clean builds and recompilation of only the changed module. Make and the native/WSL bootstrap paths in `tools/rbltool.py` track compiler sources, the private header and the canonical `VERSION` value for rebuilds. The standalone Linux `tools/rebuild_compiler.sh` rebuilds the same seven compiler sources plus all four Linux Runtime objects (assembly, containers, ABI and formatting), and reads `VERSION` at invocation.
 
@@ -53,7 +53,7 @@ The driver labels lexer, parser, semantic-validation and code-generation phases.
 
 ### RBL-level example
 
-The compiler split is not a source-language module system. RBL 0.8.0 programs still compile from one `.rbl` source file and cannot import the compiler's C modules. [`examples/compiler/lookup_demo.rbl`](../../../examples/compiler/lookup_demo.rbl) is a small runnable program that repeatedly uses local variables, functions and string values; it illustrates an ordinary workload handled by the private indexes without exposing those indexes to RBL code. See its [notes and expected output](../../../examples/compiler/README.md).
+The compiler split is not a source-language module system. RBL 0.8.1 programs still compile from one `.rbl` source file and cannot import the compiler's C modules. [`examples/compiler/lookup_demo.rbl`](../../../examples/compiler/lookup_demo.rbl) is a small runnable program that repeatedly uses local variables, functions and string values; it illustrates an ordinary workload handled by the private indexes without exposing those indexes to RBL code. See its [notes and expected output](../../../examples/compiler/README.md).
 
 ## Supported targets
 

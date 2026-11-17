@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | COMPILER PERFORMANCE AUDIT
+# last verified: v0.8.1 | 2026.11.17 | BENCHMARK BASELINE CONTEXT
 
 ## Explanation: RBL performance
 
@@ -9,7 +9,7 @@ Measurements describe specific programs in a specific environment. They are not 
 1. `benchmarks/run_benchmarks.py` measures RBL only: build time, total process runtime, startup-adjusted net time and executable size. It works through the active backend.
 2. `benchmarks/compare_all.py` compares five implementations of the same synthetic workloads: RBL, C `-O2`, C++ `-O2`, CPython and handwritten x86-64 assembly. It runs on Linux/WSL because the assembly baseline uses Linux syscalls.
 
-See the [benchmarking how-to](../how-to/benchmarking.md) for execution details and [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md) for the current RBL 0.8.0 ten-sample runtime measurement. The run was CPU-pinned but took place while a separate RENA training process was active; its background-load caveat is recorded with the results.
+See the [benchmarking how-to](../how-to/benchmarking.md) for execution details and [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md) for the RBL 0.8.0 ten-sample runtime baseline retained for comparison with 0.8.1. The run was CPU-pinned but took place while a separate RENA training process was active; its background-load caveat is recorded with the results.
 
 The separate [compiler performance audit](../../../benchmarks/PERFORMANCE_AUDIT.md) isolates the cost of translation-unit boundaries, measures parallel/incremental builds and profiles compiler hot paths. Those figures must not be confused with the runtime benchmark results: they measure the compiler itself, not the generated program.
 

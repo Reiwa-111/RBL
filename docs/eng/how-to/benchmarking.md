@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | BENCHMARKING GUIDE
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## How-to: measure RBL performance
 
@@ -60,4 +60,4 @@ C and C++ are built with `-O2`; the compiler may transform loops while preservin
 
 ## Recorded results
 
-The current five-implementation RBL 0.8.0 runtime measurements, environment and interpretation are in [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md). Compiler modularity, translation-unit overhead and build timings are in [`benchmarks/PERFORMANCE_AUDIT.md`](../../../benchmarks/PERFORMANCE_AUDIT.md).
+The five-implementation RBL 0.8.0 runtime baseline, retained for comparison with 0.8.1, is documented with its environment and interpretation in in [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md). Compiler modularity, translation-unit overhead and build timings are in [`benchmarks/PERFORMANCE_AUDIT.md`](../../../benchmarks/PERFORMANCE_AUDIT.md).

@@ -81,10 +81,17 @@ class DpiStaticChecks(unittest.TestCase):
         self.assertIn("Bind(wxEVT_DPI_CHANGED, &MainFrame::OnDpiChanged, this)", SOURCE)
         self.assertIn("event.Skip();", SOURCE)
         self.assertIn("CallAfter([this, ratio] { ApplyDpiMetrics(ratio); })", SOURCE)
-        self.assertIn("manager_.Update();", SOURCE)
+        apply_start = SOURCE.index("void MainFrame::ApplyDpiMetrics(double scale_ratio)")
+        apply_end = SOURCE.index("void MainFrame::RebuildDpiAssets()", apply_start)
+        apply_dpi = SOURCE[apply_start:apply_end]
+        self.assertRegex(
+            apply_dpi,
+            r"ClampFloatingPanesToDisplays\(manager_, this\);\s*"
+            r"//.*?\n(?:\s*//.*?\n)*\s*manager_\.Update\(\);",
+        )
         self.assertIn("SetMarginWidth(1, FromDIP(16))", SOURCE)
         self.assertIn("ClampFrameToWorkArea(this, GetSize())", SOURCE)
-        self.assertIn('AddLabel(wxID_ANY, "RBL 0.8.0", FromDIP(88))', SOURCE)
+        self.assertIn('AddLabel(wxID_ANY, "RBL 0.8.1", FromDIP(88))', SOURCE)
 
     def test_dock_size_scales_pixel_size_and_preserves_topology(self):
         self.assertEqual(

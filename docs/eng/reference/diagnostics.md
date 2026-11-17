@@ -1,8 +1,8 @@
-# last verified: v0.8.0 | 2026.11.11 | GATE G DIAGNOSTICS RECHECK
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## RBL compiler diagnostics
 
-RBL 0.8.0 compiler diagnostics preserve source positions from lexing through parsing, semantic validation and assembly generation. A source position contains the original file, byte offset, and one-based line/column coordinates.
+RBL 0.8.1 compiler diagnostics preserve source positions from lexing through parsing, semantic validation and assembly generation. A source position contains the original file, byte offset, and one-based line/column coordinates.
 
 ## Diagnostic format
 

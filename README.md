@@ -1,15 +1,17 @@
-# last verified: v0.8.0 | 2026.11.11 | END-TO-END RELEASE STATUS RECONCILIATION
+# last verified: v0.8.1 | 2026.11.17 | RELEASE PREPARATION / WINDOWS MIXED-DPI ACCEPTANCE
 
 # RBL — Reiwa Bat Language
 
 **RBL is a native compiled programming language and development toolchain.** It includes a C bootstrap compiler that generates x86-64 assembly directly, platform runtimes for Linux and Windows, a graphical IDE, a project-oriented command-line interface, regression tests and benchmark tools.
 
 <p align="center">
-  <strong>Documentation target: RBL 0.8.0</strong>
+  <strong>Documentation target: RBL 0.8.1</strong>
   ·
   <a href="docs/README.md">Documentation</a>
   ·
   <a href="examples/beginner/README_ENG.md">Beginner course</a>
+  ·
+  <a href="docs/eng/tutorials/README.md">0.8.x tutorials</a>
   ·
   <a href="docs/ru/README.md">Русская документация</a>
 </p>
@@ -34,7 +36,7 @@ python3 ../rbl.py run
 
 The relative `../rbl.py` path assumes `hello` is a direct child of the RBL Studio checkout. For a project created elsewhere, use the `RBL_STUDIO_ROOT` instructions in its generated README.
 
-The 0.8.0 Windows payload is the repository checkout itself and is locally verified. It was published on 2026-11-15 as the **`v0.8.0-r2` full release** (`https://github.com/Reiwa-111/RBL/releases/tag/v0.8.0-r2`); no binary assets are attached because the source checkout at that tag is the payload. The older GitHub `v0.8.0` entry remains the 2026-11-10 pre-release placeholder with zero assets and still contains the damaged example; it was not moved. The remaining acceptance/legal gates are recorded in the [release manifest](RELEASE_MANIFEST.txt). See the [release notes](docs/eng/release-notes.md) for the complete 0.8.0 description.
+The **`v0.8.0-r2` GitHub Release** (`https://github.com/Reiwa-111/RBL/releases/tag/v0.8.0-r2`) publishes the repository source tree directly and remains the published 0.8.0 release. RBL does not create or require separately assembled ZIP/portable archives, binary release assets, or corresponding-source archives as GitHub release deliverables or publication gates. The older GitHub `v0.8.0` entry remains the 2026-11-10 pre-release placeholder and was not moved. Version 0.8.1 is the current release-preparation tree and has not yet been published. Its implementation and verification record are in the [release manifest](RELEASE_MANIFEST.txt) and [release notes](docs/eng/release-notes.md).
 
 RBL compiles user programs to native executables. **RBL source code is not translated into C**: the compiler parses the language, performs static analysis and selected optimizations, then emits x86-64 assembly. The C compiler is used to build parts of the compiler/runtime toolchain, not to transpile user programs.
 
@@ -86,20 +88,20 @@ The compiler frontend and code generator are shared between targets where possib
 
 ### Current version
 
-The repository/compiler version is stored in the root [`VERSION`](VERSION) file. The current source tree and both bundled compiler binaries target **RBL 0.8.0**. The full 0.8.0 Windows payload is the checkout itself and was published on 2026-11-15 as `v0.8.0-r2`; remaining acceptance/legal gates are recorded in [`RELEASE_MANIFEST.txt`](RELEASE_MANIFEST.txt). The older GitHub `v0.8.0` entry published on 2026-11-10 is the pre-release placeholder and still has no attached assets.
+The repository/compiler version is stored in the root [`VERSION`](VERSION) file and is **RBL 0.8.1**. The published `v0.8.0-r2` GitHub Release remains the previous source snapshot. The 0.8.1 release-preparation tree adds the native first-run setup/installer wizard, a verified Ubuntu 24.04 Linux IDE build/install path, and the completed Windows mixed-DPI acceptance. The 0.8.1 tree is prepared but not yet published. The older GitHub `v0.8.0` entry published on 2026-11-10 remains the pre-release placeholder and was not moved.
 
-- `python rbl.py version` reads `0.8.0` from `VERSION`.
-- The Linux and Windows `rblc-asm` binaries are built with the same version value and report `0.8.0`.
+- `python rbl.py version` reads `0.8.1` from `VERSION`.
+- Rebuilt Linux and Windows `rblc-asm` binaries report `0.8.1`.
 - Newly created user projects start with their own package version, `0.1.0`; this is independent of the compiler version.
-- [`RELEASE_MANIFEST.txt`](RELEASE_MANIFEST.txt) records the 0.8.0 release scope, targets, verification evidence and known boundaries.
+- [`RELEASE_MANIFEST.txt`](RELEASE_MANIFEST.txt) records the published 0.8.0 snapshot and the 0.8.1 release-preparation scope and evidence.
 
-RBL 0.8.0 includes bounded f-string format specifications, Runtime-managed dynamic strings, a versioned Runtime ABI, source-position diagnostics, a modular compiler and indexed compiler lookups. The sections below describe the implemented 0.8.0 contract.
+The 0.8.0 language/compiler baseline, retained in RBL 0.8.1, includes bounded f-string format specifications, Runtime-managed dynamic strings, a versioned Runtime ABI, source-position diagnostics, a modular compiler and indexed compiler lookups. The sections below describe that language contract.
 
 ---
 
 ## Current candidate and scope
 
-RBL 0.8.0 is a single-file language and native compilation toolchain. Its compiler implementation is split across C translation units. The current implementation includes:
+RBL 0.8.1 is a single-file language and native compilation toolchain. Its compiler implementation is split across C translation units. The current implementation includes:
 
 - Signed 64-bit integers, binary64 floating-point values, booleans, strings, `Unit` and `null`.
 - Functions, recursion, typed function parameters and return statements.
@@ -110,7 +112,7 @@ RBL 0.8.0 is a single-file language and native compilation toolchain. Its compil
 - Linux x86-64 ELF64 and Windows x86-64 PE/COFF native executable targets.
 - A project CLI, optional graphical IDE, regression suite and benchmark runners.
 
-RBL 0.8.0 uses **Runtime ABI 1.2.0**, versioned independently from the language/compiler version. Generated executables embed their required ABI descriptor and validate it before entering RBL `main`; see the [Runtime ABI reference](docs/eng/reference/runtime-abi.md).
+RBL 0.8.1 uses **Runtime ABI 1.2.0**, versioned independently from the language/compiler version. Generated executables embed their required ABI descriptor and validate it before entering RBL `main`; see the [Runtime ABI reference](docs/eng/reference/runtime-abi.md).
 
 The exact language contract is documented in the [syntax reference](docs/eng/reference/syntax.md). The [limitations reference](docs/eng/reference/limitations.md) distinguishes implemented behavior from features that are not available yet.
 
@@ -161,7 +163,7 @@ Both targets use `runtime/rbl_containers.c` for the shared container implementat
 
 ### Native IDE and CLI
 
-RBL Studio's primary desktop frontend is the native wxWidgets 3.2 / Scintilla application in `rbl-ide/wx-ui/`, paired with the Rust `rbl-studio-worker`. It provides multi-tab editing, RBL syntax highlighting and folding, project navigation, Find/Replace, Find in Files, quick-open, command palette, clickable diagnostics, Build/Run/Check/ASM/Tests/Benchmarks/Doctor tasks, streamed output and interactive stdin/EOF. It opens ordinary text files of supported encodings while compiler actions accept only `.rbl` documents. The native GUI can launch without Python. Fresh Windows/Linux portable build payloads include app-local CPython 3.14.10, so installed backend actions do not require system Python or an inherited Python PATH. The source checkout still uses its development Python; `RBL_PYTHON` remains an explicit override. The Linux packaging path now stages Clang's integrated assembler, LLD and wxWidgets 3.2.4 shared libraries; GNU Binutils and system wxWidgets are not intended runtime dependencies. The native shell installer uses the host GTK 3/display runtime, while the Flatpak manifest uses GNOME Platform 51 to provide GTK inside the sandbox. The Linux wx build and Flatpak bundle still require final build/installer acceptance; see the [Linux packaging guide](docs/eng/how-to/linux-packaging.md) and current [toolchain source audit](toolchain/windows-x86_64/SOURCE_ARCHIVE_AUDIT.md). The older Rust/egui source remains as a legacy reference; `RBL_STUDIO_ALLOW_LEGACY=1` permits fallback to a separately built executable from a developer checkout when wx is unavailable. The legacy executable is not included in the wx installer payload. The CLI remains independently usable without the IDE. See the [Russian](docs/ru/how-to/ide.md) and [English](docs/eng/how-to/ide.md) IDE guides, [IDE resource measurements](benchmarks/IDE_RESOURCE_USAGE.md) and the [IDE engineering audit](docs/eng/explanation/ide-engineering-audit.md) ([RU](docs/ru/explanation/ide-engineering-audit.md)).
+RBL Studio's primary desktop frontend is the native wxWidgets 3.2 / Scintilla application in `rbl-ide/wx-ui/`, paired with the Rust `rbl-studio-worker`. It provides multi-tab editing, RBL syntax highlighting and folding, project navigation, Find/Replace, Find in Files, quick-open, command palette, clickable diagnostics, Build/Run/Check/ASM/Tests/Benchmarks/Doctor tasks, streamed output and interactive stdin/EOF. Its native first-run setup wizard checks the application root, worker, Python runtime and compiler toolchain, saves initial per-user preferences, and can run the platform's user-scope Install / Repair workflow when a complete installer payload is available. It can be reopened from Settings; a source checkout remains an explicit development path. The GUI opens ordinary text files of supported encodings while compiler actions accept only `.rbl` documents. The native GUI can launch without Python. Some locally built application payloads use app-local CPython 3.14.10; a source checkout uses its development Python and `RBL_PYTHON` remains an explicit override. The Linux wxWidgets GUI + Rust worker build and native install path have been verified on Ubuntu 24.04 in system wxWidgets 3.2.4 mode; the native Linux application still depends on host GTK 3 and the host display stack. This does not claim Flatpak acceptance or compatibility with arbitrary Linux distributions. GitHub source-code releases do not depend on ZIP/portable archives, binary assets, or separately published corresponding-source archives. See the [Linux packaging guide](docs/eng/how-to/linux-packaging.md), the [Russian](docs/ru/how-to/ide.md) and [English](docs/eng/how-to/ide.md) IDE guides, [IDE resource measurements](benchmarks/IDE_RESOURCE_USAGE.md) and the [IDE engineering audit](docs/eng/explanation/ide-engineering-audit.md) ([RU](docs/ru/explanation/ide-engineering-audit.md)).
 
 ### Regression-oriented development
 
@@ -180,11 +182,13 @@ The required toolchain depends on the target.
 | Linux x86-64 CLI/compiler | Portable build/install: bundled CPython 3.14.10, Clang integrated assembler and LLD; system libc/libm remain required. GNU Binutils and system Python are not required. Source checkout/development: Python 3.9+ |
 | Windows x86-64 CLI/compiler | Portable build/install: bundled CPython 3.14.10 and repository MinGW-w64/UCRT64 linker+assembler bundle. Source checkout/development: Python 3.9+; MSYS2 is needed for developer bootstrap/rebuilds or when using an external toolchain. |
 | Windows with WSL | Windows host, WSL distribution with the Linux build tools, and the configured native/WSL integration |
-| Linux desktop IDE (native shell installer) | App-local wxWidgets 3.2.4/STC/AUI, bundled CPython 3.14.10 and LLVM assembler/linker; host GTK 3 and X11/Wayland display runtime |
+| Linux desktop IDE (native shell installer) | Verified Ubuntu 24.04 build/install path using system wxWidgets 3.2.4 (STC/AUI); host GTK 3 and X11/Wayland display runtime remain required. The app-local wxWidgets build mode is a separate option |
 | Linux desktop IDE (Flatpak) | Flatpak plus the automatically installed GNOME Platform 51 runtime; GTK is supplied inside the sandbox, and wxWidgets/CPython/LLVM are app-local |
-
-The app-local Linux wxWidgets/LLVM build and Flatpak manifest are under active integration. Focused packager/backend tests pass, but the new full Linux payload, installer acceptance and Flatpak bundle have not yet passed end-to-end verification.
 | Windows desktop IDE | wxWidgets/MinGW runtime DLLs and app-local CPython 3.14.10 are included in the build/install payload |
+
+The Windows 0.8.1 desktop IDE and CLI/compiler payload requires **Windows 10 or newer**. Windows 7, Windows 8 and Windows 8.1 are unsupported. This requirement follows the bundled CPython 3.14.10 and current MinGW-w64/UCRT64 toolchain; wxWidgets' standalone compatibility does not establish compatibility of the complete application bundle.
+
+The Linux wxWidgets GUI + Rust worker build and native shell install path have been verified on Ubuntu 24.04 using system wxWidgets 3.2.4 (`RBL_USE_SYSTEM_WX=1`). GTK 3 and the host display stack remain runtime dependencies in this mode. The Flatpak payload was built and installed locally; sandbox CLI checks passed. Interactive Flatpak GUI startup, display integration, file dialogs/portals and Flathub publication are not claimed as accepted. Neither native Linux verification nor Flatpak checks establish compatibility with arbitrary distributions.
 
 On Windows, the toolchain driver supports automatic selection, native Windows compilation and WSL fallback. Native Windows compilation does not require WSL when the MinGW-w64 toolchain is available.
 
@@ -394,7 +398,7 @@ let count++
 - `let name = expression` updates an existing variable.
 - Duplicate declarations and updates to unknown names are errors.
 
-The language has dynamically typed runtime values. Function parameters can declare types, and argument values are checked when a function is called. This does not mean that RBL 0.8.0 has a complete static type system.
+The language has dynamically typed runtime values. Function parameters can declare types, and argument values are checked when a function is called. This does not mean that RBL 0.8.1 has a complete static type system.
 
 ### Functions
 
@@ -408,7 +412,7 @@ func main() (
 )
 ```
 
-Functions support parameters, return values and recursion. Parameter types are declared after parameter names. Return annotations are parsed, but return types are not enforced as a statically verified contract in v0.8.0.
+Functions support parameters, return values and recursion. Parameter types are declared after parameter names. Return annotations are parsed, but return types are not enforced as a statically verified contract in v0.8.1.
 
 ### Control flow
 
@@ -527,7 +531,7 @@ The [syntax reference](docs/eng/reference/syntax.md) describes these behaviors a
 
 ## Compiler architecture
 
-RBL 0.8.0 uses a modular C bootstrap compiler:
+RBL 0.8.1 uses a modular C bootstrap compiler:
 
 ```text
 compiler/common.c       # diagnostics, allocation helpers and hashing
@@ -564,7 +568,7 @@ When the compiler cannot safely specialize an expression, it falls back to the g
 
 ### What is not in the compiler yet
 
-The current compiler does **not** have a dedicated RBL intermediate representation, explicit CFG/basic-block pipeline, whole-function liveness analysis or global register allocator. These remain later compiler architecture steps, not features of v0.8.0.
+The current compiler does **not** have a dedicated RBL intermediate representation, explicit CFG/basic-block pipeline, whole-function liveness analysis or global register allocator. These remain later compiler architecture steps, not features of v0.8.1.
 
 See [compiler architecture](docs/eng/explanation/architecture.md) and [optimization details](docs/eng/explanation/optimization.md).
 
@@ -724,8 +728,10 @@ RBL Studio's primary frontend is the native wxWidgets 3.2 / `wxStyledTextCtrl`
 (Scintilla) application in [`rbl-ide/wx-ui/`](rbl-ide/wx-ui/), paired with the
 Rust `rbl-studio-worker`. The wx GUI is C++20; the worker reuses the Rust process
 supervision layer and launches the existing Python `tools/rbltool.py` backend.
-Portable Windows/Linux payloads include app-local CPython 3.14.10; `RBL_PYTHON`
-can explicitly override it. A source checkout needs Python 3.9+ for development.
+Locally assembled application payloads may include app-local CPython 3.14.10;
+`RBL_PYTHON` can explicitly override it. A source checkout needs Python 3.9+
+for development. A GitHub source release is the tagged repository tree, not a
+separately packaged portable archive.
 No Chromium, Electron or embedded WebView is used. Python is needed for
 compiler/build/test/benchmark actions, not to render the GUI. The previous
 Rust/egui application remains in the source tree for rollback; when the wx
@@ -733,19 +739,19 @@ executable is unavailable, `RBL_STUDIO_ALLOW_LEGACY=1` permits the launcher to
 use a separately built legacy executable from a developer checkout. It is not
 included in the wx installer payload.
 
-The 0.8.0 payload is the repository checkout itself: the wxWidgets GUI and Rust worker plus their wx DLLs live under `bin/win-x86_64/studio/`, app-local CPython 3.14.10 under `runtime/python`, and the pinned Windows toolchain under `toolchain/`. `RBLStudio.cmd` (GUI), `RBLStudio.vbs` (hidden launch) and `rbl.cmd` (CLI) in the project root run directly from the checkout with no separate distribution archive. Verified on 2026-11-15 from the repository root: Windows CTest 12/12, Linux CTest 11/11, 63/63 RBL regression tests, CLI `version`/`check`/`run`, and GUI `GUI_ALIVE=True` with title `RBL Studio` and a live worker process. The release is published as **`v0.8.0-r2`**; the older GitHub `v0.8.0` entry remains the 2026-11-10 **pre-release placeholder** with zero assets. The remaining gates are listed below and in [`RELEASE_MANIFEST.txt`](RELEASE_MANIFEST.txt).
+The 0.8.1 Windows checkout contains the wxWidgets GUI and Rust worker plus their wx DLLs under `bin/win-x86_64/studio/`, app-local CPython 3.14.10 under `runtime/python`, and the pinned Windows toolchain under `toolchain/`. `RBLStudio.cmd` (GUI), `RBLStudio.vbs` (hidden launch) and `rbl.cmd` (CLI) run from the checkout root. The `v0.8.0-r2` GitHub Release publishes the previous tagged source tree directly; no separately assembled ZIP, portable archive or binary release asset is part of the release policy. The older GitHub `v0.8.0` entry remains the 2026-11-10 pre-release placeholder.
 
-The current Windows SaveDocument suite passed 27/27 with an isolated fixture. Resource smoke runs passed at 60, 120 and 300 seconds using 32 open documents, a path-backed `resource-task.rbl`, all four task types and graceful GUI/worker shutdown; the 300-second run completed 84 task cycles. A 7,200-second attempt did not reach sampling because the harness failed to acquire notebook focus; it was not retried after the user requested no further IDE launches. The two-hour soak is therefore **NOT PASSED**.
+The native first-run setup wizard is implemented: it performs prerequisite checks before starting the worker, records initial per-user setup/preferences and can invoke the existing platform installer asynchronously for Install / Repair when a complete installer payload is available. The wizard is also available later from Settings. The Linux wxWidgets GUI + Rust worker build and native shell install path have been verified on Ubuntu 24.04 with system wxWidgets 3.2.4; host GTK 3 and the host display stack remain required. The Flatpak payload and sandbox CLI path were also checked locally, but the Flatpak GUI/portal path and Flathub publication are not claimed as complete.
 
-DPI static checks pass 12/12, but live 125-200% multi-monitor acceptance remains open. Interactive Linux desktop acceptance is not complete. The native Linux wxWidgets/IDE payload has built on Ubuntu 24.04; CTest 11/11 and full native installer/CLI/worker acceptance passed, and the extracted package opens a GUI under WSLg. The current native ABI floor is GLIBC 2.39 / GLIBCXX 3.4.32; Flatpak bundle and sandbox acceptance remain pending. The checkout carries the Rust worker source tree (`rbl-ide/worker`), the wxWidgets IDE sources (`rbl-ide/wx-ui`) and the pinned Windows toolchain bundle with its package/source inventory. The large upstream corresponding-source archives are not bundled in the checkout; the public corresponding-source delivery route still requires owner/legal approval, and the MSYS2/Python source locations are recorded in `toolchain/windows-x86_64/SOURCE_CODE.md` and the toolchain manifest. CVE-2026-90801 remains unresolved upstream; its residual risk is accepted only for the supported compiler-generated COFF workflow (no arbitrary object input and no `--gc-sections`), not as a fix or non-applicability finding. POSIX existing-target saves fail closed when `RENAME_EXCHANGE` is unsupported; this is an intentional capability/safety restriction, not a security bypass. A displaced-symlink rollback gap was fixed by no-follow inode identity checks and is covered by Linux integration tests. Windows retains a path-based `ReplaceFileW` leaf race without compare-and-swap and it is documented for 0.9; the separate LOW orphan-temp cleanup edge has been fixed by delete-on-handle cleanup and a retained-path warning fallback. Remaining publication gates are the full interactive IDE/soak acceptance, pristine-VM verification and legal approval of the public corresponding-source delivery.
+**0.8.1 acceptance snapshot (2026-11-17):** Windows CTest passed 15/15, DPI static tests 12/12, the full `python rbl.py test` suite passed (63/63 direct ASM cases and 63/63 compiler diagnostics), Linux CTest passed 14/14, Flatpak payload tests passed 6/6, and documentation validation passed with 103 Markdown files / 538 relative links. Windows live multi-monitor persistence, floating-pane restoration, saved-layout migration and off-screen recovery passed; the user additionally confirmed that the real mixed-DPI Windows scenario was checked successfully. The two-hour (7,200-second) Windows resource soak is now marked PASS based on the user's confirmation that it completed. Its raw CSV/verdict and exact final GUI/worker hashes have not yet been independently re-audited in this workspace. A pristine-VM run is not recorded.
 
-2026-11-12 validation update: the Windows payload was rebuilt and registered installer acceptance passed. Full Windows and WSL `rbl.py test` suites exited 0. The Flatpak payload was prepared on WSL ext4 and all 5,246 checksum entries verified; GNOME runtime bundle and sandbox acceptance remain pending.
+Historical validation record (2026-11-12): the Windows payload was rebuilt and registered installer acceptance passed. Full Windows and WSL `rbl.py test` suites exited 0. A Flatpak payload was prepared on WSL ext4 and its 5,246 checksum entries verified; GNOME runtime bundle and sandbox acceptance remained pending. This dated record is not a claim of a currently released or verified Linux installation.
 
 See the [wx frontend guide](docs/eng/how-to/ide.md), [engineering audit](docs/eng/explanation/ide-engineering-audit.md), [third-party inventory](rbl-ide/wx-ui/THIRD_PARTY_NOTICES.md) and [Rust worker license inventory](rbl-ide/wx-ui/RUST_DEPENDENCY_NOTICES.md).
 
 ### Build, install and launch
 
-The 0.8.0 checkout already contains the ready-to-run Windows payload: start
+The 0.8.1 checkout contains the ready-to-run Windows payload: start
 `RBLStudio.cmd` from the project root (it launches
 `bin\win-x86_64\studio\rbl-studio-wx.exe`). The build and
 installer steps below are optional, for developers and clean rebuilds.
@@ -935,7 +941,7 @@ build/
 
 A typical generated build contains assembly, object files and a native executable.
 
-**Manifest limitation:** `rbl.toml` is not yet a dependency manifest. RBL 0.8.0 does not resolve packages, download dependencies or compile imported user modules. Its currently supported package fields are `name`, `version` and `entry`.
+**Manifest limitation:** `rbl.toml` is not yet a dependency manifest. RBL 0.8.1 does not resolve packages, download dependencies or compile imported user modules. Its currently supported package fields are `name`, `version` and `entry`.
 
 See the [manifest reference](docs/eng/reference/manifest.md) and [project workflow guide](docs/eng/how-to/project-workflow.md).
 
@@ -976,7 +982,7 @@ In Windows PowerShell:
 python rbl.py test
 ```
 
-The RBL 0.8.0 verification record covers:
+The RBL 0.8.1 verification record covers:
 
 - **63/63 direct RBL regression cases passed** on Windows native and Linux/WSL.
 - Standard-library and input smoke tests passed on both paths.
@@ -984,7 +990,7 @@ The RBL 0.8.0 verification record covers:
 - Across `examples/` and compiler-test sources in `tests/`, **123 unique `.rbl` sources** are present: 116 expected successful compilations and 7 expected negative cases. All 116 positives assemble and all 7 negatives are rejected on Windows native and Linux/WSL.
 - The final Gate H differential run passed **85 selected source cases**: 62 successful deterministic programs compare exit code/stdout/stderr; 11 expected runtime-error programs must fail with matching exit code/stdout/stderr; 7 expected-negative compiler fixtures must be rejected with identical diagnostics; 5 random/platform-dependent programs must build and exit successfully on both backends (their output is not compared). All **30 diagnostic differential cases** match.
 - Runtime ABI, instrumented Linux Runtime call alignment, same-basename/backend build-cache isolation, deterministic GC/ownership/OOM probes, repeated `input()`/`read_file()` under GC pressure and the 63-scenario diagnostic suite pass.
-- CLI and rebuilt compiler binaries report `0.8.0`.
+- CLI and rebuilt compiler binaries report `0.8.1`.
 
 The regression cases cover arithmetic, floats, strings, function behavior, evaluation order, loops, ranges, containers, `null`, standard-library behavior and known compiler defects. The runner uses timeouts so a program that unexpectedly loops forever does not hang the complete suite.
 
@@ -1064,7 +1070,7 @@ The separate [0.7.2-to-0.8.0 compiler-only comparison](benchmarks/RELEASE_PERFOR
 
 ## Documentation
 
-The documentation is maintained in **English and Russian** and follows [Diátaxis](https://diataxis.fr/). Both editions describe the implemented RBL 0.8.0 language, compiler, runtime and tooling contracts.
+The documentation is maintained in **English and Russian** and follows [Diátaxis](https://diataxis.fr/). Both editions describe the implemented RBL 0.8.1 language, compiler, runtime and tooling contracts.
 
 Start at [`docs/README.md`](docs/README.md) to choose a language.
 
@@ -1086,7 +1092,7 @@ Start at [`docs/README.md`](docs/README.md) to choose a language.
 | Reference | Точный синтаксис и интерфейсы | [Синтаксис](docs/ru/reference/syntax.md), [Стандартная библиотека](docs/ru/reference/standard-library.md), [CLI](docs/ru/reference/cli.md), [Диагностика](docs/ru/reference/diagnostics.md), [Runtime ABI](docs/ru/reference/runtime-abi.md), [Манифест](docs/ru/reference/manifest.md), [Ограничения](docs/ru/reference/limitations.md) |
 | Explanation | Архитектура и проектные решения | [Архитектура](docs/ru/explanation/architecture.md), [Модель выполнения](docs/ru/explanation/execution-model.md), [Оптимизации](docs/ru/explanation/optimization.md), [Производительность](docs/ru/explanation/performance.md), [Результаты benchmark](docs/ru/explanation/performance-results.md), [Принципы дизайна](docs/ru/explanation/design.md), [Дорожная карта](docs/ru/explanation/roadmap.md) |
 
-The 0.8.0 release notes use the **Added**, **Changed** and **Fixed** categories:
+The 0.8.1 release notes use the **Added**, **Changed** and **Fixed** categories:
 
 - [English release notes](docs/eng/release-notes.md)
 - [Заметки о релизах на русском](docs/ru/release-notes.md)
@@ -1095,17 +1101,17 @@ The 0.8.0 release notes use the **Added**, **Changed** and **Fixed** categories:
 
 ## Development roadmap
 
-The roadmap records the implemented RBL 0.8.0 baseline and the remaining path to 1.0. It separates implemented functionality from planned work and defines exit criteria; it is not a release-date promise.
+The roadmap records the implemented RBL 0.8.1 baseline and the remaining path to 1.0. It separates implemented functionality from planned work and defines exit criteria; it is not a release-date promise.
 
-| Milestone | Focus | Status in 0.8.0 |
+| Milestone | Focus | Status in 0.8.1 |
 |---|---|---|
 | `0.8.0` | Compiler modularization/performance, Runtime ABI/diagnostics, string lifetime model and f-string format specifications | Implemented and validated |
 | `0.9` | Explicit RBL IR, CFG/basic blocks, liveness, whole-function register allocation and IR optimizations | Planned |
 | `1.0` | Source-module system and deterministic multi-file project builds | Planned; central 1.0 goal |
 
-### RBL 0.8.0 — compiler and runtime stabilization
+### RBL 0.8.1 — compiler/runtime baseline and IDE release preparation
 
-RBL 0.8.0 implements the modular compiler, indexed lookup, Runtime ABI, source diagnostics, managed dynamic-string lifetime and f-string formatting. See the [full performance audit](benchmarks/PERFORMANCE_AUDIT.md) for module-overhead measurements, build timings and profiled hot paths:
+RBL 0.8.1 retains the modular compiler, indexed lookup, Runtime ABI, source diagnostics, managed dynamic-string lifetime and f-string formatting. See the [full performance audit](benchmarks/PERFORMANCE_AUDIT.md) for module-overhead measurements, build timings and profiled hot paths:
 
 - Organize the compiler into `common`, `lexer`, `ast`, `parser`, `sema`, `codegen` and `driver` modules with a private shared header.
 - Use hash indexes for variable, function and string-pool lookups while preserving deterministic output and duplicate-function semantics.
@@ -1144,7 +1150,7 @@ Read the full [RBL roadmap](docs/eng/explanation/roadmap.md) or [дорожну�
 
 ## Known limitations
 
-The following are important boundaries of the v0.8.0 implementation:
+The following are important boundaries of the v0.8.1 implementation:
 
 ### Language and compiler
 
@@ -1240,7 +1246,7 @@ RBL/
 ├── RBLStudio.cmd               # Windows IDE launcher
 ├── VERSION                     # Repository/compiler version
 ├── requirements-visualize.txt  # Optional Python visualization dependencies
-├── RELEASE_MANIFEST.txt        # RBL 0.8.0 release/verification manifest
+├── RELEASE_MANIFEST.txt        # RBL 0.8.1 release/verification manifest
 └── README.md
 ```
 
@@ -1254,4 +1260,4 @@ RBL-authored source code and project documentation are licensed under the **Apac
 
 See [`LICENSE`](LICENSE) for the complete license text.
 
-The portable Windows toolchain is a separately licensed third-party component. Its package versions, observed license metadata and included license texts are listed in [`toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md`](toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md). The bundle includes GPL/LGPL/GCC-exception, ZPL, MIT/BSD, zlib and other applicable notices; redistribution requires a separate corresponding-source/source-offer compliance review. Do not treat the repository's Apache-2.0 license or the SHA-256 manifest as relicensing or legal clearance for those binaries.
+The Windows toolchain is a separately licensed third-party component. Its package versions, observed license metadata and included license texts are listed in [`toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md`](toolchain/windows-x86_64/THIRD_PARTY_NOTICES.md). The bundle includes GPL/LGPL/GCC-exception, ZPL, MIT/BSD, zlib and other applicable notices. This inventory is not a legal opinion: applicable third-party license obligations still matter when redistributing those binaries, but assembling or attaching a corresponding-source archive is not a GitHub source-release requirement. Do not treat the repository's Apache-2.0 license or the SHA-256 manifest as relicensing or legal clearance for third-party binaries.

@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.09 | BENCHMARKING GUIDE
+# last verified: v0.8.1 | 2026.11.17 | CURRENT 0.8.1 CONTRACT REVIEW
 
 ## How-to: измерение производительности RBL
 
@@ -60,4 +60,4 @@ C и C++ собираются с `-O2`; компилятор может прео
 
 ## Сохранённые результаты
 
-Текущие runtime-измерения RBL 0.8.0, окружение и интерпретация приведены в [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md). Модульность компилятора, накладные расходы translation units и время сборки описаны в [`benchmarks/PERFORMANCE_AUDIT.md`](../../../benchmarks/PERFORMANCE_AUDIT.md).
+Базовые runtime-измерения RBL 0.8.0, сохранённые для сравнения с 0.8.1, окружение и интерпретация приведены в [`benchmarks/RESULTS.md`](../../../benchmarks/RESULTS.md). Модульность компилятора, накладные расходы translation units и время сборки описаны в [`benchmarks/PERFORMANCE_AUDIT.md`](../../../benchmarks/PERFORMANCE_AUDIT.md).

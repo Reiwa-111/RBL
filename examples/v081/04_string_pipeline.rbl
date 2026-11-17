@@ -1,0 +1,15 @@
+// RBL 0.8.x: compose the rbl.string helpers with managed string results.
+func main() (
+    set raw = "   ReiwaBatLanguage 0.8.1   "
+    set clean = rbl.string.trim(raw)
+    set upper = rbl.string.upper(clean)
+    set lower = rbl.string.lower(clean)
+
+    print("clean:", clean)
+    print("upper:", upper)
+    print("lower:", lower)
+    print("contains 0.8.1:", rbl.string.contains(clean, "0.8.1"))
+    print("starts with Reiwa:", rbl.string.starts_with(clean, "Reiwa"))
+    print("ends with 0.8.1:", rbl.string.ends_with(clean, "0.8.1"))
+    print("code points:", rbl.string.len(clean))
+)

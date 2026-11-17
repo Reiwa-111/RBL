@@ -1,4 +1,4 @@
-# last verified: v0.8.0 | 2026.11.11 | WINDOWS TOOLCHAIN THIRD-PARTY NOTICES
+# last verified: v0.8.1 | 2026.11.17 | WINDOWS TOOLCHAIN THIRD-PARTY NOTICES
 
 # Third-party notices: Windows MinGW-w64 toolchain
 
@@ -37,15 +37,19 @@ text says it applies to MinGW-w64 itself rather than binaries built with it
 unless specific parts are enabled (for example profiling). The default
 manifest object is supplied by the public-domain package listed above.
 
-The machine-readable rbl-toolchain-manifest.json records package IDs, versions
-and MSYS2 source-only archive URLs. The exact source archives and signatures are
-not embedded in the 43-file runtime toolchain subtree; they are delivered as a
-separate corresponding-source archive at
-`source/Windows-toolchain-source.tar.zst` in the Windows build/install payload,
-with `source/Windows-toolchain-source.sha256`. The build and installer require
-and verify this archive. See [SOURCE_CODE.md](SOURCE_CODE.md) and
-[SOURCE_ARCHIVE_AUDIT.md](SOURCE_ARCHIVE_AUDIT.md) for package coverage and
-verification evidence.
+The machine-readable `rbl-toolchain-manifest.json` records package IDs, versions
+and upstream MSYS2 source-only archive URLs. The source archives and signatures
+are not embedded in the pruned 43-file runtime toolchain, the current GitHub
+source-tree release, or the current Windows build/install payload. The historical
+local source-material audit set and its verification evidence are documented in
+[SOURCE_CODE.md](SOURCE_CODE.md) and [SOURCE_ARCHIVE_AUDIT.md](SOURCE_ARCHIVE_AUDIT.md).
+
+The 0.8.1 GitHub release policy publishes the tagged repository source tree
+without a separately assembled corresponding-source archive. This publication
+format does not waive any third-party source-distribution, notice or written-offer
+obligations that may apply to redistributed binaries. The manifest and source
+URL inventory are not a substitute for checking those obligations. This notice
+is an engineering inventory, not legal advice or a certification of compliance.
 
 The RBL repository's Apache-2.0 license applies to RBL-authored project files;
 it does not relicense this toolchain. Before publishing binary distributions,

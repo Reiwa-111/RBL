@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 if [[ -f "$SCRIPT_DIR/.rblstudio-install-files" ]]; then
   INSTALL_DIR="$SCRIPT_DIR"
+elif [[ -f "$SCRIPT_DIR/../.rblstudio-install-files" ]]; then
+  INSTALL_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
 else
   INSTALL_DIR="${HOME}/.local/lib/rblstudio"
 fi

@@ -128,7 +128,9 @@ private:
     bool restart_worker_pending_{};
     bool worker_restart_after_task_{};
     bool worker_shutdown_kill_sent_{};
+    bool setup_launch_requested_{};
     std::chrono::steady_clock::time_point worker_shutdown_deadline_{};
+    std::chrono::steady_clock::time_point worker_startup_deadline_{};
     std::uint64_t next_request_id_{1};
     std::uint64_t active_request_id_{};
     std::filesystem::path application_root_;
@@ -241,6 +243,8 @@ private:
     void OnProjectItemCollapsed(wxTreeEvent& event);
     void OnDiagnosticActivated(wxListEvent& event);
     void OnSettings(wxCommandEvent& event);
+    void OnSetupWizard(wxCommandEvent& event);
+    bool RunSetupWizard(bool first_launch);
     void OnToggleProjectPane(wxCommandEvent& event);
     void OnToggleOutputPane(wxCommandEvent& event);
     void OnResetLayout(wxCommandEvent& event);
